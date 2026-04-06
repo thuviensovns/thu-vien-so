@@ -1,0 +1,56 @@
+{
+  "name": "thu-vien-so",
+  "version": "1.0.0",
+  "description": "Thư Viện Số - Tài Nguyên FLP, VST, Sample Cho Producer",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
+    "generate:types": "payload generate:types"
+  },
+  "keywords": [
+    "fl-studio",
+    "producer",
+    "sample-pack",
+    "vst",
+    "preset"
+  ],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1020.0",
+    "@aws-sdk/s3-request-presigner": "^3.1020.0",
+    "@payloadcms/db-postgres": "^3.80.0",
+    "@payloadcms/next": "^3.80.0",
+    "@payloadcms/richtext-lexical": "^3.80.0",
+    "@payloadcms/storage-s3": "^3.80.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cross-env": "^10.1.0",
+    "graphql": "^16.13.2",
+    "lucide-react": "^1.7.0",
+    "next": "^15.4.11",
+    "next-themes": "^0.4.6",
+    "payload": "^3.80.0",
+    "radix-ui": "^1.4.3",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "sharp": "^0.34.5",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "wavesurfer.js": "^7.12.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2"
+  }
+}

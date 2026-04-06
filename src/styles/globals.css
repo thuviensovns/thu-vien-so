@@ -1,0 +1,193 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+
+  /* Semantic color tokens — resolved via CSS custom properties below */
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-fg);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-fg);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-fg);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-fg);
+
+  /* Neon glow token for shadows */
+  --color-glow: var(--glow);
+
+  /* Semantic status colors */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-fg);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-fg);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-fg);
+
+  /* Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+/* ===== DARK THEME (default) ===== */
+:root {
+  --bg: oklch(0.145 0 0);
+  --fg: oklch(0.95 0 0);
+  --card: oklch(0.18 0 0);
+  --card-fg: oklch(0.95 0 0);
+  --primary: oklch(0.75 0.18 195);
+  --primary-fg: oklch(0.1 0 0);
+  --secondary: oklch(0.65 0.25 305);
+  --secondary-fg: oklch(0.95 0 0);
+  --accent: oklch(0.75 0.18 130);
+  --accent-fg: oklch(0.1 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-fg: oklch(0.6 0 0);
+  --border: oklch(0.25 0 0);
+  --ring: oklch(0.75 0.18 195);
+  --destructive: oklch(0.55 0.2 25);
+  --destructive-fg: oklch(0.95 0 0);
+  --glow: oklch(0.75 0.18 195 / 0.2);
+
+  /* Status colors */
+  --success: oklch(0.7 0.18 155);
+  --success-fg: oklch(0.98 0 0);
+  --warning: oklch(0.78 0.16 75);
+  --warning-fg: oklch(0.1 0 0);
+  --info: oklch(0.7 0.15 230);
+  --info-fg: oklch(0.98 0 0);
+
+  color-scheme: dark;
+}
+
+/* ===== LIGHT THEME ===== */
+.light {
+  --bg: oklch(0.98 0 0);
+  --fg: oklch(0.15 0 0);
+  --card: oklch(1 0 0);
+  --card-fg: oklch(0.15 0 0);
+  --primary: oklch(0.55 0.22 195);
+  --primary-fg: oklch(0.98 0 0);
+  --secondary: oklch(0.5 0.25 305);
+  --secondary-fg: oklch(0.98 0 0);
+  --accent: oklch(0.5 0.2 130);
+  --accent-fg: oklch(0.98 0 0);
+  --muted: oklch(0.92 0 0);
+  --muted-fg: oklch(0.45 0 0);
+  --border: oklch(0.88 0 0);
+  --ring: oklch(0.55 0.22 195);
+  --destructive: oklch(0.5 0.22 25);
+  --destructive-fg: oklch(0.98 0 0);
+  --glow: oklch(0.55 0.22 195 / 0.15);
+
+  /* Status colors */
+  --success: oklch(0.55 0.2 155);
+  --success-fg: oklch(0.98 0 0);
+  --warning: oklch(0.65 0.18 75);
+  --warning-fg: oklch(0.1 0 0);
+  --info: oklch(0.55 0.17 230);
+  --info-fg: oklch(0.98 0 0);
+
+  color-scheme: light;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Smooth theme transition */
+  html {
+    transition: color 0.3s ease, background-color 0.3s ease;
+  }
+
+  /* Respect users who prefer reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    html,
+    html * {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Focus ring for keyboard navigation */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  /* Remove default focus outline, use focus-visible instead */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Smooth interactions on all interactive elements */
+  a, button, input, select, textarea, [role="button"], [tabindex] {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  }
+
+  /* Active press effect for buttons */
+  button:active:not(:disabled),
+  [role="button"]:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  /* Scrollbar styling for dark/light */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-fg);
+  }
+}
+
+@layer utilities {
+  /* Neon glow shadow utility */
+  .shadow-glow {
+    box-shadow: 0 0 20px var(--glow);
+  }
+  .shadow-glow-sm {
+    box-shadow: 0 0 12px var(--glow);
+  }
+  .shadow-glow-lg {
+    box-shadow: 0 0 30px var(--glow);
+  }
+
+  /* Hide scrollbar for mobile tabs */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Smooth transition shorthand */
+  .transition-theme {
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+}

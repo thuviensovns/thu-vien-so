@@ -1,0 +1,56 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
+
+# next.js
+.next/
+out/
+
+# production
+build/
+dist/
+
+# env files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+
+# debug
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Payload CMS
+src/types/payload-types.ts
+media/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# pnpm
+.pnpm-store/
+
+# Claude Code
+.claude/
+
+# Development plans/docs
+plans/
