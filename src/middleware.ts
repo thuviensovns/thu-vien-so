@@ -14,19 +14,24 @@ function isRateLimited(ip: string, limit = 60, windowMs = 60_000): boolean {
   return entry.count > limit
 }
 
-// Clean up stale entries every 5 minutes
-setInterval(() => {
+// Clean up stale entries inline during rate limit checks
+function cleanupStaleEntries() {
   const now = Date.now()
-  for (const [key, value] of rateLimitMap) {
-    if (now > value.resetAt) rateLimitMap.delete(key)
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap) {
+      if (now > value.resetAt) rateLimitMap.delete(key)
+    }
   }
-}, 5 * 60_000)
+}
 
 // --- Middleware ---
 export function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
   const isApi = req.nextUrl.pathname.startsWith('/api/')
+
+  // Clean up stale rate limit entries
+  cleanupStaleEntries()
 
   // Rate limit API routes (60 req/min per IP) — skip routes with their own stricter limits
   const hasStricterLimit = req.nextUrl.pathname.startsWith('/api/contact')
@@ -160,7 +165,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Apply to all routes except static files and Next.js internals
-    '/((?!_next/static|_next/image|favicon.ico|images/).*)',
+    // Apply to all routes except static files, Next.js internals, and Payload admin
+    '/((?!_next/static|_next/image|favicon.ico|images/|admin).*)',
   ],
 }
