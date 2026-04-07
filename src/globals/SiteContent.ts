@@ -1,4 +1,5 @@
 import type { GlobalConfig } from 'payload'
+import { revalidateAfterSiteContentChange } from '@/lib/revalidate-hook'
 
 export const SiteContent: GlobalConfig = {
   slug: 'site-content',
@@ -9,6 +10,9 @@ export const SiteContent: GlobalConfig = {
   access: {
     read: () => true,
     update: ({ req: { user } }) => user?.role === 'admin',
+  },
+  hooks: {
+    afterChange: [revalidateAfterSiteContentChange],
   },
   fields: [
     {

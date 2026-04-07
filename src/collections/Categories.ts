@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { generateSlug } from '@/lib/slug-hook'
+import { revalidateAfterCategoryChange } from '@/lib/revalidate-hook'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -25,6 +26,7 @@ export const Categories: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [revalidateAfterCategoryChange],
   },
   fields: [
     { name: 'name', type: 'text', required: true, label: 'Tên danh mục' },

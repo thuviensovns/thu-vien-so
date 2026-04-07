@@ -13,7 +13,7 @@ export async function GET() {
       categoryDescriptions: data?.categoryDescriptions || null,
     }, {
       headers: {
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        'Cache-Control': 'no-store, max-age=0',
       },
     })
   } catch {

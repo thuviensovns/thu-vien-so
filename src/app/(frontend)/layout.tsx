@@ -8,6 +8,8 @@ import SiteContentSync from '@/components/providers/SiteContentSync'
 import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
 import '@/styles/globals.css'
 
+export const dynamic = 'force-dynamic'
+
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
   variable: '--font-inter',
@@ -23,7 +25,7 @@ const jetbrainsMono = JetBrains_Mono({
   variable: '--font-mono',
 })
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://thuvienso.vn'
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thuvienso.top'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

@@ -1,4 +1,5 @@
 import type { GlobalConfig } from 'payload'
+import { revalidateAfterBankConfigChange } from '@/lib/revalidate-hook'
 
 export const BankConfig: GlobalConfig = {
   slug: 'bank-config',
@@ -9,6 +10,9 @@ export const BankConfig: GlobalConfig = {
   access: {
     read: () => true,
     update: ({ req: { user } }) => user?.role === 'admin',
+  },
+  hooks: {
+    afterChange: [revalidateAfterBankConfigChange],
   },
   fields: [
     {

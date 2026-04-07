@@ -2,7 +2,7 @@
 export const siteConfig = {
   name: 'Thư Viện Số',
   description: 'Tài nguyên FLP, VST, Sample Pack cho Producer Việt Nam',
-  url: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
+  url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thuvienso.top',
   contact: {
     email: 'support.thuvienso@gmail.com',
     phone: '0876 096 170',

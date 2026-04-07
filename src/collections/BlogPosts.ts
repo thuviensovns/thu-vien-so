@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { generateSlug } from '@/lib/slug-hook'
+import { revalidateAfterBlogChange } from '@/lib/revalidate-hook'
 
 export const BlogPosts: CollectionConfig = {
   slug: 'blog-posts',
@@ -27,6 +28,7 @@ export const BlogPosts: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [revalidateAfterBlogChange],
   },
   fields: [
     { name: 'title', type: 'text', required: true, label: 'Tiêu đề' },

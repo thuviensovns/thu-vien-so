@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { generateSlug } from '@/lib/slug-hook'
+import { revalidateAfterProductChange, revalidateAfterProductDelete } from '@/lib/revalidate-hook'
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -27,6 +28,8 @@ export const Products: CollectionConfig = {
         return data
       },
     ],
+    afterChange: [revalidateAfterProductChange],
+    afterDelete: [revalidateAfterProductDelete],
   },
   fields: [
     { name: 'name', type: 'text', required: true, label: 'Tên sản phẩm' },

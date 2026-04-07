@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     // Generate payment URL
     if (paymentMethod === 'vnpay') {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.thuvienso.top'
       const paymentUrl = createVNPayUrl({
         orderId: orderNumber,
         amount: total,
