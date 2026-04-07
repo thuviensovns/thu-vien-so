@@ -2,14 +2,23 @@ import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } fro
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 function getR2Client() {
+  const endpoint = process.env.R2_ENDPOINT
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    throw new Error('R2 is not configured. Missing R2_ENDPOINT, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY.')
+  }
   return new S3Client({
     region: 'auto',
-    endpoint: process.env.R2_ENDPOINT!,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
+    endpoint,
+    credentials: { accessKeyId, secretAccessKey },
   })
+}
+
+function getBucketName(): string {
+  const bucket = process.env.R2_BUCKET_NAME
+  if (!bucket) throw new Error('R2 is not configured. Missing R2_BUCKET_NAME.')
+  return bucket
 }
 
 /**
@@ -23,7 +32,7 @@ export async function generateDownloadUrl(
 ): Promise<string> {
   const client = getR2Client()
   const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
+    Bucket: getBucketName(),
     Key: r2Key,
   })
   return getSignedUrl(client, command, { expiresIn })
@@ -42,7 +51,7 @@ export async function uploadToR2(
 ): Promise<void> {
   const client = getR2Client()
   await client.send(new PutObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
+    Bucket: getBucketName(),
     Key: r2Key,
     Body: body,
     ContentType: contentType,
@@ -56,7 +65,7 @@ export async function uploadToR2(
 export async function deleteFromR2(r2Key: string): Promise<void> {
   const client = getR2Client()
   await client.send(new DeleteObjectCommand({
-    Bucket: process.env.R2_BUCKET_NAME!,
+    Bucket: getBucketName(),
     Key: r2Key,
   }))
 }

@@ -19,8 +19,11 @@ function formatVNPayDate(date: Date): string {
 }
 
 export function createVNPayUrl(params: VNPayParams): string {
-  const tmnCode = process.env.VNPAY_TMN_CODE!
-  const hashSecret = process.env.VNPAY_HASH_SECRET!
+  const tmnCode = process.env.VNPAY_TMN_CODE
+  const hashSecret = process.env.VNPAY_HASH_SECRET
+  if (!tmnCode || !hashSecret) {
+    throw new Error('VNPay is not configured. Missing VNPAY_TMN_CODE or VNPAY_HASH_SECRET.')
+  }
   const vnpUrl = process.env.VNPAY_URL || 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'
 
   const vnpParams: Record<string, string> = {
@@ -58,7 +61,8 @@ export function createVNPayUrl(params: VNPayParams): string {
 export function verifyVNPaySignature(
   params: Record<string, string>,
 ): boolean {
-  const hashSecret = process.env.VNPAY_HASH_SECRET!
+  const hashSecret = process.env.VNPAY_HASH_SECRET
+  if (!hashSecret) return false
   const secureHash = params.vnp_SecureHash
 
   if (!secureHash) return false
