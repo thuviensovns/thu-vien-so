@@ -32,6 +32,7 @@ export default buildConfig({
   collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages],
   globals: [BankConfig, SiteContent],
   db: postgresAdapter({
+    push: true,
     pool: {
       connectionString: process.env.DATABASE_URL!,
       connectionTimeoutMillis: 5000,
