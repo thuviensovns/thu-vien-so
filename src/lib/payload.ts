@@ -3,7 +3,7 @@ import { unstable_cache } from 'next/cache'
 
 const emptyResult = { docs: [] as unknown[], totalDocs: 0, totalPages: 0, page: 1 }
 
-const PAYLOAD_TIMEOUT_MS = 5000
+const PAYLOAD_TIMEOUT_MS = 15000
 
 /** Default revalidation interval for cached queries (seconds) */
 const CACHE_TTL = 60

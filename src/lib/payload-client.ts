@@ -119,9 +119,21 @@ export async function fetchProducts(opts?: { limit?: number; type?: string; cate
   params.set('depth', '2')
   params.set('sort', '-createdAt')
 
-  const res = await fetch(`${API}/products?${params}`, { credentials: 'include' })
-  if (!res.ok) return null
-  return res.json()
+  // Add timeout to handle Neon cold starts
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 20000)
+  try {
+    const res = await fetch(`${API}/products?${params}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    clearTimeout(timer)
+    return null
+  }
 }
 
 export async function createProduct(data: Record<string, unknown>) {
@@ -166,22 +178,51 @@ export async function deleteProduct(id: string | number) {
 }
 
 export async function fetchCategories() {
-  const res = await fetch(`${API}/categories?limit=100&sort=order&depth=0`, { credentials: 'include' })
-  if (!res.ok) return null
-  return res.json()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 20000)
+  try {
+    const res = await fetch(`${API}/categories?limit=100&sort=order&depth=0`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    clearTimeout(timer)
+    return null
+  }
 }
 
 /** Revalidate customer-facing pages after admin edits */
 export async function revalidateProductPages() {
-  try {
-    const res = await fetch('/api/revalidate', { method: 'POST', credentials: 'include' })
-    const data = await res.json()
-    if (!res.ok) {
+  // Try up to 2 times — first attempt may fail on Neon cold start
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 15000)
+      const res = await fetch('/api/revalidate', {
+        method: 'POST',
+        credentials: 'include',
+        signal: controller.signal,
+      })
+      clearTimeout(timer)
+      const data = await res.json()
+      if (res.ok) return data
       console.error('[revalidate] Failed:', res.status, data)
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 2000))
+        continue
+      }
+      return data
+    } catch (e) {
+      console.error(`[revalidate] Attempt ${attempt} error:`, e)
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 2000))
+        continue
+      }
+      return null
     }
-    return data
-  } catch (e) {
-    console.error('[revalidate] Network error:', e)
-    return null
   }
+  return null
 }

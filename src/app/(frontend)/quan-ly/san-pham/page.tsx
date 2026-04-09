@@ -55,23 +55,38 @@ export default function ProductsPage() {
   const [saving, setSaving] = useState(false)
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'offline'>('loading')
 
-  // Load products + categories from database on mount
+  // Load products + categories from database on mount (with retry for cold starts)
   useEffect(() => {
-    Promise.all([fetchProducts({ limit: 200 }), fetchCategories()]).then(([data, catData]) => {
-      // Build category slug -> id map
-      if (catData && catData.docs) {
-        const map: Record<string, number> = {}
-        for (const c of catData.docs) map[String(c.slug)] = Number(c.id)
-        setCatIdMap(map)
-      }
-      if (data && data.docs && data.docs.length > 0) {
-        setDbProducts(mapPayloadDocs(data.docs))
-        setUseDb(true)
-        setDbStatus('connected')
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+
+    async function loadFromDb(attempt = 1) {
+      try {
+        const [data, catData] = await Promise.all([fetchProducts({ limit: 200 }), fetchCategories()])
+        // Build category slug -> id map
+        if (catData && catData.docs) {
+          const map: Record<string, number> = {}
+          for (const c of catData.docs) map[String(c.slug)] = Number(c.id)
+          setCatIdMap(map)
+        }
+        if (data && data.docs) {
+          setDbProducts(mapPayloadDocs(data.docs))
+          setUseDb(true)
+          setDbStatus('connected')
+          return
+        }
+      } catch {}
+
+      // Retry up to 3 times (covers Neon cold start + Vercel function warmup)
+      if (attempt < 3) {
+        setDbStatus('loading')
+        retryTimer = setTimeout(() => loadFromDb(attempt + 1), 3000)
       } else {
         setDbStatus('offline')
       }
-    }).catch(() => { setDbStatus('offline') })
+    }
+
+    loadFromDb()
+    return () => { if (retryTimer) clearTimeout(retryTimer) }
   }, [])
 
   // Reload DB products after changes + revalidate customer pages
