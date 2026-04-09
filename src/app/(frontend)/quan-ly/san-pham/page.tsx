@@ -309,7 +309,7 @@ export default function ProductsPage() {
       try {
         await deletePayloadProduct(product.id)
         toast.success('Đã xóa sản phẩm')
-        reloadDb()
+        await reloadDb()
       } catch {
         toast.error('Lỗi xóa sản phẩm')
       }

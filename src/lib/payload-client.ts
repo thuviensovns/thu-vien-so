@@ -174,7 +174,7 @@ export async function fetchCategories() {
 /** Revalidate customer-facing pages after admin edits */
 export async function revalidateProductPages() {
   try {
-    const res = await fetch('/api/revalidate', { method: 'POST' })
+    const res = await fetch('/api/revalidate', { method: 'POST', credentials: 'include' })
     const data = await res.json()
     if (!res.ok) {
       console.error('[revalidate] Failed:', res.status, data)

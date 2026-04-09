@@ -32,15 +32,16 @@ export async function POST(req: NextRequest) {
 
     // Revalidate all pages
     revalidatePath('/', 'layout')
-    revalidatePath('/san-pham', 'page')
+    revalidatePath('/san-pham', 'layout')
     revalidatePath('/tim-kiem', 'page')
-    revalidatePath('/danh-muc', 'page')
-    revalidatePath('/blog', 'page')
+    revalidatePath('/danh-muc', 'layout')
+    revalidatePath('/blog', 'layout')
     revalidatePath('/gioi-thieu', 'page')
     revalidatePath('/nap-tien', 'page')
     revalidateTag('products')
     revalidateTag('categories')
     revalidateTag('blog')
+    revalidateTag('blog-posts')
     revalidateTag('site-content')
     return NextResponse.json({ revalidated: true, timestamp: Date.now() })
   } catch (error) {
