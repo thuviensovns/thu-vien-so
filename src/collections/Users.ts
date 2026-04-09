@@ -46,10 +46,10 @@ export const Users: CollectionConfig = {
       },
       hooks: {
         beforeChange: [
-          ({ value, originalDoc, req }) => {
+          ({ value, data, originalDoc }) => {
             // Prevent setting role to admin for anyone except the designated admin email
             if (value === 'admin') {
-              const email = req?.data?.email || originalDoc?.email
+              const email = data?.email || originalDoc?.email
               if (email !== ADMIN_EMAIL) return 'customer'
             }
             return value
