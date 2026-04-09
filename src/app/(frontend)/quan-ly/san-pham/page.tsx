@@ -153,6 +153,7 @@ export default function ProductsPage() {
       originalPrice: product.pricing.originalPrice ? String(product.pricing.originalPrice) : '',
       featured: product.featured || false,
       file: fileData,
+      downloadUrl: (product as any).file?.downloadUrl || '',
     })
     setShowForm(true)
   }
@@ -212,13 +213,20 @@ export default function ProductsPage() {
           }
           if (categoryId) payload.category = categoryId
           if (thumbnailId) payload.thumbnail = thumbnailId
-          // Include file metadata from R2 upload
-          if (form.file) {
-            payload.file = {
-              r2Key: form.file.r2Key,
-              fileName: form.file.fileName,
-              fileSize: form.file.fileSize,
-              fileFormat: form.file.fileFormat,
+          // Include file metadata and download URL
+          {
+            const filePayload: Record<string, unknown> = {}
+            if (form.file) {
+              filePayload.r2Key = form.file.r2Key
+              filePayload.fileName = form.file.fileName
+              filePayload.fileSize = form.file.fileSize
+              filePayload.fileFormat = form.file.fileFormat
+            }
+            if (form.downloadUrl.trim()) {
+              filePayload.downloadUrl = form.downloadUrl.trim()
+            }
+            if (Object.keys(filePayload).length > 0) {
+              payload.file = filePayload
             }
           }
           const res = await updateProduct(editingId, payload)
@@ -239,13 +247,20 @@ export default function ProductsPage() {
             thumbnail: thumbnailId || 1,
           }
           if (categoryId) payload.category = categoryId
-          // Include file metadata from R2 upload
-          if (form.file) {
-            payload.file = {
-              r2Key: form.file.r2Key,
-              fileName: form.file.fileName,
-              fileSize: form.file.fileSize,
-              fileFormat: form.file.fileFormat,
+          // Include file metadata and download URL
+          {
+            const filePayload: Record<string, unknown> = {}
+            if (form.file) {
+              filePayload.r2Key = form.file.r2Key
+              filePayload.fileName = form.file.fileName
+              filePayload.fileSize = form.file.fileSize
+              filePayload.fileFormat = form.file.fileFormat
+            }
+            if (form.downloadUrl.trim()) {
+              filePayload.downloadUrl = form.downloadUrl.trim()
+            }
+            if (Object.keys(filePayload).length > 0) {
+              payload.file = filePayload
             }
           }
           const res = await createProduct(payload)

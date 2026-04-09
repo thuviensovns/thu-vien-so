@@ -30,6 +30,7 @@ export interface ProductFormData {
   originalPrice: string
   featured: boolean
   file: FileData | null
+  downloadUrl: string
 }
 
 export const defaultForm: ProductFormData = {
@@ -41,6 +42,7 @@ export const defaultForm: ProductFormData = {
   originalPrice: '',
   featured: false,
   file: null,
+  downloadUrl: '',
 }
 
 export function autoSlug(name: string) {
@@ -306,9 +308,23 @@ export default function ProductForm({
             </label>
           </div>
 
+          {/* Download URL */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium mb-1.5 block">Link tải trực tiếp (Google Drive, Mediafire...)</label>
+            <Input
+              value={form.downloadUrl}
+              onChange={(e) => setForm((p) => ({ ...p, downloadUrl: e.target.value }))}
+              placeholder="https://drive.google.com/... hoặc https://mediafire.com/..."
+              className="bg-muted/50 font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Ưu tiên dùng link tải trực tiếp. Nếu để trống, hệ thống sẽ dùng file upload R2 bên dưới.
+            </p>
+          </div>
+
           {/* Product file upload */}
           <div className="sm:col-span-2">
-            <label className="text-xs font-medium mb-1.5 block">File sản phẩm (để khách tải sau khi mua)</label>
+            <label className="text-xs font-medium mb-1.5 block">File sản phẩm (tùy chọn — dùng khi không có link tải)</label>
             {form.file ? (
               <div className="flex items-center gap-3 p-3 rounded-lg border border-success/20 bg-success/5">
                 <FileArchive className="h-8 w-8 text-success shrink-0" />
