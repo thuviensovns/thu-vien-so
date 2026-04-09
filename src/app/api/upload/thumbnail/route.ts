@@ -37,8 +37,9 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     await uploadToR2(r2Key, buffer, file.type)
 
-    // Generate a long-lived signed URL (30 days)
-    const url = await generateDownloadUrl(r2Key, 30 * 24 * 60 * 60)
+    // Generate a very long-lived signed URL (~10 years)
+    // TODO: Replace with public R2 bucket URL for permanent access
+    const url = await generateDownloadUrl(r2Key, 315360000)
 
     return NextResponse.json({ url, r2Key })
   } catch (error) {

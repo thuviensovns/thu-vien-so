@@ -203,9 +203,15 @@ export default function ProductsPage() {
   const deletedCount = useDb ? 0 : deletedDemoIds.length
 
   function openEditForm(product: AnyProduct) {
-    const isCustom = 'isCustom' in product && product.isCustom === true
-    setEditingId(isCustom ? product.id : null)
-    setEditingDemoId(isCustom ? null : product.id)
+    // Bug fix: DB products should always use editingId for update (not create)
+    if (useDb) {
+      setEditingId(product.id)
+      setEditingDemoId(null)
+    } else {
+      const isCustom = 'isCustom' in product && product.isCustom === true
+      setEditingId(isCustom ? product.id : null)
+      setEditingDemoId(isCustom ? null : product.id)
+    }
     const file = 'file' in product ? product.file : undefined
     const fileData = file?.r2Key ? {
       r2Key: file.r2Key,
@@ -247,9 +253,12 @@ export default function ProductsPage() {
     if (useDb) {
       // Database mode: sync via Payload API
       const categoryId = catIdMap[form.type]
+      if (!categoryId) {
+        toast.error('Danh mục chưa có trong database', { description: `Loại "${form.type}" chưa được tạo. Hãy reload trang hoặc tạo danh mục trước.` })
+        return
+      }
 
       setSaving(true)
-      // Ensure we have a valid Payload session
       const authed = await ensureAuth()
       if (!authed) {
         console.error('[Save] Auth failed — aborting save')
@@ -264,38 +273,40 @@ export default function ProductsPage() {
           thumbnailResult = await uploadMedia(form.thumbnailUrl, productData.slug)
           toast.dismiss('img-upload')
           if (!thumbnailResult) {
-            toast.error('Lỗi upload hình ảnh', { description: 'Kiểm tra Console (F12) để xem chi tiết lỗi.' })
-            setSaving(false)
-            return
+            // R2 not configured or upload failed — skip image, continue saving product
+            toast.warning('Không thể upload ảnh (R2 chưa cấu hình?). Sản phẩm sẽ dùng ảnh mặc định.', { duration: 5000 })
+            thumbnailResult = null
           }
-          // If R2 returned a URL string, update the thumbnail URL in productData
           if (typeof thumbnailResult === 'string') {
             productData.thumbnail = { url: thumbnailResult }
           }
         }
 
+        // Build file group payload — only include non-empty fields
+        const filePayload: Record<string, unknown> = {}
+        if (form.file) {
+          filePayload.r2Key = form.file.r2Key
+          filePayload.fileName = form.file.fileName
+          filePayload.fileSize = form.file.fileSize
+          filePayload.fileFormat = form.file.fileFormat
+        }
+        if (form.downloadUrl.trim()) {
+          filePayload.downloadUrl = form.downloadUrl.trim()
+        }
+
         if (editingId) {
+          // --- UPDATE existing product ---
           const payload: Record<string, unknown> = {
             name: productData.name,
             slug: productData.slug,
             type: productData.type,
             pricing: productData.pricing,
             featured: productData.featured,
+            category: categoryId,
           }
-          if (categoryId) payload.category = categoryId
-          // thumbnail: Payload media ID (number) or R2 URL (string → stored in thumbnailUrl)
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
-          // Always send file group so downloadUrl can be set/cleared
-          payload.file = {
-            ...(form.file ? {
-              r2Key: form.file.r2Key,
-              fileName: form.file.fileName,
-              fileSize: form.file.fileSize,
-              fileFormat: form.file.fileFormat,
-            } : {}),
-            downloadUrl: form.downloadUrl.trim() || null,
-          }
+          if (Object.keys(filePayload).length > 0) payload.file = filePayload
           const res = await updateProduct(editingId, payload)
           if (res.doc || res.id) {
             toast.success('Đã cập nhật & đồng bộ sản phẩm', { description: 'Trang khách hàng đã được cập nhật.' })
@@ -305,26 +316,19 @@ export default function ProductsPage() {
             return
           }
         } else {
+          // --- CREATE new product ---
           const payload: Record<string, unknown> = {
             name: productData.name,
             slug: productData.slug,
             type: productData.type,
             pricing: productData.pricing,
             featured: productData.featured,
-            ...(typeof thumbnailResult === 'number' ? { thumbnail: thumbnailResult } : { thumbnail: 1 }),
-            ...(typeof thumbnailResult === 'string' ? { thumbnailUrl: thumbnailResult } : {}),
+            category: categoryId,
           }
-          if (categoryId) payload.category = categoryId
-          // Always send file group so downloadUrl is saved
-          payload.file = {
-            ...(form.file ? {
-              r2Key: form.file.r2Key,
-              fileName: form.file.fileName,
-              fileSize: form.file.fileSize,
-              fileFormat: form.file.fileFormat,
-            } : {}),
-            downloadUrl: form.downloadUrl.trim() || null,
-          }
+          // Only set thumbnail fields if we have a valid result (no hardcoded fallback)
+          if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
+          if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
+          if (Object.keys(filePayload).length > 0) payload.file = filePayload
           const res = await createProduct(payload)
           if (res.doc || res.id) {
             toast.success('Đã thêm & đồng bộ sản phẩm mới', { description: 'Trang khách hàng đã được cập nhật.' })

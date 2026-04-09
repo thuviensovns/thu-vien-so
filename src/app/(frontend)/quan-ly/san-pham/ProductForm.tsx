@@ -153,6 +153,9 @@ export default function ProductForm({
       toast.error('File quá lớn (tối đa 5MB)')
       return
     }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.warning('Ảnh lớn hơn 2MB — khuyến nghị nén trước khi upload')
+    }
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
