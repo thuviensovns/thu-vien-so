@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d9ff"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Waveform bars -->
+  <g opacity="0.08">
+    <rect x="40" y="120" width="6" height="60" rx="3" fill="#00d9ff"/>
+    <rect x="54" y="100" width="6" height="100" rx="3" fill="#00d9ff"/>
+    <rect x="68" y="80" width="6" height="140" rx="3" fill="#00d9ff"/>
+    <rect x="82" y="110" width="6" height="80" rx="3" fill="#00d9ff"/>
+    <rect x="96" y="90" width="6" height="120" rx="3" fill="#00d9ff"/>
+    <rect x="300" y="120" width="6" height="60" rx="3" fill="#d946ef"/>
+    <rect x="314" y="100" width="6" height="100" rx="3" fill="#d946ef"/>
+    <rect x="328" y="80" width="6" height="140" rx="3" fill="#d946ef"/>
+    <rect x="342" y="110" width="6" height="80" rx="3" fill="#d946ef"/>
+    <rect x="356" y="90" width="6" height="120" rx="3" fill="#d946ef"/>
+  </g>
+  <!-- Center icon -->
+  <circle cx="200" cy="140" r="45" fill="none" stroke="#00d9ff" stroke-width="1.5" opacity="0.2"/>
+  <text x="200" y="155" font-family="system-ui, sans-serif" font-size="42" fill="url(#accent)" text-anchor="middle" opacity="0.6">♪</text>
+  <!-- Label -->
+  <text x="200" y="220" font-family="system-ui, sans-serif" font-size="14" fill="#8b949e" text-anchor="middle" letter-spacing="2">SAMPLE PACK</text>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Slider bars -->
+  <g opacity="0.06">
+    <rect x="80" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="82" cy="120" r="8" fill="#06b6d4"/>
+    <rect x="120" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="122" cy="160" r="8" fill="#06b6d4"/>
+    <rect x="160" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="162" cy="100" r="8" fill="#06b6d4"/>
+    <rect x="240" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="242" cy="140" r="8" fill="#06b6d4"/>
+    <rect x="280" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="282" cy="110" r="8" fill="#06b6d4"/>
+    <rect x="320" y="80" width="4" height="140" rx="2" fill="#06b6d4"/>
+    <circle cx="322" cy="180" r="8" fill="#06b6d4"/>
+  </g>
+  <!-- Center icon -->
+  <circle cx="200" cy="140" r="45" fill="none" stroke="#06b6d4" stroke-width="1.5" opacity="0.2"/>
+  <text x="200" y="155" font-family="system-ui, sans-serif" font-size="42" fill="url(#accent)" text-anchor="middle" opacity="0.6">♫</text>
+  <!-- Label -->
+  <text x="200" y="220" font-family="system-ui, sans-serif" font-size="14" fill="#8b949e" text-anchor="middle" letter-spacing="2">PRESET</text>
+</svg>

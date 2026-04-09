@@ -1,6 +1,16 @@
 import { ProductCard } from '@/components/shared/ProductCard'
 import { Package } from 'lucide-react'
 
+/** Category-specific placeholder images */
+const categoryPlaceholders: Record<string, string> = {
+  'sample-pack': '/images/placeholder-sample-pack.svg',
+  flp: '/images/placeholder-flp.svg',
+  vst: '/images/placeholder-vst.svg',
+  preset: '/images/placeholder-preset.svg',
+  instrument: '/images/placeholder-instrument.svg',
+  'song-nhac-lyrics': '/images/placeholder-song-nhac-lyrics.svg',
+}
+
 export interface ProductGridItem {
   id: string
   name: string
@@ -40,7 +50,9 @@ export function ProductGrid({ products }: ProductGridProps) {
             ? product.thumbnail
             : product.thumbnail?.url || ''
         const thumbnailUrl =
-          rawUrl && !rawUrl.endsWith('/placeholder.jpg') ? rawUrl : '/images/placeholder.jpg'
+          rawUrl && !rawUrl.endsWith('/placeholder.jpg') && !rawUrl.endsWith('/placeholder.svg')
+            ? rawUrl
+            : categoryPlaceholders[product.type] || '/images/placeholder.svg'
 
         return (
           <div

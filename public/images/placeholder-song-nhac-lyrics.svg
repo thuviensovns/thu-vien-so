@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#db2777"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Sound wave lines -->
+  <g opacity="0.06">
+    <path d="M30,150 Q80,100 130,150 Q180,200 230,150 Q280,100 330,150 Q360,175 370,150" stroke="#ec4899" stroke-width="2" fill="none"/>
+    <path d="M30,160 Q80,120 130,160 Q180,200 230,160 Q280,120 330,160 Q360,180 370,160" stroke="#ec4899" stroke-width="1.5" fill="none"/>
+    <path d="M30,140 Q80,80 130,140 Q180,200 230,140 Q280,80 330,140 Q360,170 370,140" stroke="#ec4899" stroke-width="1" fill="none"/>
+  </g>
+  <!-- Center icon -->
+  <circle cx="200" cy="140" r="45" fill="none" stroke="#ec4899" stroke-width="1.5" opacity="0.2"/>
+  <text x="200" y="155" font-family="system-ui, sans-serif" font-size="38" fill="url(#accent)" text-anchor="middle" opacity="0.6">🎤</text>
+  <!-- Label -->
+  <text x="200" y="225" font-family="system-ui, sans-serif" font-size="13" fill="#8b949e" text-anchor="middle" letter-spacing="2">SÓNG NHẠC LYRICS</text>
+</svg>

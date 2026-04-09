@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Piano keys hint -->
+  <g opacity="0.06">
+    <rect x="120" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="145" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="170" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="195" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="220" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="245" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="270" y="200" width="20" height="60" rx="2" fill="#ffffff"/>
+    <rect x="133" y="200" width="14" height="38" rx="2" fill="#f97316" opacity="0.5"/>
+    <rect x="158" y="200" width="14" height="38" rx="2" fill="#f97316" opacity="0.5"/>
+    <rect x="208" y="200" width="14" height="38" rx="2" fill="#f97316" opacity="0.5"/>
+    <rect x="233" y="200" width="14" height="38" rx="2" fill="#f97316" opacity="0.5"/>
+    <rect x="258" y="200" width="14" height="38" rx="2" fill="#f97316" opacity="0.5"/>
+  </g>
+  <!-- Center icon -->
+  <circle cx="200" cy="120" r="45" fill="none" stroke="#f97316" stroke-width="1.5" opacity="0.2"/>
+  <text x="200" y="135" font-family="system-ui, sans-serif" font-size="42" fill="url(#accent)" text-anchor="middle" opacity="0.6">♬</text>
+  <!-- Label -->
+  <text x="200" y="195" font-family="system-ui, sans-serif" font-size="14" fill="#8b949e" text-anchor="middle" letter-spacing="2">FLP PROJECT</text>
+</svg>

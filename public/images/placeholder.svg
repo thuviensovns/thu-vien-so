@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d9ff"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Floating notes -->
+  <text x="60" y="80" font-family="system-ui" font-size="24" fill="#00d9ff" opacity="0.05">♪</text>
+  <text x="320" y="70" font-family="system-ui" font-size="30" fill="#d946ef" opacity="0.05">♫</text>
+  <text x="80" y="240" font-family="system-ui" font-size="20" fill="#d946ef" opacity="0.04">♬</text>
+  <text x="310" y="250" font-family="system-ui" font-size="28" fill="#00d9ff" opacity="0.04">♪</text>
+  <!-- Center icon -->
+  <circle cx="200" cy="135" r="45" fill="none" stroke="url(#accent)" stroke-width="1.5" opacity="0.15"/>
+  <text x="200" y="152" font-family="system-ui, sans-serif" font-size="44" fill="url(#accent)" text-anchor="middle" opacity="0.4">♫</text>
+  <!-- Label -->
+  <text x="200" y="220" font-family="system-ui, sans-serif" font-size="13" fill="#8b949e" text-anchor="middle" letter-spacing="2">THƯ VIỆN SỐ</text>
+</svg>

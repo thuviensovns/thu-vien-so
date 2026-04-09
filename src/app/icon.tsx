@@ -10,22 +10,32 @@ export default function Icon() {
         style={{
           width: 32,
           height: 32,
-          borderRadius: 6,
-          background: '#0d1117',
+          borderRadius: 7,
+          background: 'linear-gradient(135deg, #0d1117, #161b22)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
         }}
       >
-        <span style={{ color: '#00d9ff', fontSize: 18, fontWeight: 700 }}>T</span>
+        <span
+          style={{
+            fontSize: 20,
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #00d9ff, #7c3aed)',
+            backgroundClip: 'text',
+            color: '#00d9ff',
+          }}
+        >
+          ♫
+        </span>
         <div
           style={{
             position: 'absolute',
-            top: 3,
-            right: 3,
-            width: 6,
-            height: 6,
+            top: 2,
+            right: 2,
+            width: 5,
+            height: 5,
             borderRadius: '50%',
             background: '#d946ef',
           }}

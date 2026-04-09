@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#1a1f2e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <!-- Knobs pattern -->
+  <g opacity="0.06">
+    <circle cx="100" cy="100" r="20" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <circle cx="100" cy="100" r="3" fill="#a855f7"/>
+    <circle cx="300" cy="100" r="20" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <circle cx="300" cy="100" r="3" fill="#a855f7"/>
+    <circle cx="100" cy="200" r="20" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <circle cx="100" cy="200" r="3" fill="#a855f7"/>
+    <circle cx="300" cy="200" r="20" stroke="#a855f7" stroke-width="2" fill="none"/>
+    <circle cx="300" cy="200" r="3" fill="#a855f7"/>
+  </g>
+  <!-- Center icon -->
+  <circle cx="200" cy="135" r="45" fill="none" stroke="#a855f7" stroke-width="1.5" opacity="0.2"/>
+  <text x="200" y="150" font-family="system-ui, sans-serif" font-size="40" fill="url(#accent)" text-anchor="middle" opacity="0.6">⚡</text>
+  <!-- Label -->
+  <text x="200" y="220" font-family="system-ui, sans-serif" font-size="14" fill="#8b949e" text-anchor="middle" letter-spacing="2">VST PLUGIN</text>
+</svg>

@@ -1,5 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="6" fill="#0d1117"/>
-  <text x="16" y="22" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#00d9ff" text-anchor="middle">T</text>
-  <circle cx="24" cy="8" r="3" fill="#d946ef"/>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="note" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d9ff"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <!-- Musical note ♪ -->
+  <text x="16" y="24" font-family="system-ui, sans-serif" font-size="22" fill="url(#note)" text-anchor="middle" font-weight="bold">♫</text>
+  <!-- Glow dot -->
+  <circle cx="25" cy="6" r="2.5" fill="#d946ef" opacity="0.9"/>
+  <circle cx="25" cy="6" r="4" fill="#d946ef" opacity="0.2"/>
 </svg>
