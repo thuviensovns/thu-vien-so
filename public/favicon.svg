@@ -1,18 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0d1117"/>
-      <stop offset="100%" stop-color="#161b22"/>
-    </linearGradient>
-    <linearGradient id="note" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#00d9ff"/>
       <stop offset="100%" stop-color="#7c3aed"/>
     </linearGradient>
   </defs>
-  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
-  <!-- Musical note ♪ -->
-  <text x="16" y="24" font-family="system-ui, sans-serif" font-size="22" fill="url(#note)" text-anchor="middle" font-weight="bold">♫</text>
+  <rect width="32" height="32" rx="7" fill="#0d1117"/>
+  <rect width="32" height="32" rx="7" fill="url(#g)" opacity="0.1"/>
+  <!-- Beamed eighth notes -->
+  <path d="M11 25V10h1v15h-1z" fill="url(#g)"/>
+  <path d="M21 23V8h1v15h-1z" fill="url(#g)"/>
+  <ellipse cx="9.5" cy="25.5" rx="3" ry="2.3" transform="rotate(-15 9.5 25.5)" fill="url(#g)"/>
+  <ellipse cx="19.5" cy="23.5" rx="3" ry="2.3" transform="rotate(-15 19.5 23.5)" fill="url(#g)"/>
+  <path d="M11 10L22 8v2.5L11 12.5z" fill="url(#g)"/>
   <!-- Glow dot -->
-  <circle cx="25" cy="6" r="2.5" fill="#d946ef" opacity="0.9"/>
-  <circle cx="25" cy="6" r="4" fill="#d946ef" opacity="0.2"/>
+  <circle cx="28" cy="4" r="2.5" fill="#d946ef" opacity="0.85"/>
 </svg>

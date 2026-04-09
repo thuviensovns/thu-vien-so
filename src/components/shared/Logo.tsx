@@ -1,15 +1,43 @@
+'use client'
+
 import Link from 'next/link'
+import Image from 'next/image'
+import { useTheme } from 'next-themes'
+import { useEffect, useState } from 'react'
 
 export function Logo() {
+  const { resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  const logoSrc = mounted && resolvedTheme === 'light' ? '/logo-light.svg' : '/logo.svg'
+
   return (
-    <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-90 transition-opacity">
-      <div className="relative h-8 w-8 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 border border-primary/30 flex items-center justify-center">
-        <span className="text-lg leading-none" aria-hidden="true">♫</span>
-        <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-secondary animate-pulse" />
-      </div>
-      <span className="font-heading text-lg font-bold tracking-tight">
-        Thư Viện <span className="text-secondary">Số</span>
-      </span>
+    <Link href="/" className="flex items-center hover:opacity-90 transition-opacity shrink-0">
+      <Image
+        src={logoSrc}
+        alt="Thư Viện Số"
+        width={160}
+        height={38}
+        className="h-8 sm:h-9 w-auto"
+        priority
+      />
+    </Link>
+  )
+}
+
+/** Icon-only logo for compact spaces */
+export function LogoIcon({ className = 'h-8 w-8' }: { className?: string }) {
+  return (
+    <Link href="/" className="flex items-center hover:opacity-90 transition-opacity shrink-0">
+      <Image
+        src="/logo-icon.svg"
+        alt="Thư Viện Số"
+        width={40}
+        height={40}
+        className={className}
+      />
     </Link>
   )
 }

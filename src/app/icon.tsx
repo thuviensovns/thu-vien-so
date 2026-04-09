@@ -16,24 +16,35 @@ export default function Icon() {
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
+          overflow: 'hidden',
         }}
       >
+        {/* Gradient overlay */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(135deg, rgba(0,217,255,0.1), rgba(124,58,237,0.1))',
+            display: 'flex',
+          }}
+        />
+        {/* Musical notes symbol */}
         <span
           style={{
-            fontSize: 20,
-            fontWeight: 700,
-            background: 'linear-gradient(135deg, #00d9ff, #7c3aed)',
-            backgroundClip: 'text',
+            fontSize: 18,
             color: '#00d9ff',
+            position: 'relative',
+            fontWeight: 700,
           }}
         >
           ♫
         </span>
+        {/* Glow dot */}
         <div
           style={{
             position: 'absolute',
-            top: 2,
-            right: 2,
+            top: 1,
+            right: 1,
             width: 5,
             height: 5,
             borderRadius: '50%',

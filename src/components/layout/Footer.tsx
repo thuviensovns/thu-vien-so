@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Music, Mail, Phone } from 'lucide-react'
+import Image from 'next/image'
+import { Mail, Phone } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { getSiteSettings, defaultSiteSettings } from '@/lib/config'
 
@@ -60,9 +61,14 @@ export function Footer({ initialSettings }: { initialSettings?: Record<string, u
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2 sm:col-span-2 lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2 text-primary mb-3">
-              <Music className="h-6 w-6" />
-              <span className="font-heading font-bold text-lg">{s.logoText || s.siteName}</span>
+            <Link href="/" className="flex items-center mb-3">
+              <Image
+                src="/logo.svg"
+                alt={s.logoText || s.siteName}
+                width={160}
+                height={38}
+                className="h-8 w-auto"
+              />
             </Link>
             <p className="text-sm text-muted-foreground mb-4 max-w-xs">
               {s.footerText}

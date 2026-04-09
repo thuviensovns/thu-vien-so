@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, Music, FileAudio, Guitar, Plug, Sliders, Mic, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet } from 'lucide-react'
+import Image from 'next/image'
+import { Menu, FileAudio, Guitar, Plug, Sliders, Mic, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet, Music } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
@@ -54,7 +55,7 @@ export function MobileNav() {
       <SheetContent side="left" className="w-[280px] max-w-[80vw] bg-card border-border p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
           <SheetTitle className="flex items-center gap-2 text-primary text-base">
-            <Music className="h-5 w-5" />
+            <Image src="/logo-icon.svg" alt="Thư Viện Số" width={28} height={28} className="h-7 w-7" />
             Thư Viện Số
           </SheetTitle>
         </SheetHeader>

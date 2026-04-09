@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <defs>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d9ff"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00d9ff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect x="1" y="1" width="38" height="38" rx="10" fill="#0d1117"/>
+  <rect x="1" y="1" width="38" height="38" rx="10" fill="url(#iconGrad)" opacity="0.12"/>
+  <rect x="1.5" y="1.5" width="37" height="37" rx="9.5" stroke="url(#borderGrad)" stroke-width="1"/>
+  <!-- Beamed eighth notes -->
+  <path d="M14 30V12h1v18h-1z" fill="url(#iconGrad)"/>
+  <path d="M26 28V10h1v18h-1z" fill="url(#iconGrad)"/>
+  <!-- Note heads -->
+  <ellipse cx="12" cy="31" rx="4" ry="3" transform="rotate(-15 12 31)" fill="url(#iconGrad)"/>
+  <ellipse cx="24" cy="29" rx="4" ry="3" transform="rotate(-15 24 29)" fill="url(#iconGrad)"/>
+  <!-- Beam -->
+  <path d="M14 12L27 10v3L14 15z" fill="url(#iconGrad)"/>
+  <!-- Glow dot -->
+  <circle cx="35" cy="5" r="3.5" fill="#d946ef" opacity="0.8"/>
+  <circle cx="35" cy="5" r="5.5" fill="#d946ef" opacity="0.15"/>
+</svg>
