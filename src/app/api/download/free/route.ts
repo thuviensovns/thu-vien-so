@@ -30,11 +30,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid productId' }, { status: 400 })
     }
 
-    // Verify product is free
-    const product = await payload.findByID({
-      collection: 'products',
-      id: productId,
-    })
+    // Find product by ID first, then by slug as fallback
+    let product: any = null
+    try {
+      product = await payload.findByID({
+        collection: 'products',
+        id: productId,
+      })
+    } catch {
+      // findByID failed (e.g. slug passed instead of numeric ID) — try find by slug
+      const bySlug = await payload.find({
+        collection: 'products',
+        where: { slug: { equals: productId } },
+        limit: 1,
+      })
+      product = bySlug.docs[0] || null
+    }
+
+    if (!product) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
 
     if (!product.pricing.isFree && product.pricing.price > 0) {
       return NextResponse.json(

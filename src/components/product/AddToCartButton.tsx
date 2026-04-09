@@ -23,29 +23,6 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
   const [justAdded, setJustAdded] = useState(false)
   const isInCart = items.some((i) => i.id === id)
 
-  function triggerDemoDownload() {
-    const content = [
-      '=== Thư Viện Số ===',
-      '',
-      `Sản phẩm: ${name}`,
-      `Loại: ${type}`,
-      '',
-      'Cảm ơn bạn đã tải sản phẩm miễn phí!',
-      '',
-      'Lưu ý: Đây là file xác nhận. File sản phẩm thực tế',
-      'sẽ có khi kết nối database.',
-      '',
-      'Hỗ trợ: support.thuvienso@gmail.com',
-    ].join('\n')
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${slug}-free.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   async function handleFreeDownload() {
     try {
       const res = await fetch('/api/download/free', {
@@ -69,14 +46,16 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
             a.click()
             document.body.removeChild(a)
           }
-        } else {
-          triggerDemoDownload()
+          router.refresh()
+          return
         }
-        router.refresh()
-        return
       }
-    } catch {}
-    triggerDemoDownload()
+      toast.error('Chưa có file tải cho sản phẩm này', {
+        description: 'Admin chưa thêm link tải. Vui lòng liên hệ hỗ trợ.',
+      })
+    } catch {
+      toast.error('Lỗi kết nối', { description: 'Không thể tải xuống. Vui lòng thử lại.' })
+    }
   }
 
   function handleAddToCart() {

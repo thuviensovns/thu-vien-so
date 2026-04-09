@@ -92,27 +92,6 @@ export const ProductCard = memo(function ProductCard({
     onDeleted?.()
   }
 
-  function triggerDemoFile() {
-    const content = [
-      '=== Thư Viện Số ===',
-      '',
-      `Sản phẩm: ${name}`,
-      `Loại: ${typeLabels[type] || type}`,
-      '',
-      'Cảm ơn bạn đã tải sản phẩm miễn phí!',
-      '',
-      'Lưu ý: Đây là file xác nhận.',
-      'File thực tế sẽ có khi kết nối database.',
-    ].join('\n')
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const blobUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = blobUrl
-    a.download = `${slug}-free.txt`
-    a.click()
-    URL.revokeObjectURL(blobUrl)
-  }
-
   async function handleFreeDownload() {
     try {
       const res = await fetch('/api/download/free', {
@@ -137,14 +116,17 @@ export const ProductCard = memo(function ProductCard({
             a.click()
             document.body.removeChild(a)
           }
-        } else {
-          triggerDemoFile()
+          router.refresh()
+          return
         }
-        router.refresh()
-        return
       }
-    } catch {}
-    triggerDemoFile()
+      // No URL or API error — notify user
+      toast.error('Chưa có file tải cho sản phẩm này', {
+        description: 'Admin chưa thêm link tải. Vui lòng liên hệ hỗ trợ.',
+      })
+    } catch {
+      toast.error('Lỗi kết nối', { description: 'Không thể tải xuống. Vui lòng thử lại.' })
+    }
   }
 
   function handleBuyNow(e: React.MouseEvent) {
