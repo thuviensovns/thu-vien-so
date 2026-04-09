@@ -31,8 +31,10 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: id }),
       })
-      const data = res.ok ? await res.json() : null
-      if (data?.url) {
+      let data: any = null
+      try { data = await res.json() } catch {}
+
+      if (res.ok && data?.url) {
         toast.dismiss('free-dl')
         const isExternal = data.url.startsWith('http') && !data.url.includes('.r2.cloudflarestorage.')
         if (isExternal) {
@@ -50,8 +52,8 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
         router.refresh()
         return
       }
-      const errMsg = data?.error || (res.ok ? 'Chưa có file tải' : `Lỗi server (${res.status})`)
-      toast.error(errMsg, { id: 'free-dl', description: 'Liên hệ admin để được hỗ trợ.' })
+      const errMsg = data?.error || (res.ok ? 'Chưa có file tải cho sản phẩm này' : `Lỗi server (${res.status})`)
+      toast.error(errMsg, { id: 'free-dl' })
     } catch {
       toast.error('Lỗi kết nối', { id: 'free-dl', description: 'Không thể tải xuống. Vui lòng thử lại.' })
     }

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid productId' }, { status: 400 })
     }
 
-    const payload = await getPayloadForApi()
+    const payload = await getPayloadForApi(15000)
 
     // SECURITY: Require authenticated user
     let user: any = null

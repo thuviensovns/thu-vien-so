@@ -4,7 +4,7 @@ import { generateDownloadUrl } from '@/lib/r2'
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = await getPayloadForApi()
+    const payload = await getPayloadForApi(15000)
 
     // Verify auth
     const { user } = await payload.auth({ headers: req.headers })
@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Download error:', error)
     const msg = (error as Error).message
-    if (msg === 'timeout' || msg.includes('ECONNREFUSED')) {
-      return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+    if (msg.includes('timeout') || msg.includes('ECONNREFUSED')) {
+      return NextResponse.json({ error: 'Database đang khởi động, vui lòng thử lại sau vài giây' }, { status: 503 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

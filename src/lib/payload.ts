@@ -48,11 +48,17 @@ export async function getPayloadClient() {
 
 /**
  * Get Payload instance for API routes — throws on timeout.
+ * Reuses cached instance from safeGetPayload when available.
  */
-export async function getPayloadForApi(timeoutMs = 5000) {
+export async function getPayloadForApi(timeoutMs = 15000) {
+  // Reuse cached instance if available (avoids re-init on every request)
+  if (_cachedPayload) return _cachedPayload
+
   const { getPayload } = await import('payload')
   const config = (await import('@payload-config')).default
-  return withTimeout(getPayload({ config }), timeoutMs)
+  const instance = await withTimeout(getPayload({ config }), timeoutMs)
+  _cachedPayload = instance
+  return instance
 }
 
 // ─── Cached query functions ───────────────────────────────────────────

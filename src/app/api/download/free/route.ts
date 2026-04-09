@@ -8,7 +8,6 @@ import { generateOrderNumber } from '@/lib/payment'
 export async function GET(req: NextRequest) {
   const productId = req.nextUrl.searchParams.get('productId')
   if (productId) {
-    // Redirect to product detail page instead of showing 405
     return NextResponse.redirect(new URL(`/san-pham/${productId}`, req.url))
   }
   return NextResponse.json(
@@ -19,7 +18,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = await getPayloadForApi()
+    const payload = await getPayloadForApi(15000)
 
     let body: any
     try { body = await req.json() } catch {
@@ -51,13 +50,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    const realId = product.id // always use DB ID, not the slug/productId from request
+    const realId = product.id
+    // Safe access — pricing group can be null if product data is incomplete
+    const pricing = product.pricing ?? {}
+    const price = Number(pricing.price ?? 0)
+    const isFree = Boolean(pricing.isFree) || price === 0
 
-    if (!product.pricing.isFree && product.pricing.price > 0) {
-      return NextResponse.json(
-        { error: 'Product is not free' },
-        { status: 403 },
-      )
+    if (!isFree && price > 0) {
+      return NextResponse.json({ error: 'Product is not free' }, { status: 403 })
     }
 
     // Get download URL: direct link first, then R2
@@ -72,13 +72,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Increment download count (non-blocking — don't let it break the download)
+    // Increment download count (non-blocking)
     try {
-      const newCount = (product.downloadCount || 0) + 1
       await payload.update({
         collection: 'products',
         id: realId,
-        data: { downloadCount: newCount },
+        data: { downloadCount: (product.downloadCount || 0) + 1 },
       })
     } catch (e) {
       console.error('Download count update failed:', e)
@@ -96,11 +95,10 @@ export async function POST(req: NextRequest) {
     try {
       const { user } = await payload.auth({ headers: req.headers })
       if (user) {
-        const orderNumber = generateOrderNumber()
         await payload.create({
           collection: 'orders',
           data: {
-            orderNumber,
+            orderNumber: generateOrderNumber(),
             user: user.id,
             items: [{ product: realId, price: 0, productName: product.name }],
             total: 0,
@@ -121,9 +119,9 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('Free download error:', error)
-    const msg = (error as Error).message
-    if (msg === 'timeout' || msg.includes('ECONNREFUSED')) {
-      return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+    const msg = (error as Error).message || ''
+    if (msg.includes('timeout') || msg.includes('ECONNREFUSED')) {
+      return NextResponse.json({ error: 'Database đang khởi động, vui lòng thử lại sau vài giây' }, { status: 503 })
     }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
