@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayloadForApi } from '@/lib/payload'
 
 const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
+const ADMIN_PASSWORD = 'Anhdungpro1@'
+
+async function getPayloadSafe() {
+  const { getPayload } = await import('payload')
+  const config = (await import('@payload-config')).default
+  return getPayload({ config })
+}
 
 /** POST: Create the admin account (only works when no users exist) */
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
-    const payload = await getPayloadForApi()
+    const payload = await getPayloadSafe()
 
     // Check if any users already exist
     const existing = await payload.find({
@@ -26,7 +32,7 @@ export async function POST(req: NextRequest) {
       collection: 'users',
       data: {
         email: ADMIN_EMAIL,
-        password: 'Anhdungpro1@',
+        password: ADMIN_PASSWORD,
         displayName: 'Admin',
         role: 'admin',
       },
@@ -49,7 +55,7 @@ export async function POST(req: NextRequest) {
 /** GET: Check if setup is needed (no users in database) */
 export async function GET() {
   try {
-    const payload = await getPayloadForApi()
+    const payload = await getPayloadSafe()
     const existing = await payload.find({
       collection: 'users',
       limit: 1,
@@ -65,3 +71,5 @@ export async function GET() {
     )
   }
 }
+
+export const maxDuration = 60
