@@ -35,8 +35,8 @@ export default buildConfig({
     push: true,
     pool: {
       connectionString: process.env.DATABASE_URL!,
-      connectionTimeoutMillis: 5000,
-      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
     },
   }),
   editor: lexicalEditor(),
