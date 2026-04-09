@@ -53,8 +53,26 @@ export async function POST(req: NextRequest) {
     }
 
     const { bankBin, bankName, accountNumber, accountName } = body
+
+    // Validate required fields exist and are strings
     if (!bankBin || !bankName || !accountNumber || !accountName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    if (typeof bankBin !== 'string' || typeof bankName !== 'string'
+      || typeof accountNumber !== 'string' || typeof accountName !== 'string') {
+      return NextResponse.json({ error: 'Invalid field types' }, { status: 400 })
+    }
+
+    // Validate field lengths and format
+    if (bankBin.length > 20 || bankName.length > 100
+      || accountNumber.length > 30 || accountName.length > 100) {
+      return NextResponse.json({ error: 'Field value too long' }, { status: 400 })
+    }
+    if (!/^\d+$/.test(accountNumber)) {
+      return NextResponse.json({ error: 'Account number must contain only digits' }, { status: 400 })
+    }
+    if (/[<>"';]/.test(bankBin + bankName + accountName)) {
+      return NextResponse.json({ error: 'Invalid characters detected' }, { status: 400 })
     }
 
     await payload.updateGlobal({

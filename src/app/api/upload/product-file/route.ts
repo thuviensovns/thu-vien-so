@@ -5,6 +5,28 @@ import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 const ALLOWED_EXTENSIONS = ['zip', 'rar', '7z', 'flp', 'wav', 'mp3', 'flac', 'aif', 'aiff', 'mid', 'midi', 'fxp', 'fxb', 'nki', 'dll', 'vst3', 'au', 'component']
 
+// Map extensions to allowed MIME types (prevents extension spoofing)
+const ALLOWED_MIME_TYPES: Record<string, string[]> = {
+  zip: ['application/zip', 'application/x-zip-compressed'],
+  rar: ['application/x-rar-compressed', 'application/vnd.rar'],
+  '7z': ['application/x-7z-compressed'],
+  flp: ['application/octet-stream'],
+  wav: ['audio/wav', 'audio/x-wav', 'audio/wave'],
+  mp3: ['audio/mpeg', 'audio/mp3'],
+  flac: ['audio/flac', 'audio/x-flac'],
+  aif: ['audio/aiff', 'audio/x-aiff'],
+  aiff: ['audio/aiff', 'audio/x-aiff'],
+  mid: ['audio/midi', 'audio/x-midi'],
+  midi: ['audio/midi', 'audio/x-midi'],
+  fxp: ['application/octet-stream'],
+  fxb: ['application/octet-stream'],
+  nki: ['application/octet-stream'],
+  dll: ['application/x-msdownload', 'application/octet-stream'],
+  vst3: ['application/octet-stream'],
+  au: ['audio/basic', 'application/octet-stream'],
+  component: ['application/octet-stream'],
+}
+
 /** POST: Admin uploads a product file to R2 */
 export async function POST(req: NextRequest) {
   try {
@@ -37,6 +59,12 @@ export async function POST(req: NextRequest) {
     const ext = fileName.split('.').pop()?.toLowerCase() || ''
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return NextResponse.json({ error: `Định dạng .${ext} không được hỗ trợ. Hỗ trợ: ${ALLOWED_EXTENSIONS.join(', ')}` }, { status: 400 })
+    }
+
+    // Validate MIME type matches extension (prevents extension spoofing)
+    const allowedMimes = ALLOWED_MIME_TYPES[ext]
+    if (allowedMimes && file.type && !allowedMimes.includes(file.type)) {
+      return NextResponse.json({ error: `MIME type "${file.type}" không khớp với định dạng .${ext}` }, { status: 400 })
     }
 
     // Generate R2 key: products/{slug}/{timestamp}-{filename}
