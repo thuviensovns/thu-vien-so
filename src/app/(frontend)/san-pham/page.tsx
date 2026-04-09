@@ -9,7 +9,6 @@ import {
   Package, Sparkles, ChevronRight, Download, Gift, Flame, ArrowRight,
 } from 'lucide-react'
 import { getProducts, getCategoryStats } from '@/lib/payload'
-import { getCategoryMetaSorted } from '@/lib/demo-data'
 import { ProductListingClient } from '@/components/product/ProductListingClient'
 import type { ProductGridItem } from '@/components/product/ProductGrid'
 import { CategoryStatsBar, CategoryStatsCount } from '@/components/product/CategoryStatsBar'
@@ -20,7 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { typeLabels } from '@/lib/config'
+import { categoryMeta, typeLabels } from '@/lib/config'
 
 export const metadata: Metadata = {
   title: 'Tất cả sản phẩm',
@@ -60,10 +59,9 @@ export default async function ProductsPage({ searchParams }: PageProps) {
     getCategoryStats(),
   ])
 
-  // Fallback to demo data when DB unavailable
   const hasRealData = products.totalDocs > 0
-  let totalPages = hasRealData ? products.totalPages : 1
-  let currentPage = hasRealData ? (products.page || 1) : 1
+  const totalPages = products.totalPages || 1
+  const currentPage = products.page || 1
 
   // Compute overall stats from DB
   const allCatValues = catStatsMap ? Object.values(catStatsMap) : []
@@ -126,7 +124,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 Tất cả
               </Badge>
             </Link>
-            {getCategoryMetaSorted().map((cat) => {
+            {categoryMeta.map((cat) => {
               const CatIcon = categoryIcons[cat.slug] || Package
               const isActive = params.type === cat.slug
               return (
@@ -162,11 +160,6 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                   {isFree === true && <span className="text-success ml-1">miễn phí</span>}
                   {isFree === false && <span className="text-primary ml-1">trả phí</span>}
                 </p>
-                {!hasRealData && (
-                  <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
-                    Demo
-                  </Badge>
-                )}
               </div>
               <Suspense fallback={null}>
                 <ProductSort />
@@ -208,7 +201,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {getCategoryMetaSorted().map((cat) => {
+            {categoryMeta.map((cat) => {
               const Icon = categoryIcons[cat.slug] || Package
               return (
                 <Link key={cat.slug} href={`/danh-muc/${cat.slug}`} className="group block">

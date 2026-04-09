@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { useBalance } from '@/hooks/use-balance'
 import { usePolling } from '@/hooks/use-polling'
 import { formatVND } from '@/lib/format'
-import { getEffectiveProducts } from '@/lib/demo-data'
 import {
   getDemoOrders, getDemoUsers, getRevenueByDay,
   getActivityLog, getCoupons, getTopUpHistory, exportAllData,
@@ -89,7 +88,6 @@ export default function AdminDashboard() {
     todayOrders, todayRevenue, newUsersToday, topProducts, activeSessionCount,
     lastLogin, failedLoginCount,
   } = useMemo(() => {
-    const products = getEffectiveProducts()
     const users = getDemoUsers()
     const orders = getDemoOrders()
     const revenue = orders.filter((o) => o.status === 'paid').reduce((sum, o) => sum + (o.total || 0), 0)
@@ -123,7 +121,7 @@ export default function AdminDashboard() {
 
     return {
       stats: [
-        { label: 'Sản phẩm', value: dbStats?.products ?? products.length, icon: Package, color: 'text-primary', bg: 'bg-primary/10', href: '/quan-ly/san-pham' },
+        { label: 'Sản phẩm', value: dbStats?.products ?? 0, icon: Package, color: 'text-primary', bg: 'bg-primary/10', href: '/quan-ly/san-pham' },
         { label: 'Người dùng', value: dbStats?.users ?? (users.length + BUILT_IN_ADMIN_COUNT), icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10', href: '/quan-ly/nguoi-dung' },
         { label: 'Đơn hàng', value: dbStats?.orders ?? orders.length, icon: ShoppingCart, color: 'text-warning', bg: 'bg-warning/10', href: '/quan-ly/don-hang' },
         { label: 'Doanh thu', value: formatVND(dbStats?.revenue ?? revenue), icon: TrendingUp, color: 'text-success', bg: 'bg-success/10', href: '/quan-ly/don-hang' },

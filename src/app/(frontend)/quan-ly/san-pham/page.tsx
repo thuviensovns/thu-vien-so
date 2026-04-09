@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatVND } from '@/lib/format'
 import { categoryMeta } from '@/lib/config'
-import { getDemoProducts } from '@/lib/demo-data'
 import {
   getAdminProducts, addAdminProduct, updateAdminProduct, deleteAdminProduct,
   getDeletedDemoIds, deleteDemoProduct, restoreDemoProduct,
@@ -95,31 +94,11 @@ export default function ProductsPage() {
     }
   }, [])
 
-  // Merge demo + admin products (or use DB products when available)
+  // Use DB products when available, otherwise empty
   const allProducts: AnyProduct[] = useMemo(() => {
     if (useDb) return dbProducts
-
-    const overrides = demoOverrides
-    const demo: AnyProduct[] = getDemoProducts().map((p) => {
-      const override = overrides[p.id]
-      if (override) {
-        return {
-          ...p,
-          ...override,
-          name: override.name || p.name,
-          slug: override.slug || p.slug,
-          type: override.type || p.type,
-          thumbnail: override.thumbnail || p.thumbnail,
-          pricing: override.pricing ? { ...p.pricing, ...override.pricing } : p.pricing,
-          featured: override.featured !== undefined ? override.featured : p.featured,
-          isCustom: false as const,
-          isDeleted: deletedDemoIds.includes(p.id),
-        }
-      }
-      return { ...p, isCustom: false as const, isDeleted: deletedDemoIds.includes(p.id) }
-    })
-    return [...adminProducts, ...demo]
-  }, [useDb, dbProducts, adminProducts, deletedDemoIds, demoOverrides])
+    return []
+  }, [useDb, dbProducts])
 
   const filtered = useMemo(() => {
     let result = showDeleted ? allProducts : allProducts.filter((p) => !('isDeleted' in p && p.isDeleted))

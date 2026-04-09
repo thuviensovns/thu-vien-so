@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ProductCard } from '@/components/shared/ProductCard'
-import { getEffectiveProducts, getCategoryMetaSorted, getCategoryDescriptions, type DemoProduct } from '@/lib/demo-data'
-import { getSiteSettings, defaultSiteSettings } from '@/lib/config'
+import { getCategoryDescriptions, type DemoProduct } from '@/lib/demo-data'
+import { getSiteSettings, defaultSiteSettings, categoryMeta } from '@/lib/config'
 import { mapPayloadDoc } from '@/lib/product-mapper'
 
 const categoryIcons: Record<string, typeof Music> = { Music, Headphones, Zap, Sliders, Guitar, Mic }
@@ -65,10 +65,10 @@ interface HomeContentProps {
 
 export function HomeContent({ serverProducts = [], serverCategories = [], hasRealData = false, siteStats, initialSettings, initialCatDescs }: HomeContentProps) {
   const [products, setProducts] = useState<DemoProduct[]>(() => {
-    if (hasRealData && serverProducts.length > 0) {
+    if (serverProducts.length > 0) {
       return serverProducts.map(mapPayloadDoc)
     }
-    return getEffectiveProducts()
+    return []
   })
   // Use server-fetched DB data as initial state to prevent flash
   const [settings, setSettings] = useState(() =>
@@ -80,38 +80,20 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
   )
 
   const refresh = useCallback(() => {
-    if (!hasRealData) {
-      setProducts(getEffectiveProducts())
-    }
     setSettings(getSiteSettings())
     setCatDescs(getCategoryDescriptions())
-  }, [hasRealData])
+  }, [])
 
   useEffect(() => {
     refresh()
-    // Always listen for site settings & category description changes (stored in localStorage)
-    // Only skip product-related localStorage keys when using real DB
     const onStorage = (e: StorageEvent) => {
-      // Site settings & category descriptions: always listen
       if (!e.key || e.key === 'admin_site_settings' || e.key === 'admin_category_descriptions') {
         refresh()
-        return
       }
-      // Product-related keys: only listen when NOT using real DB
-      if (!hasRealData && (e.key === 'admin_products' || e.key === 'deleted_demo_products' || e.key === 'demo_product_overrides')) {
-        refresh()
-      }
-    }
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') refresh()
     }
     window.addEventListener('storage', onStorage)
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [refresh, hasRealData])
+    return () => window.removeEventListener('storage', onStorage)
+  }, [refresh])
 
   const catStats = useMemo(() => computeStats(products), [products])
   // Always use real DB stats — never fall back to demo inflated numbers
@@ -204,7 +186,7 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
           </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
-          {getCategoryMetaSorted().map((cat) => {
+          {categoryMeta.map((cat) => {
             const Icon = categoryIcons[cat.iconName as keyof typeof categoryIcons] || Music
             const cs = catStats[cat.slug]
             return (

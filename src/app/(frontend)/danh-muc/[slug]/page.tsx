@@ -10,7 +10,7 @@ import {
   Package, Download, Gift, ChevronRight, Sparkles, ArrowUpDown,
 } from 'lucide-react'
 import { getCategoryBySlug, getProducts, getCategoryStats } from '@/lib/payload'
-import { demoCategoryDescriptions, getCategoryMetaSorted } from '@/lib/demo-data'
+import { demoCategoryDescriptions } from '@/lib/demo-data'
 import { ProductListingClient } from '@/components/product/ProductListingClient'
 import type { ProductGridItem } from '@/components/product/ProductGrid'
 import { CategoryStatsBar } from '@/components/product/CategoryStatsBar'
@@ -73,16 +73,15 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
     isFree,
   })
 
-  // Use demo data if DB returns no products
   const hasRealData = products.totalDocs > 0
   const categoryServerStats = catStatsMap?.[slug]
-  const totalPages = hasRealData ? products.totalPages : 1
-  const currentPage = hasRealData ? (products.page || 1) : 1
+  const totalPages = products.totalPages || 1
+  const currentPage = products.page || 1
 
   const IconComponent = categoryIcons[slug] || Package
 
   // Sibling categories for navigation
-  const siblings = getCategoryMetaSorted().filter((c) => c.slug !== slug)
+  const siblings = categoryMeta.filter((c) => c.slug !== slug)
 
   return (
     <div className="min-h-screen">
@@ -196,7 +195,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-sm mb-3">Danh mục khác</h3>
                   <div className="space-y-1">
-                    {getCategoryMetaSorted().map((cat) => {
+                    {categoryMeta.map((cat) => {
                       const CatIcon = categoryIcons[cat.slug] || Package
                       const isActive = cat.slug === slug
                       return (
@@ -248,11 +247,6 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
                   {sp.price === 'free' && <span className="text-success ml-1">miễn phí</span>}
                   {sp.price === 'paid' && <span className="text-primary ml-1">trả phí</span>}
                 </p>
-                {!hasRealData && (
-                  <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
-                    Demo
-                  </Badge>
-                )}
               </div>
               <Suspense fallback={null}>
                 <ProductSort />

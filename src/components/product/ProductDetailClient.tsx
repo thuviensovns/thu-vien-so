@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getDemoProductBySlug, getEffectiveProducts, type DemoProduct } from '@/lib/demo-data'
 import Image from 'next/image'
 import Link from 'next/link'
 import {
@@ -31,44 +30,14 @@ const categoryIcons: Record<string, typeof Music> = {
 
 interface ProductDetailClientProps {
   slug: string
-  /** Server-fetched product (null if DB unavailable) */
+  /** Server-fetched product (null if not found) */
   serverProduct: any | null
 }
 
 export function ProductDetailClient({ slug, serverProduct }: ProductDetailClientProps) {
-  const [demoProduct, setDemoProduct] = useState<DemoProduct | null>(null)
+  const p = serverProduct
 
-  useEffect(() => {
-    if (!serverProduct) {
-      setDemoProduct(getDemoProductBySlug(slug))
-    }
-    const reload = () => {
-      if (!serverProduct) setDemoProduct(getDemoProductBySlug(slug))
-    }
-    const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === 'admin_products' || e.key === 'deleted_demo_products' || e.key === 'demo_product_overrides') {
-        reload()
-      }
-    }
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') reload()
-    }
-    window.addEventListener('storage', onStorage)
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [slug, serverProduct])
-
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-
-  const p = serverProduct || demoProduct
-  // Show nothing until client has tried loading from localStorage
   if (!p) {
-    if (!mounted) return null
-    // Client mounted but product not found — show not found
     return (
       <div className="min-h-screen flex flex-col items-center justify-center py-20 text-center">
         <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
@@ -83,8 +52,6 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
     )
   }
 
-  const isDemo = !serverProduct && !!demoProduct
-
   const r2Thumb = typeof p.thumbnailUrl === 'string' && p.thumbnailUrl ? p.thumbnailUrl : ''
   const rawThumb = r2Thumb || (typeof p.thumbnail === 'object' && p.thumbnail?.url ? p.thumbnail.url : '')
   const thumbnailUrl = rawThumb && !rawThumb.endsWith('/placeholder.jpg') ? rawThumb : '/images/placeholder.jpg'
@@ -97,11 +64,6 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
   const isFreeItem = p.pricing.isFree || p.pricing.price === 0
   const hasDiscount = p.pricing.originalPrice && p.pricing.originalPrice > p.pricing.price
   const discountPercent = hasDiscount ? Math.round((1 - p.pricing.price / p.pricing.originalPrice!) * 100) : 0
-
-  // Related products from effective products (localStorage-aware)
-  const relatedProducts = categorySlug
-    ? getEffectiveProducts(categorySlug).filter((rp) => rp.id !== p.id).slice(0, 4)
-    : []
 
   const CatIcon = categoryIcons[categorySlug] || Package
 
@@ -137,12 +99,6 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
       </div>
 
       <div className="container mx-auto px-4 py-5 sm:py-8">
-        {isDemo && (
-          <div className="mb-4 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs">
-            Đang hiển thị dữ liệu demo. Kết nối database để xem dữ liệu thật.
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
           {/* Left: Image — 3 cols */}
           <div className="lg:col-span-3">
@@ -367,24 +323,6 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
             </Card>
           </div>
         </div>
-
-        {/* Related Products */}
-        {relatedProducts.length > 0 && (
-          <>
-            <Separator className="my-8 sm:my-10" />
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg sm:text-xl font-bold">Sản phẩm liên quan</h2>
-                {categorySlug && (
-                  <Link href={`/danh-muc/${categorySlug}`} className="text-xs sm:text-sm text-primary hover:underline">
-                    Xem tất cả →
-                  </Link>
-                )}
-              </div>
-              <ProductGrid products={relatedProducts} />
-            </div>
-          </>
-        )}
       </div>
     </div>
   )

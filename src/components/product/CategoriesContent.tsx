@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { Music, Headphones, Zap, Sliders, Guitar, Mic, Package, ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { demoCategoryDescriptions, getCategoryDescriptions, getCategoryMetaSorted } from '@/lib/demo-data'
+import { getCategoryDescriptions } from '@/lib/demo-data'
+import { categoryMeta } from '@/lib/config'
 
 const categoryIcons: Record<string, typeof Music> = {
   'sample-pack': Music, 'flp': Headphones, 'vst': Zap,
@@ -33,7 +34,6 @@ interface CategoriesContentProps {
 }
 
 export function CategoriesContent({ serverCatStats }: CategoriesContentProps) {
-  // Use server stats when available, otherwise show zeros
   const [catStats, setCatStats] = useState<Record<string, { totalProducts: number; freeProducts: number }>>(() => {
     if (serverCatStats) {
       const mapped: Record<string, { totalProducts: number; freeProducts: number }> = {}
@@ -44,7 +44,7 @@ export function CategoriesContent({ serverCatStats }: CategoriesContentProps) {
     }
     return {}
   })
-  const [catDescs, setCatDescs] = useState<Record<string, string>>(demoCategoryDescriptions)
+  const [catDescs, setCatDescs] = useState<Record<string, string>>({})
 
   const refresh = useCallback(() => {
     setCatDescs(getCategoryDescriptions())
@@ -53,7 +53,7 @@ export function CategoriesContent({ serverCatStats }: CategoriesContentProps) {
   useEffect(() => {
     refresh()
     const onStorage = (e: StorageEvent) => {
-      if (!e.key || e.key === 'admin_products' || e.key === 'deleted_demo_products' || e.key === 'demo_product_overrides' || e.key === 'admin_category_descriptions') {
+      if (!e.key || e.key === 'admin_category_descriptions') {
         refresh()
       }
     }
@@ -82,7 +82,7 @@ export function CategoriesContent({ serverCatStats }: CategoriesContentProps) {
       {/* Categories grid */}
       <div className="container mx-auto px-4 py-8 sm:py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {getCategoryMetaSorted().map((cat) => {
+          {categoryMeta.map((cat) => {
             const Icon = categoryIcons[cat.slug] || Package
             const stats = catStats[cat.slug]
             const desc = catDescs[cat.slug] || cat.description
