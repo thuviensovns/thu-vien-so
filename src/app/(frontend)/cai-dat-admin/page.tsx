@@ -2,17 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
+import { Shield, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 
 export default function SetupAdminPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -33,17 +28,12 @@ export default function SetupAdminPage() {
       .finally(() => setChecking(false))
   }, [router])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function handleSetup() {
     setError('')
     setIsLoading(true)
 
     try {
-      const res = await fetch('/api/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, displayName }),
-      })
+      const res = await fetch('/api/setup', { method: 'POST' })
       const data = await res.json()
 
       if (res.ok) {
@@ -93,7 +83,7 @@ export default function SetupAdminPage() {
             </div>
             <h1 className="text-2xl font-bold">Thiết lập Admin</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Tạo tài khoản quản trị viên đầu tiên
+              Tạo tài khoản quản trị viên cho hệ thống
             </p>
           </div>
 
@@ -104,69 +94,18 @@ export default function SetupAdminPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="displayName" className="text-sm font-medium mb-1.5 block">Tên hiển thị</label>
-              <Input
-                id="displayName"
-                type="text"
-                placeholder="Admin"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={isLoading}
-                className="bg-muted/50"
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isLoading}
-                className="bg-muted/50"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="text-sm font-medium mb-1.5 block">Mật khẩu</label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Tối thiểu 8 ký tự"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={isLoading}
-                  className="bg-muted/50 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {isLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Shield className="mr-2 h-4 w-4" />
-              )}
-              {isLoading ? 'Đang tạo...' : 'Tạo tài khoản Admin'}
-            </Button>
-          </form>
+          <Button
+            onClick={handleSetup}
+            disabled={isLoading}
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Shield className="mr-2 h-4 w-4" />
+            )}
+            {isLoading ? 'Đang tạo...' : 'Tạo tài khoản Admin'}
+          </Button>
         </CardContent>
       </Card>
     </div>

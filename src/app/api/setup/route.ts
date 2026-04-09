@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 
-/** POST: Create the first admin user (only works when no users exist) */
+const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
+
+/** POST: Create the admin account (only works when no users exist) */
 export async function POST(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
@@ -14,37 +16,18 @@ export async function POST(req: NextRequest) {
 
     if (existing.totalDocs > 0) {
       return NextResponse.json(
-        { error: 'Đã có tài khoản trong hệ thống. Không thể tạo thêm admin qua API này.' },
+        { error: 'Hệ thống đã được thiết lập. Không thể tạo thêm admin.' },
         { status: 403 }
       )
     }
 
-    let body: any
-    try { body = await req.json() } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-    }
-
-    const { email, password, displayName } = body
-
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email và mật khẩu là bắt buộc' }, { status: 400 })
-    }
-
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      return NextResponse.json({ error: 'Invalid field types' }, { status: 400 })
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Mật khẩu phải có ít nhất 8 ký tự' }, { status: 400 })
-    }
-
-    // Create admin user
+    // Create the one and only admin account
     const user = await payload.create({
       collection: 'users',
       data: {
-        email,
-        password,
-        displayName: displayName || 'Admin',
+        email: ADMIN_EMAIL,
+        password: 'Anhdungpro1@',
+        displayName: 'Admin',
         role: 'admin',
       },
     })

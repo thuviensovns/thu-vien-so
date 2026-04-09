@@ -1,5 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
+const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
+
 export const Users: CollectionConfig = {
   slug: 'users',
   auth: true,
@@ -39,7 +41,20 @@ export const Users: CollectionConfig = {
       ],
       required: true,
       access: {
-        update: ({ req: { user } }) => user?.role === 'admin',
+        // Only the designated admin can have admin role
+        update: ({ req: { user } }) => user?.role === 'admin' && user?.email === ADMIN_EMAIL,
+      },
+      hooks: {
+        beforeChange: [
+          ({ value, originalDoc, req }) => {
+            // Prevent setting role to admin for anyone except the designated admin email
+            if (value === 'admin') {
+              const email = req?.data?.email || originalDoc?.email
+              if (email !== ADMIN_EMAIL) return 'customer'
+            }
+            return value
+          },
+        ],
       },
     },
     { name: 'avatar', type: 'upload', relationTo: 'media' },
