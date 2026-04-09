@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
-const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
-const ADMIN_PASSWORD = 'Anhdungpro1@'
+// SECURITY: Read from env vars — NEVER hardcode credentials
+const ADMIN_EMAIL = process.env.INITIAL_ADMIN_EMAIL || ''
+const ADMIN_PASSWORD = process.env.INITIAL_ADMIN_PASSWORD || ''
 
 async function getPayloadSafe() {
   const { getPayload } = await import('payload')
@@ -24,6 +25,13 @@ export async function POST() {
       return NextResponse.json(
         { error: 'Hệ thống đã được thiết lập. Không thể tạo thêm admin.' },
         { status: 403 }
+      )
+    }
+
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+      return NextResponse.json(
+        { error: 'INITIAL_ADMIN_EMAIL và INITIAL_ADMIN_PASSWORD chưa được cấu hình trong env.' },
+        { status: 500 }
       )
     }
 

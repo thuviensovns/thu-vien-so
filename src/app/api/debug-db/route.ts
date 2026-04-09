@@ -1,9 +1,16 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-export async function GET() {
+/** Debug endpoint — requires admin auth or REVALIDATE_SECRET */
+export async function GET(req: NextRequest) {
+  // Security: require secret or admin auth
+  const secret = process.env.REVALIDATE_SECRET
+  const headerSecret = req.headers.get('x-debug-secret') || req.nextUrl.searchParams.get('secret')
+  if (!secret || headerSecret !== secret) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
   const results: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     env: {
