@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     // Auth check — admin only
     const payload = await getPayloadForApi()
     const { user } = await payload.auth({ headers: req.headers })
-    if (!user || (user as any).role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -95,7 +95,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
     const { user } = await payload.auth({ headers: req.headers })
-    if (!user || (user as any).role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

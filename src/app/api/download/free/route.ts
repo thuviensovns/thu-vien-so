@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await getPayloadForApi(15000)
 
-    let body: any
+    let body: { productId?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find product by ID first, then by slug as fallback
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let product: any = null
     try {
       product = await payload.findByID({

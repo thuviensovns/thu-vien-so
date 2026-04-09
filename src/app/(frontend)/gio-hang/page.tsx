@@ -113,6 +113,7 @@ export default function CartPage() {
                     removeItem(item.id)
                     toast.info('Đã xóa khỏi giỏ hàng', { description: item.name })
                   }}
+                  aria-label={`Xóa ${item.name} khỏi giỏ hàng`}
                   className="text-muted-foreground hover:text-destructive shrink-0 h-8 w-8"
                 >
                   <Trash2 className="h-4 w-4" />

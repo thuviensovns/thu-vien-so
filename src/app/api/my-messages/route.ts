@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json({
-      messages: messages.docs.map((msg: any) => ({
+      messages: messages.docs.map((msg) => ({
         id: msg.id,
         name: msg.name,
         email: msg.email,

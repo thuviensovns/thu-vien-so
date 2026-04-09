@@ -34,6 +34,7 @@ export default function AdminPagination({
           className="h-7 w-7"
           disabled={currentPage <= 1}
           onClick={() => onPageChange(currentPage - 1)}
+          aria-label="Trang trước"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
@@ -58,6 +59,7 @@ export default function AdminPagination({
           className="h-7 w-7"
           disabled={currentPage >= totalPages}
           onClick={() => onPageChange(currentPage + 1)}
+          aria-label="Trang sau"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>

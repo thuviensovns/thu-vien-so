@@ -51,10 +51,10 @@ export async function POST() {
       message: 'Tài khoản admin đã được tạo thành công!',
       user: { id: user.id, email: user.email, role: 'admin' },
     })
-  } catch (error: any) {
+  } catch (error) {
     console.error('[Setup] Error:', error)
     return NextResponse.json(
-      { error: error?.message || 'Không thể tạo tài khoản' },
+      { error: (error as Error)?.message || 'Không thể tạo tài khoản' },
       { status: 500 }
     )
   }
@@ -72,9 +72,9 @@ export async function GET() {
     return NextResponse.json({
       needsSetup: existing.totalDocs === 0,
     })
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json(
-      { error: 'Database connection failed', details: error?.message },
+      { error: 'Database connection failed', details: (error as Error)?.message },
       { status: 500 }
     )
   }

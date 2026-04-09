@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Vui lòng đăng nhập để xem thông tin chuyển khoản' }, { status: 401 })
     }
 
-    const bankConfig = await payload.findGlobal({ slug: 'bank-config' }) as any
+    const bankConfig = await payload.findGlobal({ slug: 'bank-config' }) as { bankBin?: string; bankName?: string; accountNumber?: string; accountName?: string }
 
     if (bankConfig?.accountNumber) {
       return NextResponse.json({
@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
     const payload = await getPayloadForApi()
 
     const { user } = await payload.auth({ headers: req.headers })
-    if (!user || (user as any).role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: any
+    let body: { bankBin?: string; bankName?: string; accountNumber?: string; accountName?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }

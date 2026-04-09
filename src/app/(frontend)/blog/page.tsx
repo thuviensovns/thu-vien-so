@@ -64,7 +64,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   // Use real posts if available, otherwise fall back to demo
   const hasRealPosts = result.docs.length > 0
   const posts = hasRealPosts
-    ? result.docs.map((doc: any) => ({
+    ? (result.docs as Array<Record<string, any>>).map((doc) => ({
         title: doc.title,
         slug: doc.slug,
         excerpt: doc.excerpt || '',

@@ -95,6 +95,7 @@ export function AudioPreview({ src, bpm, musicalKey }: AudioPreviewProps) {
           size="icon"
           onClick={togglePlay}
           disabled={!isReady}
+          aria-label={isPlaying ? 'Tạm dừng' : 'Phát nhạc'}
           className="h-9 w-9 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all"
         >
           {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
@@ -121,6 +122,7 @@ export function AudioPreview({ src, bpm, musicalKey }: AudioPreviewProps) {
             variant="ghost"
             size="icon"
             onClick={toggleMute}
+            aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
             className="h-7 w-7 text-muted-foreground hover:text-foreground"
           >
             {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}

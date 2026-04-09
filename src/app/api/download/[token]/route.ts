@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { generateDownloadUrl } from '@/lib/r2'
+import type { Order, OrderItem, Product } from '@/types/payload-types'
 
 export const maxDuration = 30
 
@@ -32,7 +33,7 @@ export async function GET(
       depth: 1, // resolve product relationships
     })
 
-    const order = orders.docs[0] as any
+    const order = orders.docs[0] as Order
     if (!order) {
       return NextResponse.json({ error: 'Token không hợp lệ hoặc đã hết hạn' }, { status: 404 })
     }
@@ -49,11 +50,11 @@ export async function GET(
 
     // If no productId specified, return list of downloadable products
     if (!productId) {
-      const items = (order.items || []).map((item: any) => {
-        const product = item.product
+      const items = (order.items || []).map((item: OrderItem) => {
+        const product = typeof item.product === 'object' ? item.product as Product : null
         const file = product?.file || {}
         return {
-          productId: typeof product === 'object' ? product.id : product,
+          productId: product ? product.id : item.product,
           name: item.productName || product?.name || 'Unknown',
           hasFile: !!(file.r2Key || file.downloadUrl),
           fileName: file.fileName || null,
@@ -69,8 +70,8 @@ export async function GET(
     }
 
     // Find the product in order items
-    const orderItem = (order.items || []).find((item: any) => {
-      const pid = typeof item.product === 'object' ? String(item.product?.id) : String(item.product)
+    const orderItem = (order.items || []).find((item: OrderItem) => {
+      const pid = typeof item.product === 'object' ? String((item.product as Product).id) : String(item.product)
       return pid === String(productId)
     })
 
@@ -82,18 +83,18 @@ export async function GET(
     const product = typeof orderItem.product === 'object' ? orderItem.product : null
     if (!product) {
       // Product not resolved, fetch it
-      const fetched = await payload.findByID({ collection: 'products', id: productId, depth: 0 })
-      return generateFileResponse(fetched as any)
+      const fetched = await payload.findByID({ collection: 'products', id: productId, depth: 0 }) as Product
+      return generateFileResponse(fetched)
     }
 
-    return generateFileResponse(product)
+    return generateFileResponse(product as Product)
   } catch (error) {
     console.error('[Download Token] Error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-async function generateFileResponse(product: any) {
+async function generateFileResponse(product: Product) {
   const file = product?.file || {}
   const fileName = file.fileName || `${product?.slug || 'product'}.zip`
 

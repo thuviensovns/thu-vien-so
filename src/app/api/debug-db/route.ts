@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     results.products = {
       totalDocs: products.totalDocs,
       totalPages: products.totalPages,
-      sampleIds: products.docs.map((d: any) => ({ id: d.id, name: d.name, slug: d.slug })),
+      sampleIds: products.docs.map((d) => ({ id: d.id, name: d.name, slug: d.slug })),
     }
 
     // Count categories
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     })
     results.categories = {
       totalDocs: categories.totalDocs,
-      docs: categories.docs.map((d: any) => ({ id: d.id, name: d.name, slug: d.slug })),
+      docs: categories.docs.map((d) => ({ id: d.id, name: d.name, slug: d.slug })),
     }
 
     results.status = 'ok'

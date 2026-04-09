@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto'
 import type { Payload } from 'payload'
+import type { Order, OrderItem, Product } from '@/types/payload-types'
 
 const DOWNLOAD_EXPIRY_HOURS = 72
-const MAX_DOWNLOADS = 5
 
 export interface FulfillResult {
   downloadToken: string
@@ -21,7 +21,7 @@ export async function fulfillOrder(
   orderId: number | string,
   paymentInfo?: { transactionId?: string; paidAt?: string; rawResponse?: unknown },
 ): Promise<FulfillResult> {
-  const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 0 }) as any
+  const order = await payload.findByID({ collection: 'orders', id: orderId, depth: 0 }) as Order
 
   if (!order) throw new Error(`Order ${orderId} not found`)
 
@@ -29,7 +29,7 @@ export async function fulfillOrder(
   if (order.downloadToken) {
     return {
       downloadToken: order.downloadToken,
-      downloadExpiresAt: order.downloadExpiresAt,
+      downloadExpiresAt: order.downloadExpiresAt!,
       orderNumber: order.orderNumber,
     }
   }
@@ -60,15 +60,15 @@ export async function fulfillOrder(
   // Increment downloadCount on each product (non-blocking, best-effort)
   if (order.items && Array.isArray(order.items)) {
     await Promise.allSettled(
-      order.items.map(async (item: any) => {
-        const productId = typeof item.product === 'object' ? item.product?.id : item.product
+      order.items.map(async (item: OrderItem) => {
+        const productId = typeof item.product === 'object' ? (item.product as Product).id : item.product
         if (!productId) return
         try {
-          const product = await payload.findByID({ collection: 'products', id: productId, depth: 0 })
+          const product = await payload.findByID({ collection: 'products', id: productId, depth: 0 }) as Product
           await payload.update({
             collection: 'products',
             id: productId,
-            data: { downloadCount: ((product as any).downloadCount || 0) + 1 },
+            data: { downloadCount: (product.downloadCount || 0) + 1 },
           })
         } catch (e) {
           console.error(`[fulfillOrder] Failed to update downloadCount for product ${productId}:`, e)

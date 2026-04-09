@@ -31,7 +31,7 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: id }),
       })
-      let data: any = null
+      let data: { url?: string; fileName?: string; error?: string } | null = null
       try { data = await res.json() } catch {}
 
       if (res.ok && data?.url) {

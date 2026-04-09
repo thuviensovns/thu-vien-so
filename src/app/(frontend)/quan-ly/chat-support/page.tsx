@@ -43,7 +43,7 @@ export default function ChatSupportPage() {
   }
 
   // Update a top-level field
-  const updateField = (field: keyof ChatConfig, value: any) => {
+  const updateField = (field: keyof ChatConfig, value: ChatConfig[keyof ChatConfig]) => {
     handleSave({ ...config, [field]: value })
   }
 

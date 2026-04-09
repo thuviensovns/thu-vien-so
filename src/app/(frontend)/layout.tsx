@@ -75,7 +75,7 @@ const getSiteContentFromDB = unstable_cache(
       const { getPayload } = await import('payload')
       const config = (await import('@payload-config')).default
       const payload = await getPayload({ config })
-      const data = await payload.findGlobal({ slug: 'site-content' }) as any
+      const data = await payload.findGlobal({ slug: 'site-content' }) as { settings?: Record<string, unknown> | null; categoryDescriptions?: Record<string, string> | null }
       return {
         settings: data?.settings || null,
         categoryDescriptions: data?.categoryDescriptions || null,

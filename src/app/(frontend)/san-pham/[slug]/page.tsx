@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       type: 'website',
       images: (() => {
-        const r2Url = typeof (product as any).thumbnailUrl === 'string' ? (product as any).thumbnailUrl : ''
+        const r2Url = typeof (product as Record<string, unknown>).thumbnailUrl === 'string' ? (product as Record<string, unknown>).thumbnailUrl as string : ''
         const mediaUrl = typeof (product as Record<string, unknown>).thumbnail === 'object' ? (product.thumbnail as { url?: string })?.url : ''
         const img = r2Url || mediaUrl
         return img ? [img] : []

@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const payload = await getPayloadForApi()
 
-    const data = await payload.findGlobal({ slug: 'site-content' }) as any
+    const data = await payload.findGlobal({ slug: 'site-content' }) as { settings?: Record<string, unknown> | null; categoryDescriptions?: Record<string, string> | null }
 
     return NextResponse.json({
       settings: data?.settings || null,
@@ -27,11 +27,11 @@ export async function POST(req: NextRequest) {
     const payload = await getPayloadForApi()
 
     const { user } = await payload.auth({ headers: req.headers })
-    if (!user || (user as any).role !== 'admin') {
+    if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: any
+    let body: { settings?: unknown; categoryDescriptions?: unknown }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
     }

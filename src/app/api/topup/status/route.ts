@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const topup = result.docs[0] as any
+    const topup = result.docs[0]
     return NextResponse.json({
       id: topup.id,
       status: topup.status,

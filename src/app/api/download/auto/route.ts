@@ -9,7 +9,7 @@ import { generateDownloadUrl } from '@/lib/r2'
  */
 export async function POST(req: NextRequest) {
   try {
-    let body: any
+    let body: { productId?: string; orderNumber?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const payload = await getPayloadForApi(15000)
 
     // SECURITY: Require authenticated user
-    let user: any = null
+    let user: Record<string, unknown> | null = null
     try {
       const auth = await payload.auth({ headers: req.headers })
       user = auth.user

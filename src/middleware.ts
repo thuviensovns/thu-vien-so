@@ -1,27 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// --- Rate limiting (in-memory, per IP) ---
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-function isRateLimited(ip: string, limit = 60, windowMs = 60_000): boolean {
-  const now = Date.now()
-  const entry = rateLimitMap.get(ip)
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + windowMs })
-    return false
-  }
-  entry.count++
-  return entry.count > limit
-}
-
-function cleanupStaleEntries() {
-  const now = Date.now()
-  if (rateLimitMap.size > 1000) {
-    for (const [key, value] of rateLimitMap) {
-      if (now > value.resetAt) rateLimitMap.delete(key)
-    }
-  }
-}
+import { isRateLimited, cleanupStaleEntries } from '@/lib/rate-limit'
 
 // --- Middleware ---
 export function middleware(req: NextRequest) {

@@ -77,7 +77,7 @@ export default function ProductsPage() {
         }
 
         if (data && data.docs) {
-          const apiError = (data as any).error
+          const apiError = (data as Record<string, unknown>).error as string | undefined
           if (apiError && data.docs.length === 0) {
             // API returned an error with no docs — treat as failed, retry
             console.warn('[Admin] API error (attempt', attempt + '):', apiError)
@@ -157,11 +157,12 @@ export default function ProductsPage() {
     const isCustom = 'isCustom' in product && product.isCustom === true
     setEditingId(isCustom ? product.id : null)
     setEditingDemoId(isCustom ? null : product.id)
-    const fileData = (product as any).file?.r2Key ? {
-      r2Key: (product as any).file.r2Key,
-      fileName: (product as any).file.fileName || '',
-      fileSize: (product as any).file.fileSize || 0,
-      fileFormat: (product as any).file.fileFormat || '',
+    const file = 'file' in product ? product.file : undefined
+    const fileData = file?.r2Key ? {
+      r2Key: file.r2Key,
+      fileName: file.fileName || '',
+      fileSize: file.fileSize || 0,
+      fileFormat: file.fileFormat || '',
     } : null
     setForm({
       name: product.name,
@@ -172,7 +173,7 @@ export default function ProductsPage() {
       originalPrice: product.pricing.originalPrice ? String(product.pricing.originalPrice) : '',
       featured: product.featured || false,
       file: fileData,
-      downloadUrl: (product as any).file?.downloadUrl || '',
+      downloadUrl: file?.downloadUrl || '',
     })
     setShowForm(true)
   }

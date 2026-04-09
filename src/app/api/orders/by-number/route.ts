@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       depth: 0,
     })
 
-    const order = orders.docs[0] as any
+    const order = orders.docs[0]
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }

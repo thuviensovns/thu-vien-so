@@ -53,6 +53,7 @@ const validDemoSlugs = [
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let post: any = null
   try {
     post = await getBlogPostBySlug(slug)
@@ -76,7 +77,7 @@ export default async function BlogPostPage({ params }: PageProps) {
     'huong-dan-cai-dat-fl-studio-v25-1-6': ['FL Studio', 'Cài đặt', 'Hướng dẫn'],
     '10-meo-mix-nhac-vinahouse': ['Vinahouse', 'Mixing', 'Producer'],
   }
-  const tags = post?.tags?.map((t: any) => t.tag).filter(Boolean) || defaultTags[slug] || ['Producer', 'Tutorial', 'Sản xuất nhạc']
+  const tags = post?.tags?.map((t: { tag?: string }) => t.tag).filter(Boolean) || defaultTags[slug] || ['Producer', 'Tutorial', 'Sản xuất nhạc']
 
   const demoExcerpts: Record<string, string> = {
     'tong-hop-phim-tat-fl-studio': 'Khám phá bảng phím tắt FL Studio đầy đủ: Playlist, Piano Roll, Mixer, Channel Rack… Giúp producer tăng tốc làm nhạc nhanh chóng và hiệu quả.',

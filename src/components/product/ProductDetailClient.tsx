@@ -22,7 +22,6 @@ const AudioPreview = dynamic(
 )
 import { typeLabels } from '@/lib/config'
 import { formatFileSize } from '@/lib/format'
-
 const categoryIcons: Record<string, typeof Music> = {
   'sample-pack': Music, 'flp': Headphones, 'vst': Zap,
   'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic,
@@ -31,6 +30,7 @@ const categoryIcons: Record<string, typeof Music> = {
 interface ProductDetailClientProps {
   slug: string
   /** Server-fetched product (null if not found) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serverProduct: any | null
 }
 

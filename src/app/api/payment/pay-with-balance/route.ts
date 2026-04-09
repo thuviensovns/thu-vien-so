@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { fulfillOrder } from '@/lib/fulfill-order'
 import { revalidatePath } from 'next/cache'
+import type { Order, User } from '@/types/payload-types'
 
 /** Pay for an order using account balance */
 export async function POST(req: NextRequest) {
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: any
+    let body: { orderId?: string | number }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get order
-    const order = await payload.findByID({ collection: 'orders', id: orderId }) as any
+    const order = await payload.findByID({ collection: 'orders', id: orderId }) as Order
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
@@ -52,8 +53,8 @@ export async function POST(req: NextRequest) {
 
     // SECURITY: Atomic-like balance deduction to prevent race conditions
     // Step 1: Get fresh balance and verify sufficiency
-    const freshUser = await payload.findByID({ collection: 'users', id: user.id })
-    const currentBalance = (freshUser as any).balance || 0
+    const freshUser = await payload.findByID({ collection: 'users', id: user.id }) as User
+    const currentBalance = freshUser.balance || 0
 
     if (currentBalance < total) {
       return NextResponse.json({
@@ -65,19 +66,19 @@ export async function POST(req: NextRequest) {
     await payload.update({
       collection: 'orders',
       id: orderId,
-      data: { status: 'processing' } as any,
+      data: { status: 'processing' },
     })
 
     // Step 3: Re-fetch balance to minimize TOCTOU window
-    const recheckUser = await payload.findByID({ collection: 'users', id: user.id })
-    const recheckBalance = (recheckUser as any).balance || 0
+    const recheckUser = await payload.findByID({ collection: 'users', id: user.id }) as User
+    const recheckBalance = recheckUser.balance || 0
 
     if (recheckBalance < total) {
       // Rollback order status
       await payload.update({
         collection: 'orders',
         id: orderId,
-        data: { status: 'pending' } as any,
+        data: { status: 'pending' },
       })
       return NextResponse.json({
         error: `Số dư không đủ. Cần ${total}, hiện có ${recheckBalance}`,
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
     await payload.update({
       collection: 'users',
       id: user.id,
-      data: { balance: recheckBalance - total } as any,
+      data: { balance: recheckBalance - total },
     })
 
     // Step 5: Fulfill order — generates downloadToken, marks as paid, increments download counts

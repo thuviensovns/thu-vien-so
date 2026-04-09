@@ -1,11 +1,12 @@
 import type { DemoProduct } from '@/lib/demo-data'
+import type { Product } from '@/types/payload-types'
 
 /**
  * Map a raw Payload CMS document to a DemoProduct shape.
  * Used by both the storefront (HomeContent) and admin (ProductTable) to
  * normalise DB records into the client-side product type.
  */
-export function mapPayloadDoc(doc: Record<string, unknown>): DemoProduct {
+export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProduct {
   const pricing = (doc.pricing as Record<string, unknown>) || {}
   const preview = (doc.preview as Record<string, unknown>) || {}
   const category = (doc.category as Record<string, unknown>) || {}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { fulfillOrder } from '@/lib/fulfill-order'
 import { revalidatePath } from 'next/cache'
+import type { Order, TopUp, User } from '@/types/payload-types'
+import type { SepayWebhookBody } from '@/types/domain'
 
 /**
  * Sepay / Casso webhook for bank transfer notifications.
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const payload = await getPayloadForApi()
 
-    let body: any
+    let body: SepayWebhookBody
     try { body = await req.json() } catch {
       return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 })
     }
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
       })
 
       if (orderResult.totalDocs > 0) {
-        const order = orderResult.docs[0] as any
+        const order = orderResult.docs[0] as Order
 
         // Verify amount (allow 5,000 VND tolerance for bank fees)
         const tolerance = Math.min(5000, order.total * 0.1)
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'No matching pending topup' })
     }
 
-    const topup = result.docs[0] as any
+    const topup = result.docs[0] as TopUp
 
     // Verify amount (allow flat fee tolerance of max 5,000 VND for bank fees)
     const tolerance = Math.min(5000, topup.amount * 0.1)
@@ -149,8 +151,8 @@ export async function POST(req: NextRequest) {
 
     // ATOMIC: Conditionally update only if still pending (prevents double-credit)
     // Payload doesn't support WHERE in update, so we re-check status right before update
-    const freshTopup = await payload.findByID({ collection: 'topups', id: topup.id })
-    if ((freshTopup as any).status !== 'pending') {
+    const freshTopup = await payload.findByID({ collection: 'topups', id: topup.id }) as TopUp
+    if (freshTopup.status !== 'pending') {
       console.log('[Sepay Webhook] Topup already processed:', topup.id)
       return NextResponse.json({ success: true, message: 'Already processed' })
     }
@@ -169,8 +171,8 @@ export async function POST(req: NextRequest) {
 
     // Credit user balance
     const userId = typeof topup.user === 'object' ? topup.user.id : topup.user
-    const currentUser = await payload.findByID({ collection: 'users', id: userId })
-    const currentBalance = (currentUser as any).balance || 0
+    const currentUser = await payload.findByID({ collection: 'users', id: userId }) as User
+    const currentBalance = currentUser.balance || 0
     const creditAmount = Math.min(amount, topup.amount)
 
     await payload.update({
@@ -178,7 +180,7 @@ export async function POST(req: NextRequest) {
       id: userId,
       data: {
         balance: currentBalance + creditAmount,
-      } as any,
+      },
     })
 
     console.log(`[Sepay Webhook] Credited ${creditAmount} VND to user ${userId}. New balance: ${currentBalance + creditAmount}`)

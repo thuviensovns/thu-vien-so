@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import type { ContactMessage } from '@/types/payload-types'
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       unreadCount: newMessages.totalDocs,
-      recent: recentMessages.docs.map((msg: any) => ({
+      recent: recentMessages.docs.map((msg) => ({
         id: msg.id,
         name: msg.name,
         email: msg.email,

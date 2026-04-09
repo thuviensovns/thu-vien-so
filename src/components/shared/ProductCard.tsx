@@ -100,7 +100,7 @@ export const ProductCard = memo(function ProductCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: id || slug }),
       })
-      let data: any = null
+      let data: { url?: string; fileName?: string; error?: string } | null = null
       try { data = await res.json() } catch {}
 
       if (res.ok && data?.url) {
@@ -279,6 +279,7 @@ export const ProductCard = memo(function ProductCard({
               variant="outline"
               onClick={handleAddToCart}
               disabled={isInCart}
+              aria-label={isInCart ? 'Đã thêm vào giỏ' : 'Thêm vào giỏ hàng'}
               className={`h-8 w-8 sm:w-auto sm:px-2.5 rounded-lg transition-all duration-200 shrink-0 ${
                 isInCart || justAdded
                   ? 'bg-success/10 text-success border-success/20'

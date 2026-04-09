@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import type { User } from '@/types/payload-types'
 
 /** GET: Fetch current user balance from DB */
 export async function GET(req: NextRequest) {
@@ -12,8 +13,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch fresh user data to get balance
-    const freshUser = await payload.findByID({ collection: 'users', id: user.id })
-    const balance = (freshUser as any).balance || 0
+    const freshUser = await payload.findByID({ collection: 'users', id: user.id }) as User
+    const balance = freshUser.balance || 0
 
     return NextResponse.json({ balance })
   } catch (error) {

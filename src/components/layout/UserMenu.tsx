@@ -36,7 +36,7 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
+        <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary" aria-label="Menu tài khoản">
           <User className="h-5 w-5" />
           <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ${isAdmin ? 'bg-warning' : 'bg-accent'}`} />
         </Button>
