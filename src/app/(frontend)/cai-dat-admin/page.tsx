@@ -1,63 +1,84 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { LogIn, Music, Loader2, AlertCircle, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Shield, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { useAuth } from '@/hooks/use-auth'
-import { toast } from 'sonner'
 
-export default function LoginPage() {
+export default function SetupAdminPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { user, isLoading: authLoading, login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const justRegistered = searchParams.get('registered') === 'true'
+  const [checking, setChecking] = useState(true)
+  const [needsSetup, setNeedsSetup] = useState(false)
 
-  // Redirect if already logged in (admins → admin panel, users → account)
   useEffect(() => {
-    if (!authLoading && user) {
-      router.replace(user.role === 'admin' ? '/quan-ly' : '/tai-khoan')
-    }
-  }, [authLoading, user, router])
+    fetch('/api/setup')
+      .then(res => res.json())
+      .then(data => {
+        if (data.needsSetup) {
+          setNeedsSetup(true)
+        } else {
+          router.replace('/dang-nhap')
+        }
+      })
+      .catch(() => setError('Không thể kết nối đến server'))
+      .finally(() => setChecking(false))
+  }, [router])
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setIsLoading(true)
 
-    const result = await login(email, password)
-    if (result.ok) {
-      toast.success('Đăng nhập thành công!')
-      // Fetch user to check role, then redirect accordingly
-      try {
-        const meRes = await fetch('/api/users/me', { credentials: 'include' })
-        const meData = await meRes.json()
-        const role = meData?.user?.role
-        router.push(role === 'admin' ? '/quan-ly' : '/tai-khoan')
-      } catch {
-        router.push('/tai-khoan')
+    try {
+      const res = await fetch('/api/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, displayName }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        setSuccess(true)
+        setTimeout(() => router.push('/dang-nhap'), 2000)
+      } else {
+        setError(data.error || 'Không thể tạo tài khoản')
       }
-    } else {
-      setError(result.error || 'Đăng nhập thất bại')
-      toast.error('Đăng nhập thất bại', { description: result.error })
+    } catch {
+      setError('Lỗi kết nối server')
+    } finally {
       setIsLoading(false)
     }
   }
 
-  // Don't show form if already logged in
-  if (!authLoading && user) {
+  if (checking) {
     return (
-      <div className="container mx-auto flex items-center justify-center min-h-[60vh] px-4 py-8">
+      <div className="container mx-auto flex items-center justify-center min-h-[60vh]">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!needsSetup) return null
+
+  if (success) {
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-[60vh] px-4">
+        <Card className="w-full max-w-md border-border bg-card">
+          <CardContent className="p-8 text-center">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-2">Tạo admin thành công!</h2>
+            <p className="text-muted-foreground">Đang chuyển đến trang đăng nhập...</p>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -68,21 +89,13 @@ export default function LoginPage() {
         <CardContent className="p-6 sm:p-8">
           <div className="text-center mb-6">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-              <Music className="h-7 w-7 text-primary" />
+              <Shield className="h-7 w-7 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold">Đăng nhập</h1>
+            <h1 className="text-2xl font-bold">Thiết lập Admin</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Đăng nhập để mua và tải sản phẩm
+              Tạo tài khoản quản trị viên đầu tiên
             </p>
           </div>
-
-          {/* Success message after registration */}
-          {justRegistered && !error && (
-            <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
-              Đăng ký thành công! Hãy đăng nhập để tiếp tục.
-            </div>
-          )}
 
           {error && (
             <div className="mb-4 flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
@@ -91,17 +104,28 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="displayName" className="text-sm font-medium mb-1.5 block">Tên hiển thị</label>
+              <Input
+                id="displayName"
+                type="text"
+                placeholder="Admin"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                disabled={isLoading}
+                className="bg-muted/50"
+              />
+            </div>
             <div>
               <label htmlFor="email" className="text-sm font-medium mb-1.5 block">Email</label>
               <Input
                 id="email"
                 type="email"
-                placeholder="email@example.com"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="email"
                 disabled={isLoading}
                 className="bg-muted/50"
               />
@@ -112,11 +136,11 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Nhập mật khẩu"
+                  placeholder="Tối thiểu 8 ký tự"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  autoComplete="current-password"
+                  minLength={8}
                   disabled={isLoading}
                   className="bg-muted/50 pr-10"
                 />
@@ -138,21 +162,11 @@ export default function LoginPage() {
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <LogIn className="mr-2 h-4 w-4" />
+                <Shield className="mr-2 h-4 w-4" />
               )}
-              {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+              {isLoading ? 'Đang tạo...' : 'Tạo tài khoản Admin'}
             </Button>
           </form>
-
-
-          <Separator className="my-6" />
-
-          <p className="text-center text-sm text-muted-foreground">
-            Chưa có tài khoản?{' '}
-            <Link href="/dang-ky" className="text-primary hover:underline font-medium">
-              Đăng ký ngay
-            </Link>
-          </p>
         </CardContent>
       </Card>
     </div>
