@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { fulfillOrder } from '@/lib/fulfill-order'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -63,8 +64,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Already processed (duplicate txId)' })
     }
 
-    // Extract transfer code from content (word-boundary match)
+    // Extract transfer code from content
     const content = String(body.content || body.description || '').toUpperCase()
+
+    // Try to match an ORDER number first (DH... or MUS-...)
+    const orderMatch = content.match(/\b(DH[A-Z0-9]{10,20}|MUS-[A-Z0-9]+-[A-Z0-9]+)\b/)
+    if (orderMatch) {
+      const orderNumber = orderMatch[0]
+      console.log('[Sepay Webhook] Detected order number:', orderNumber)
+
+      // Find pending order with this order number
+      const orderResult = await payload.find({
+        collection: 'orders',
+        where: {
+          orderNumber: { equals: orderNumber },
+          status: { equals: 'pending' },
+        },
+        limit: 1,
+        depth: 0,
+      })
+
+      if (orderResult.totalDocs > 0) {
+        const order = orderResult.docs[0] as any
+
+        // Verify amount (allow 5,000 VND tolerance for bank fees)
+        const tolerance = Math.min(5000, order.total * 0.1)
+        if (amount < order.total - tolerance) {
+          console.warn(`[Sepay Webhook] Order amount mismatch: received ${amount}, expected ${order.total}`)
+          return NextResponse.json({ success: false, error: 'Amount too low for order' }, { status: 400 })
+        }
+
+        // Fulfill the order — generates downloadToken, marks as paid
+        const result = await fulfillOrder(payload, order.id, {
+          transactionId: bankTxId,
+          paidAt: new Date().toISOString(),
+          rawResponse: { gateway: body.gateway, bankTxId, amount, content },
+        })
+
+        console.log(`[Sepay Webhook] Order ${orderNumber} fulfilled. Token: ${result.downloadToken}`)
+
+        try { revalidatePath('/', 'layout') } catch {}
+
+        return NextResponse.json({
+          success: true,
+          message: 'Order fulfilled',
+          orderNumber,
+          downloadToken: result.downloadToken,
+        })
+      }
+    }
+
+    // No order match — try top-up code (NAP...)
     const codeMatch = content.match(/\bNAP[A-Z0-9]{4,12}\b/)
     if (!codeMatch) {
       console.log('[Sepay Webhook] No transfer code found in:', content)

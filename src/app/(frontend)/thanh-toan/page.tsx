@@ -157,13 +157,14 @@ export default function CheckoutPage() {
           return
         }
 
+        const payData = await payRes.json()
         consumeCoupon()
         saveOrderToLocal('Số dư TK', 'paid')
-        try { localStorage.setItem('purchased_items', JSON.stringify(items)) } catch {}
         clearCart()
         setIsSubmitting(false)
         toast.success('Thanh toán thành công bằng số dư!')
-        router.push(`/thanh-toan/ket-qua?status=success&orderNumber=${orderData.orderNumber || ''}`)
+        const token = payData.downloadToken || ''
+        router.push(`/thanh-toan/ket-qua?status=success&orderNumber=${payData.orderNumber || orderData.orderNumber || ''}&token=${token}`)
       } catch {
         setError('Lỗi kết nối. Vui lòng thử lại.')
         setIsSubmitting(false)
@@ -187,13 +188,12 @@ export default function CheckoutPage() {
         // Bank-transfer stays pending until webhook confirms; VNPay redirects to payment gateway
         const orderStatus = paymentMethod === 'bank-transfer' ? 'pending' : 'paid'
         saveOrderToLocal(paymentMethod === 'bank-transfer' ? 'QR Bank' : paymentMethod, orderStatus)
-        try { localStorage.setItem('purchased_items', JSON.stringify(items)) } catch {}
         clearCart()
         setIsSubmitting(false)
         if (data.paymentUrl) { window.location.href = data.paymentUrl }
         else {
           const resultStatus = paymentMethod === 'bank-transfer' ? 'pending' : 'success'
-          router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}`)
+          router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}&orderId=${data.orderId || ''}`)
         }
         return
       }

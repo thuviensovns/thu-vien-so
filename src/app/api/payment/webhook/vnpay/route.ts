@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { fulfillOrder } from '@/lib/fulfill-order'
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { verifyVNPaySignature } from '@/lib/payment'
 
@@ -69,53 +70,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ RspCode: '00', Message: 'Confirm Success' })
     }
 
-    // Payment success — update order
-    await payload.update({
-      collection: 'orders',
-      id: order.id,
-      data: {
-        status: 'paid',
-        payment: {
-          ...order.payment,
-          transactionId,
-          paidAt: new Date().toISOString(),
-          rawResponse: params,
-        },
-      },
+    // Payment success — fulfill order (generates downloadToken, increments counts)
+    await fulfillOrder(payload, order.id, {
+      transactionId,
+      paidAt: new Date().toISOString(),
+      rawResponse: params,
     })
-
-    // Create download records for each item
-    const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + 72)
-
-    for (const item of order.items) {
-      const productId =
-        typeof item.product === 'string' ? item.product : item.product?.id
-      if (!productId) continue
-
-      await payload.create({
-        collection: 'downloads',
-        data: {
-          user: typeof order.user === 'string' ? order.user : order.user.id,
-          order: order.id,
-          product: productId,
-          downloadCount: 0,
-          maxDownloads: 5,
-          expiresAt: expiresAt.toISOString(),
-        },
-      })
-
-      // Increment product download count
-      const product = await payload.findByID({
-        collection: 'products',
-        id: productId,
-      })
-      await payload.update({
-        collection: 'products',
-        id: productId,
-        data: { downloadCount: (product.downloadCount || 0) + 1 },
-      })
-    }
 
     // Revalidate pages so stats update
     try {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { fulfillOrder } from '@/lib/fulfill-order'
 import { revalidatePath } from 'next/cache'
 
 /** Pay for an order using account balance */
@@ -90,23 +91,19 @@ export async function POST(req: NextRequest) {
       data: { balance: recheckBalance - total } as any,
     })
 
-    // Step 5: Mark order as paid
-    await payload.update({
-      collection: 'orders',
-      id: orderId,
-      data: {
-        status: 'paid',
-        payment: { method: 'balance', paidAt: new Date().toISOString() },
-      } as any,
+    // Step 5: Fulfill order — generates downloadToken, marks as paid, increments download counts
+    const result = await fulfillOrder(payload, orderId, {
+      paidAt: new Date().toISOString(),
     })
-
 
     try { revalidatePath('/', 'layout') } catch {}
 
     return NextResponse.json({
       success: true,
-      newBalance: currentBalance - total,
+      newBalance: recheckBalance - total,
       orderId,
+      orderNumber: result.orderNumber,
+      downloadToken: result.downloadToken,
     })
   } catch (error) {
     console.error('[Balance Pay] Error:', error)

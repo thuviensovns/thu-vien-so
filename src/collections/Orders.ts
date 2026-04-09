@@ -61,6 +61,7 @@ export const Orders: CollectionConfig = {
             { label: 'MoMo', value: 'momo' },
             { label: 'ZaloPay', value: 'zalopay' },
             { label: 'Chuyển khoản', value: 'bank-transfer' },
+            { label: 'Số dư', value: 'balance' },
           ],
         },
         { name: 'transactionId', type: 'text', label: 'Mã giao dịch' },
@@ -71,5 +72,9 @@ export const Orders: CollectionConfig = {
     { name: 'customerEmail', type: 'email', label: 'Email khách hàng' },
     { name: 'customerPhone', type: 'text', label: 'SĐT khách hàng' },
     { name: 'note', type: 'textarea', label: 'Ghi chú' },
+
+    // Token-based download system
+    { name: 'downloadToken', type: 'text', unique: true, index: true, label: 'Download Token', admin: { readOnly: true, position: 'sidebar' } },
+    { name: 'downloadExpiresAt', type: 'date', label: 'Download hết hạn', admin: { readOnly: true, position: 'sidebar' } },
   ],
 }
