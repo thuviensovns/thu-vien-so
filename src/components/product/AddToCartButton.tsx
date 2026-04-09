@@ -24,44 +24,42 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
   const isInCart = items.some((i) => i.id === id)
 
   async function handleFreeDownload() {
+    toast.loading('Đang tải xuống...', { id: 'free-dl', description: name })
     try {
       const res = await fetch('/api/download/free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId: id }),
       })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.url) {
-          // External links (Google Drive, etc.) → new tab; R2 → direct download
-          const isExternal = data.url.startsWith('http') && !data.url.includes('.r2.cloudflarestorage.')
-          if (isExternal) {
-            window.open(data.url, '_blank', 'noopener')
-          } else {
-            const a = document.createElement('a')
-            a.href = data.url
-            a.download = data.fileName || `${slug}.zip`
-            a.style.display = 'none'
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-          }
-          router.refresh()
-          return
+      const data = res.ok ? await res.json() : null
+      if (data?.url) {
+        toast.dismiss('free-dl')
+        const isExternal = data.url.startsWith('http') && !data.url.includes('.r2.cloudflarestorage.')
+        if (isExternal) {
+          window.open(data.url, '_blank', 'noopener')
+        } else {
+          const a = document.createElement('a')
+          a.href = data.url
+          a.download = data.fileName || `${slug}.zip`
+          a.style.display = 'none'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
         }
+        toast.success('Tải xuống thành công!', { description: name })
+        router.refresh()
+        return
       }
-      toast.error('Chưa có file tải cho sản phẩm này', {
-        description: 'Admin chưa thêm link tải. Vui lòng liên hệ hỗ trợ.',
-      })
+      const errMsg = data?.error || (res.ok ? 'Chưa có file tải' : `Lỗi server (${res.status})`)
+      toast.error(errMsg, { id: 'free-dl', description: 'Liên hệ admin để được hỗ trợ.' })
     } catch {
-      toast.error('Lỗi kết nối', { description: 'Không thể tải xuống. Vui lòng thử lại.' })
+      toast.error('Lỗi kết nối', { id: 'free-dl', description: 'Không thể tải xuống. Vui lòng thử lại.' })
     }
   }
 
-  function handleAddToCart() {
+  async function handleAddToCart() {
     if (isFree) {
-      handleFreeDownload()
-      toast.success('Đang tải xuống...', { description: name })
+      await handleFreeDownload()
       return
     }
     if (isInCart) return
@@ -77,13 +75,11 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
     })
   }
 
-  function handleBuyNow() {
+  async function handleBuyNow() {
     if (isFree) {
-      handleFreeDownload()
-      toast.success('Đang tải xuống...', { description: name })
+      await handleFreeDownload()
       return
     }
-    // Add to cart then redirect to checkout
     if (!isInCart) {
       addItem({ id, name, slug, price, thumbnail, type })
     }

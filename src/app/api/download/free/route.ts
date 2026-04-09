@@ -51,52 +51,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
+    const realId = product.id // always use DB ID, not the slug/productId from request
+
     if (!product.pricing.isFree && product.pricing.price > 0) {
       return NextResponse.json(
         { error: 'Product is not free' },
         { status: 403 },
       )
-    }
-
-    // Always increment download count for free products
-    const newCount = (product.downloadCount || 0) + 1
-    await payload.update({
-      collection: 'products',
-      id: productId,
-      data: { downloadCount: newCount },
-    })
-
-    // Revalidate pages so stats update immediately
-    try {
-      revalidatePath(`/san-pham/${product.slug}`, 'page')
-      revalidatePath('/san-pham', 'page')
-      revalidatePath('/', 'layout')
-      revalidatePath('/gioi-thieu', 'page')
-      revalidatePath('/danh-muc', 'page')
-      revalidateTag('products')
-    } catch {}
-
-    // Optionally create order record for tracking
-    const { user } = await payload.auth({ headers: req.headers })
-    if (user) {
-      const orderNumber = generateOrderNumber()
-      await payload.create({
-        collection: 'orders',
-        data: {
-          orderNumber,
-          user: user.id,
-          items: [
-            {
-              product: productId,
-              price: 0,
-              productName: product.name,
-            },
-          ],
-          total: 0,
-          status: 'paid',
-          customerEmail: user.email,
-        },
-      })
     }
 
     // Get download URL: direct link first, then R2
@@ -106,13 +67,56 @@ export async function POST(req: NextRequest) {
     } else if (product.file?.r2Key) {
       try {
         url = await generateDownloadUrl(product.file.r2Key, 3600)
-      } catch {}
+      } catch (e) {
+        console.error('R2 URL generation failed:', e)
+      }
+    }
+
+    // Increment download count (non-blocking — don't let it break the download)
+    try {
+      const newCount = (product.downloadCount || 0) + 1
+      await payload.update({
+        collection: 'products',
+        id: realId,
+        data: { downloadCount: newCount },
+      })
+    } catch (e) {
+      console.error('Download count update failed:', e)
+    }
+
+    // Revalidate pages (non-blocking)
+    try {
+      revalidatePath(`/san-pham/${product.slug}`, 'page')
+      revalidatePath('/san-pham', 'page')
+      revalidatePath('/', 'layout')
+      revalidateTag('products')
+    } catch {}
+
+    // Create order record for tracking (non-blocking)
+    try {
+      const { user } = await payload.auth({ headers: req.headers })
+      if (user) {
+        const orderNumber = generateOrderNumber()
+        await payload.create({
+          collection: 'orders',
+          data: {
+            orderNumber,
+            user: user.id,
+            items: [{ product: realId, price: 0, productName: product.name }],
+            total: 0,
+            status: 'paid',
+            customerEmail: user.email,
+          },
+        })
+      }
+    } catch (e) {
+      console.error('Order creation failed:', e)
     }
 
     return NextResponse.json({
       url,
       fileName: product.file?.fileName || `${product.slug}.${product.file?.fileFormat || 'zip'}`,
-      downloadCount: newCount,
+      downloadCount: (product.downloadCount || 0) + 1,
       success: true,
     })
   } catch (error) {
