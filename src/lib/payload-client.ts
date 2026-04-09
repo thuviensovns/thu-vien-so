@@ -43,9 +43,10 @@ function mimeToExt(mime: string): string {
   return map[mime] || 'jpg'
 }
 
-/** Upload an image (data URL) to Payload media collection.
- *  Returns the media document ID on success, or null on failure. */
-export async function uploadMedia(dataUrl: string, slugName?: string): Promise<number | null> {
+/** Upload an image (data URL) to R2 via /api/upload/thumbnail.
+ *  Returns the R2 public URL on success, or null on failure.
+ *  Also tries Payload /api/media as fallback to get a media ID. */
+export async function uploadMedia(dataUrl: string, slugName?: string): Promise<number | string | null> {
   try {
     const { blob, mimeType } = dataUrlToBlob(dataUrl)
     const ext = mimeToExt(mimeType)
@@ -53,7 +54,30 @@ export async function uploadMedia(dataUrl: string, slugName?: string): Promise<n
       ? `${slugName.replace(/\.[^.]+$/, '')}-${Date.now()}.${ext}`
       : `product-${Date.now()}.${ext}`
 
+    // Try R2 thumbnail upload first (bypasses Vercel 4.5MB body limit)
+    try {
+      const r2Form = new FormData()
+      r2Form.append('file', blob, name)
+      r2Form.append('productSlug', slugName || 'product')
 
+      const r2Res = await fetch('/api/upload/thumbnail', {
+        method: 'POST',
+        credentials: 'include',
+        body: r2Form,
+      })
+
+      if (r2Res.ok) {
+        const r2Data = await r2Res.json()
+        if (r2Data.url) {
+          // Return URL string — caller must handle both number (media ID) and string (URL)
+          return r2Data.url
+        }
+      }
+    } catch (e) {
+      console.warn('[uploadMedia] R2 thumbnail upload failed, trying Payload media:', e)
+    }
+
+    // Fallback: try Payload /api/media (may hit 413 on Vercel Hobby for large images)
     const formData = new FormData()
     formData.append('file', blob, name)
     formData.append('alt', slugName?.replace(/\.[^.]+$/, '') || 'Product image')

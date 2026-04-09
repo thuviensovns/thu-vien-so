@@ -9,9 +9,13 @@ export function mapPayloadDoc(doc: Record<string, unknown>): DemoProduct {
   const pricing = (doc.pricing as Record<string, unknown>) || {}
   const preview = (doc.preview as Record<string, unknown>) || {}
   const category = (doc.category as Record<string, unknown>) || {}
+  const fileGroup = (doc.file as Record<string, unknown>) || {}
   const thumbnail = doc.thumbnail
   let thumbUrl = '/images/placeholder.jpg'
-  if (thumbnail && typeof thumbnail === 'object' && 'url' in thumbnail) {
+  // Prefer thumbnailUrl (R2/external) over Payload media thumbnail
+  if (doc.thumbnailUrl && typeof doc.thumbnailUrl === 'string') {
+    thumbUrl = doc.thumbnailUrl
+  } else if (thumbnail && typeof thumbnail === 'object' && 'url' in thumbnail) {
     const url = (thumbnail as Record<string, string>).url
     if (url && !url.endsWith('/placeholder.jpg')) thumbUrl = url
   }
@@ -29,6 +33,13 @@ export function mapPayloadDoc(doc: Record<string, unknown>): DemoProduct {
     preview: {
       bpm: preview.bpm ? Number(preview.bpm) : null,
       musicalKey: preview.musicalKey ? String(preview.musicalKey) : null,
+    },
+    file: {
+      r2Key: fileGroup.r2Key ? String(fileGroup.r2Key) : undefined,
+      fileName: fileGroup.fileName ? String(fileGroup.fileName) : undefined,
+      fileSize: fileGroup.fileSize ? Number(fileGroup.fileSize) : undefined,
+      fileFormat: fileGroup.fileFormat ? String(fileGroup.fileFormat) : undefined,
+      downloadUrl: fileGroup.downloadUrl ? String(fileGroup.downloadUrl) : undefined,
     },
     downloadCount: Number(doc.downloadCount || 0),
     featured: Boolean(doc.featured),

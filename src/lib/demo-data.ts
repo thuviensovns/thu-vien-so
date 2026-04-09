@@ -13,7 +13,7 @@ export interface DemoProduct {
   downloadCount: number
   featured?: boolean
   category?: { slug: string; name: string }
-  file?: { fileFormat?: string; fileSize?: number }
+  file?: { r2Key?: string; fileName?: string; fileSize?: number; fileFormat?: string; downloadUrl?: string }
   compatibility?: { daw?: string; version?: string }[]
   tags?: { tag?: string }[]
   updatedAt: string

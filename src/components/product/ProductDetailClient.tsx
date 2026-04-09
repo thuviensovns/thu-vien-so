@@ -85,7 +85,8 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
 
   const isDemo = !serverProduct && !!demoProduct
 
-  const rawThumb = typeof p.thumbnail === 'object' && p.thumbnail?.url ? p.thumbnail.url : ''
+  const r2Thumb = typeof p.thumbnailUrl === 'string' && p.thumbnailUrl ? p.thumbnailUrl : ''
+  const rawThumb = r2Thumb || (typeof p.thumbnail === 'object' && p.thumbnail?.url ? p.thumbnail.url : '')
   const thumbnailUrl = rawThumb && !rawThumb.endsWith('/placeholder.jpg') ? rawThumb : '/images/placeholder.jpg'
 
   const categorySlug =

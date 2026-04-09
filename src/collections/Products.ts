@@ -104,7 +104,13 @@ export const Products: CollectionConfig = {
     },
 
     // Images
-    { name: 'thumbnail', type: 'upload', relationTo: 'media', required: true, label: 'Ảnh đại diện' },
+    { name: 'thumbnail', type: 'upload', relationTo: 'media', label: 'Ảnh đại diện (Payload Media)' },
+    {
+      name: 'thumbnailUrl',
+      type: 'text',
+      label: 'URL ảnh đại diện (R2/External)',
+      admin: { description: 'Dùng khi upload ảnh qua R2. Ưu tiên hơn thumbnail Media.' },
+    },
     {
       name: 'gallery',
       type: 'array',

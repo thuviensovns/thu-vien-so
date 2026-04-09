@@ -30,9 +30,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     description: `Download ${p.name} - ${typeLabels[p.type] || p.type} cho Producer`,
     openGraph: {
       type: 'website',
-      images: typeof (p as Record<string, unknown>).thumbnail === 'object' && (p.thumbnail as { url?: string })?.url
-        ? [(p.thumbnail as { url: string }).url]
-        : [],
+      images: (() => {
+        const r2Url = typeof (p as any).thumbnailUrl === 'string' ? (p as any).thumbnailUrl : ''
+        const mediaUrl = typeof (p as Record<string, unknown>).thumbnail === 'object' ? (p.thumbnail as { url?: string })?.url : ''
+        const img = r2Url || mediaUrl
+        return img ? [img] : []
+      })(),
     },
   }
 }

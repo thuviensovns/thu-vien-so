@@ -189,18 +189,20 @@ export default function ProductsPage() {
       }
       try {
         // Upload image if user selected a new one (data URL)
-        let thumbnailId: number | null = null
+        let thumbnailResult: number | string | null = null
         if (form.thumbnailUrl.startsWith('data:')) {
-
           toast.loading('Đang upload hình ảnh...', { id: 'img-upload' })
-          thumbnailId = await uploadMedia(form.thumbnailUrl, productData.slug)
+          thumbnailResult = await uploadMedia(form.thumbnailUrl, productData.slug)
           toast.dismiss('img-upload')
-          if (!thumbnailId) {
+          if (!thumbnailResult) {
             toast.error('Lỗi upload hình ảnh', { description: 'Kiểm tra Console (F12) để xem chi tiết lỗi.' })
             setSaving(false)
             return
           }
-
+          // If R2 returned a URL string, update the thumbnail URL in productData
+          if (typeof thumbnailResult === 'string') {
+            productData.thumbnail = { url: thumbnailResult }
+          }
         }
 
         if (editingId) {
@@ -212,22 +214,18 @@ export default function ProductsPage() {
             featured: productData.featured,
           }
           if (categoryId) payload.category = categoryId
-          if (thumbnailId) payload.thumbnail = thumbnailId
-          // Include file metadata and download URL
-          {
-            const filePayload: Record<string, unknown> = {}
-            if (form.file) {
-              filePayload.r2Key = form.file.r2Key
-              filePayload.fileName = form.file.fileName
-              filePayload.fileSize = form.file.fileSize
-              filePayload.fileFormat = form.file.fileFormat
-            }
-            if (form.downloadUrl.trim()) {
-              filePayload.downloadUrl = form.downloadUrl.trim()
-            }
-            if (Object.keys(filePayload).length > 0) {
-              payload.file = filePayload
-            }
+          // thumbnail: Payload media ID (number) or R2 URL (string → stored in thumbnailUrl)
+          if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
+          if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
+          // Always send file group so downloadUrl can be set/cleared
+          payload.file = {
+            ...(form.file ? {
+              r2Key: form.file.r2Key,
+              fileName: form.file.fileName,
+              fileSize: form.file.fileSize,
+              fileFormat: form.file.fileFormat,
+            } : {}),
+            downloadUrl: form.downloadUrl.trim() || null,
           }
           const res = await updateProduct(editingId, payload)
           if (res.doc || res.id) {
@@ -244,24 +242,19 @@ export default function ProductsPage() {
             type: productData.type,
             pricing: productData.pricing,
             featured: productData.featured,
-            thumbnail: thumbnailId || 1,
+            ...(typeof thumbnailResult === 'number' ? { thumbnail: thumbnailResult } : { thumbnail: 1 }),
+            ...(typeof thumbnailResult === 'string' ? { thumbnailUrl: thumbnailResult } : {}),
           }
           if (categoryId) payload.category = categoryId
-          // Include file metadata and download URL
-          {
-            const filePayload: Record<string, unknown> = {}
-            if (form.file) {
-              filePayload.r2Key = form.file.r2Key
-              filePayload.fileName = form.file.fileName
-              filePayload.fileSize = form.file.fileSize
-              filePayload.fileFormat = form.file.fileFormat
-            }
-            if (form.downloadUrl.trim()) {
-              filePayload.downloadUrl = form.downloadUrl.trim()
-            }
-            if (Object.keys(filePayload).length > 0) {
-              payload.file = filePayload
-            }
+          // Always send file group so downloadUrl is saved
+          payload.file = {
+            ...(form.file ? {
+              r2Key: form.file.r2Key,
+              fileName: form.file.fileName,
+              fileSize: form.file.fileSize,
+              fileFormat: form.file.fileFormat,
+            } : {}),
+            downloadUrl: form.downloadUrl.trim() || null,
           }
           const res = await createProduct(payload)
           if (res.doc || res.id) {

@@ -77,8 +77,8 @@ export default function ProductForm({
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 500 * 1024 * 1024) {
-      toast.error('File quá lớn (tối đa 500MB)')
+    if (file.size > 4.5 * 1024 * 1024) {
+      toast.error('File quá lớn (tối đa 4.5MB trên Vercel Hobby). Hãy dùng link tải trực tiếp.')
       return
     }
 
@@ -367,7 +367,7 @@ export default function ProductForm({
                   )}
                 </Button>
                 <p className="text-[10px] text-muted-foreground">
-                  ZIP, RAR, 7Z, FLP, WAV, MP3, FLAC, VST... — tối đa 500MB
+                  ZIP, RAR, 7Z, FLP, WAV, MP3, FLAC, VST... — tối đa 4.5MB (Vercel Hobby). Dùng link tải bên trên cho file lớn.
                 </p>
               </div>
             )}
