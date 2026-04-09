@@ -99,15 +99,15 @@ async function _getProducts(opts: {
   }
 }
 
+// Module-scoped cached fetcher — ensures revalidateTag('products') works reliably
+const _getProductsCached = unstable_cache(
+  async (serializedOpts: string) => _getProducts(JSON.parse(serializedOpts)),
+  ['products-query'],
+  { revalidate: CACHE_TTL, tags: ['products'] }
+)
+
 export async function getProducts(opts: Parameters<typeof _getProducts>[0]) {
-  // Build a stable cache key from opts
-  const key = JSON.stringify(opts)
-  const cached = unstable_cache(
-    () => _getProducts(opts),
-    ['products', key],
-    { revalidate: CACHE_TTL, tags: ['products'] }
-  )
-  return cached()
+  return _getProductsCached(JSON.stringify(opts))
 }
 
 async function _getProductBySlug(slug: string) {
@@ -128,13 +128,14 @@ async function _getProductBySlug(slug: string) {
   }
 }
 
+const _getProductBySlugCached = unstable_cache(
+  async (slug: string) => _getProductBySlug(slug),
+  ['product-by-slug'],
+  { revalidate: CACHE_TTL, tags: ['products'] }
+)
+
 export async function getProductBySlug(slug: string) {
-  const cached = unstable_cache(
-    () => _getProductBySlug(slug),
-    ['product', slug],
-    { revalidate: CACHE_TTL, tags: ['products'] }
-  )
-  return cached()
+  return _getProductBySlugCached(slug)
 }
 
 async function _getCategories() {
@@ -153,13 +154,14 @@ async function _getCategories() {
   }
 }
 
+const _getCategoriesCached = unstable_cache(
+  _getCategories,
+  ['categories'],
+  { revalidate: CACHE_TTL, tags: ['categories'] }
+)
+
 export async function getCategories() {
-  const cached = unstable_cache(
-    _getCategories,
-    ['categories'],
-    { revalidate: CACHE_TTL, tags: ['categories'] }
-  )
-  return cached()
+  return _getCategoriesCached()
 }
 
 async function _getCategoryBySlug(slug: string) {
@@ -179,13 +181,14 @@ async function _getCategoryBySlug(slug: string) {
   }
 }
 
+const _getCategoryBySlugCached = unstable_cache(
+  async (slug: string) => _getCategoryBySlug(slug),
+  ['category-by-slug'],
+  { revalidate: CACHE_TTL, tags: ['categories'] }
+)
+
 export async function getCategoryBySlug(slug: string) {
-  const cached = unstable_cache(
-    () => _getCategoryBySlug(slug),
-    ['category', slug],
-    { revalidate: CACHE_TTL, tags: ['categories'] }
-  )
-  return cached()
+  return _getCategoryBySlugCached(slug)
 }
 
 async function _getBlogPosts(opts?: {
@@ -215,14 +218,14 @@ async function _getBlogPosts(opts?: {
   }
 }
 
+const _getBlogPostsCached = unstable_cache(
+  async (serializedOpts: string) => _getBlogPosts(JSON.parse(serializedOpts)),
+  ['blog-posts-query'],
+  { revalidate: CACHE_TTL, tags: ['blog-posts'] }
+)
+
 export async function getBlogPosts(opts?: Parameters<typeof _getBlogPosts>[0]) {
-  const key = JSON.stringify(opts || {})
-  const cached = unstable_cache(
-    () => _getBlogPosts(opts),
-    ['blog-posts', key],
-    { revalidate: CACHE_TTL, tags: ['blog-posts'] }
-  )
-  return cached()
+  return _getBlogPostsCached(JSON.stringify(opts || {}))
 }
 
 /** Get site-wide stats — cached for 2 minutes */
@@ -249,13 +252,14 @@ async function _getSiteStats() {
   }
 }
 
+const _getSiteStatsCached = unstable_cache(
+  _getSiteStats,
+  ['site-stats'],
+  { revalidate: 120, tags: ['products', 'users'] }
+)
+
 export async function getSiteStats() {
-  const cached = unstable_cache(
-    _getSiteStats,
-    ['site-stats'],
-    { revalidate: 120, tags: ['products', 'users'] }
-  )
-  return cached()
+  return _getSiteStatsCached()
 }
 
 /** Get per-category stats — uses count queries instead of loading all products */
@@ -306,13 +310,14 @@ async function _getCategoryStats() {
   }
 }
 
+const _getCategoryStatsCached = unstable_cache(
+  _getCategoryStats,
+  ['category-stats'],
+  { revalidate: 120, tags: ['products', 'categories'] }
+)
+
 export async function getCategoryStats() {
-  const cached = unstable_cache(
-    _getCategoryStats,
-    ['category-stats'],
-    { revalidate: 120, tags: ['products', 'categories'] }
-  )
-  return cached()
+  return _getCategoryStatsCached()
 }
 
 /** Get order stats — cached for 2 minutes */
@@ -342,13 +347,14 @@ async function _getOrderStats() {
   }
 }
 
+const _getOrderStatsCached = unstable_cache(
+  _getOrderStats,
+  ['order-stats'],
+  { revalidate: 120, tags: ['orders'] }
+)
+
 export async function getOrderStats() {
-  const cached = unstable_cache(
-    _getOrderStats,
-    ['order-stats'],
-    { revalidate: 120, tags: ['orders'] }
-  )
-  return cached()
+  return _getOrderStatsCached()
 }
 
 async function _getBlogPostBySlug(slug: string) {
@@ -369,11 +375,12 @@ async function _getBlogPostBySlug(slug: string) {
   }
 }
 
+const _getBlogPostBySlugCached = unstable_cache(
+  async (slug: string) => _getBlogPostBySlug(slug),
+  ['blog-post-by-slug'],
+  { revalidate: CACHE_TTL, tags: ['blog-posts'] }
+)
+
 export async function getBlogPostBySlug(slug: string) {
-  const cached = unstable_cache(
-    () => _getBlogPostBySlug(slug),
-    ['blog-post', slug],
-    { revalidate: CACHE_TTL, tags: ['blog-posts'] }
-  )
-  return cached()
+  return _getBlogPostBySlugCached(slug)
 }

@@ -137,7 +137,7 @@ export async function fetchProducts(opts?: { limit?: number; type?: string; cate
 }
 
 export async function createProduct(data: Record<string, unknown>) {
-  const res = await fetch(`${API}/products`, {
+  const res = await fetch(`${API}/products?draft=false`, {
     method: 'POST',
     headers: JSON_HEADERS,
     credentials: 'include',
@@ -151,7 +151,7 @@ export async function createProduct(data: Record<string, unknown>) {
 }
 
 export async function updateProduct(id: string | number, data: Record<string, unknown>) {
-  const res = await fetch(`${API}/products/${id}`, {
+  const res = await fetch(`${API}/products/${id}?draft=false`, {
     method: 'PATCH',
     headers: JSON_HEADERS,
     credentials: 'include',

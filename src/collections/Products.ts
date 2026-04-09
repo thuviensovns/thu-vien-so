@@ -12,7 +12,7 @@ export const Products: CollectionConfig = {
     listSearchableFields: ['name', 'slug'],
   },
   labels: { singular: 'Sản phẩm', plural: 'Sản phẩm' },
-  versions: { drafts: true },
+  versions: false,
   access: {
     read: () => true,
     create: ({ req: { user } }) => user?.role === 'admin',
