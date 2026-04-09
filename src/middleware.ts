@@ -27,6 +27,7 @@ export function middleware(req: NextRequest) {
     && !pathname.startsWith('/api/setup')
     && !pathname.startsWith('/api/orders')
     && !pathname.startsWith('/api/debug-db')
+    && !pathname.startsWith('/api/health')
   if (isPayloadApi) return NextResponse.next()
 
   // Rate limit custom API routes

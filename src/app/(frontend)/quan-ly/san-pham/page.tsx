@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
-  Package, Plus, Search, Trash2, FileDown, AlertCircle,
+  Package, Plus, Search, Trash2, FileDown, AlertCircle, RefreshCw, Database, Wifi, WifiOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +26,23 @@ import { useAuth } from '@/hooks/use-auth'
 
 const ITEMS_PER_PAGE = 15
 
+/** Keys from legacy demo/localStorage mode — safe to clear */
+const STALE_STORAGE_KEYS = [
+  'admin_activity_log', 'admin_products', 'deleted_demo_products',
+  'demo_product_overrides', 'demo_orders', 'demo_users', 'demo_passwords',
+  'admin_sessions', 'admin_login_history', 'admin_custom_variations',
+]
+
+function clearStaleLocalStorage() {
+  let cleared = 0
+  for (const key of STALE_STORAGE_KEYS) {
+    if (localStorage.getItem(key)) {
+      localStorage.removeItem(key)
+      cleared++
+    }
+  }
+  return cleared
+}
 
 export default function ProductsPage() {
   const { user } = useAuth()
@@ -56,6 +73,38 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1)
   const [saving, setSaving] = useState(false)
   const [dbStatus, setDbStatus] = useState<'loading' | 'connected' | 'offline'>('loading')
+  const [healthInfo, setHealthInfo] = useState<Record<string, unknown> | null>(null)
+  const [retrying, setRetrying] = useState(false)
+
+  // Auto-clear stale localStorage on mount to prevent "localStorage full" errors
+  useEffect(() => {
+    try {
+      const cleared = clearStaleLocalStorage()
+      if (cleared > 0) console.log(`[Admin] Cleared ${cleared} stale localStorage keys`)
+    } catch {}
+  }, [])
+
+  // Health check + reconnect handler
+  const handleHealthCheck = useCallback(async () => {
+    setRetrying(true)
+    setHealthInfo(null)
+    try {
+      const res = await fetch('/api/health', { cache: 'no-store' })
+      const data = await res.json()
+      setHealthInfo(data)
+      if (data.status === 'ok') {
+        toast.success(`Database connected! ${data.productCount} sản phẩm, ${data.categoryCount} danh mục`, { duration: 5000 })
+        // Reload the page to re-fetch products
+        window.location.reload()
+        return
+      }
+      toast.error('Database vẫn offline', { description: data.error || 'Kiểm tra DATABASE_URL' })
+    } catch (e) {
+      toast.error('Không thể kết nối health check', { description: String(e) })
+    } finally {
+      setRetrying(false)
+    }
+  }, [])
 
   // Load products + categories from database on mount (with retry for cold starts)
   useEffect(() => {
@@ -412,10 +461,12 @@ export default function ProductsPage() {
             </span>
             {dbStatus === 'offline' && (
               <button
-                onClick={() => window.location.reload()}
-                className="text-[10px] text-primary underline"
+                onClick={handleHealthCheck}
+                disabled={retrying}
+                className="text-[10px] text-primary underline flex items-center gap-1"
               >
-                Thử lại
+                <RefreshCw className={`h-2.5 w-2.5 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Đang kiểm tra...' : 'Thử kết nối lại'}
               </button>
             )}
             {dbError && dbStatus === 'offline' && (
@@ -524,18 +575,55 @@ export default function ProductsPage() {
         </>)
       })()}
 
-      {/* Info */}
-      <div className="p-3 rounded-lg bg-muted/30 border border-border">
-        <div className="flex items-start gap-2 text-xs text-muted-foreground">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <p>Sản phẩm được lưu trực tiếp vào database PostgreSQL. Thay đổi sẽ tự động đồng bộ với trang khách hàng.</p>
-            {dbStatus === 'offline' && (
-              <p className="text-destructive">Không thể kết nối database. Kiểm tra Console (F12) để xem chi tiết lỗi. Bấm &quot;Thử lại&quot; để kết nối lại.</p>
-            )}
+      {/* Info / Diagnostic Panel */}
+      {dbStatus === 'offline' ? (
+        <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20 space-y-3">
+          <div className="flex items-start gap-2 text-sm">
+            <WifiOff className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+            <div className="space-y-2 flex-1">
+              <p className="font-medium text-destructive">Không thể kết nối Database</p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Nguyên nhân phổ biến:</p>
+                <ul className="list-disc list-inside space-y-0.5 ml-1">
+                  <li>DATABASE_URL chưa được cấu hình trên Vercel</li>
+                  <li>Neon database đang cold start (thử kết nối lại)</li>
+                  <li>Connection string sai hoặc database chưa tạo</li>
+                </ul>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button size="sm" variant="outline" onClick={handleHealthCheck} disabled={retrying} className="text-xs h-7">
+                  <RefreshCw className={`mr-1 h-3 w-3 ${retrying ? 'animate-spin' : ''}`} />
+                  {retrying ? 'Đang kiểm tra...' : 'Kiểm tra kết nối'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    const cleared = clearStaleLocalStorage()
+                    toast.success(`Đã xóa ${cleared} mục localStorage cũ`)
+                  }}
+                  className="text-xs h-7 text-muted-foreground"
+                >
+                  <Trash2 className="mr-1 h-3 w-3" />
+                  Dọn localStorage
+                </Button>
+              </div>
+              {healthInfo && (
+                <pre className="mt-2 p-2 rounded bg-muted/50 text-[10px] font-mono overflow-x-auto max-h-32">
+                  {JSON.stringify(healthInfo, null, 2)}
+                </pre>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="p-3 rounded-lg bg-muted/30 border border-border">
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <Database className="h-3.5 w-3.5 shrink-0 mt-0.5 text-success" />
+            <p>Sản phẩm được lưu trực tiếp vào database PostgreSQL. Thay đổi sẽ tự động đồng bộ với trang khách hàng.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
