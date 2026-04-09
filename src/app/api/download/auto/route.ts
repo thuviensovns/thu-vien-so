@@ -59,18 +59,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Download expired' }, { status: 410 })
     }
 
-    // Get product file key
+    // Get product file
     const product = typeof download.product === 'object' ? download.product : null
-    if (!product?.file?.r2Key) {
+    if (!product?.file?.downloadUrl && !product?.file?.r2Key) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
-    // Generate signed URL
-    const url = await generateDownloadUrl(product.file.r2Key)
+    // Get download URL: direct link first, then R2
+    let url: string
+    if (product.file.downloadUrl) {
+      url = product.file.downloadUrl
+    } else {
+      url = await generateDownloadUrl(product.file.r2Key!)
+    }
 
     // Determine filename
     const ext = product.file.fileFormat || 'zip'
-    const fileName = `${product.slug || productId}.${ext}`
+    const fileName = product.file.fileName || `${product.slug || productId}.${ext}`
 
     // Increment download count
     await payload.update({

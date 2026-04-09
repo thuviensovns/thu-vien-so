@@ -48,18 +48,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Download expired' }, { status: 410 })
     }
 
-    // Get product R2 key
+    // Get product file
     const product =
       typeof download.product === 'object' ? download.product : null
-    if (!product || !product.file?.r2Key) {
+    if (!product || (!product.file?.downloadUrl && !product.file?.r2Key)) {
       return NextResponse.json(
         { error: 'Product file not found' },
         { status: 404 },
       )
     }
 
-    // Generate signed URL
-    const url = await generateDownloadUrl(product.file.r2Key)
+    // Get download URL: direct link first, then R2
+    let url: string
+    if (product.file.downloadUrl) {
+      url = product.file.downloadUrl
+    } else {
+      url = await generateDownloadUrl(product.file.r2Key!)
+    }
 
     // Update download record
     const ip = req.headers.get('x-forwarded-for') || 'unknown'

@@ -123,22 +123,27 @@ export const ProductCard = memo(function ProductCard({
       if (res.ok) {
         const data = await res.json()
         if (data.url) {
-          const a = document.createElement('a')
-          a.href = data.url
-          a.download = `${slug}.zip`
-          a.style.display = 'none'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
+          // External links (Google Drive, Mediafire, etc.) → open in new tab
+          // R2 signed URLs → direct download
+          const isExternal = data.url.startsWith('http') && !data.url.includes('.r2.cloudflarestorage.')
+          if (isExternal) {
+            window.open(data.url, '_blank', 'noopener')
+          } else {
+            const a = document.createElement('a')
+            a.href = data.url
+            a.download = data.fileName || `${slug}.zip`
+            a.style.display = 'none'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          }
         } else {
           triggerDemoFile()
         }
-        // Refresh page to show updated download count
         router.refresh()
         return
       }
     } catch {}
-    // Fallback: API unavailable
     triggerDemoFile()
   }
 

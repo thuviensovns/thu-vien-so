@@ -84,15 +84,22 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Generate R2 download URL if file exists
+    // Get download URL: direct link first, then R2
     let url: string | null = null
-    if (product.file?.r2Key) {
+    if (product.file?.downloadUrl) {
+      url = product.file.downloadUrl
+    } else if (product.file?.r2Key) {
       try {
         url = await generateDownloadUrl(product.file.r2Key, 3600)
       } catch {}
     }
 
-    return NextResponse.json({ url, downloadCount: newCount, success: true })
+    return NextResponse.json({
+      url,
+      fileName: product.file?.fileName || `${product.slug}.${product.file?.fileFormat || 'zip'}`,
+      downloadCount: newCount,
+      success: true,
+    })
   } catch (error) {
     console.error('Free download error:', error)
     const msg = (error as Error).message

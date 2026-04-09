@@ -56,17 +56,26 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       if (res.ok) {
         const data = await res.json()
         if (data.url) {
-          window.open(data.url, '_blank')
+          // External links (Google Drive, etc.) → new tab; R2 → direct download
+          const isExternal = data.url.startsWith('http') && !data.url.includes('.r2.cloudflarestorage.')
+          if (isExternal) {
+            window.open(data.url, '_blank', 'noopener')
+          } else {
+            const a = document.createElement('a')
+            a.href = data.url
+            a.download = data.fileName || `${slug}.zip`
+            a.style.display = 'none'
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+          }
         } else {
-          // No R2 file — use demo download but count was already incremented
           triggerDemoDownload()
         }
-        // Refresh page to show updated download count
         router.refresh()
         return
       }
     } catch {}
-    // Fallback demo download (API unavailable)
     triggerDemoDownload()
   }
 

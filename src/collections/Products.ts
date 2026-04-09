@@ -69,13 +69,21 @@ export const Products: CollectionConfig = {
       ],
     },
 
-    // Downloadable File (stored in R2)
+    // Downloadable File
     {
       name: 'file',
       type: 'group',
       label: 'File tải về',
       fields: [
-        { name: 'r2Key', type: 'text', admin: { description: 'Cloudflare R2 object key' } },
+        {
+          name: 'downloadUrl',
+          type: 'text',
+          label: 'Link tải trực tiếp',
+          admin: {
+            description: 'Dán link Google Drive, Mediafire, Mega... Ưu tiên dùng trước R2. Để trống nếu dùng R2.',
+          },
+        },
+        { name: 'r2Key', type: 'text', label: 'R2 Key', admin: { description: 'Cloudflare R2 object key (nếu upload qua R2)' } },
         { name: 'fileName', type: 'text', label: 'Tên file' },
         { name: 'fileSize', type: 'number', label: 'Dung lượng (bytes)' },
         { name: 'fileFormat', type: 'text', label: 'Định dạng (zip, rar...)' },
