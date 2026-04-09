@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator'
 import { siteConfig } from '@/lib/config'
 import { getSiteStats } from '@/lib/payload'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'Giới thiệu',

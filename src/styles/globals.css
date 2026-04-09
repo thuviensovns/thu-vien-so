@@ -111,8 +111,9 @@
     @apply bg-background text-foreground;
   }
 
-  /* Smooth theme transition */
+  /* Smooth scroll + theme transition */
   html {
+    scroll-behavior: smooth;
     transition: color 0.3s ease, background-color 0.3s ease;
   }
 
@@ -189,5 +190,49 @@
   /* Smooth transition shorthand */
   .transition-theme {
     transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  /* ── Stagger & page animations ── */
+
+  /* Fade in */
+  .animate-fade-in {
+    animation: fadeIn 0.4s ease-out both;
+  }
+
+  /* Fade in + slide up (for product cards, sections) */
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out both;
+  }
+
+  /* Page content fade-in */
+  .animate-page-in {
+    animation: pageIn 0.3s ease-out both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pageIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

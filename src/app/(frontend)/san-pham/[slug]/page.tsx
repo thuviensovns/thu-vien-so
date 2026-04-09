@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
 import { getProductBySlug } from '@/lib/payload'
 import { getDemoProductBySlug } from '@/lib/demo-data'

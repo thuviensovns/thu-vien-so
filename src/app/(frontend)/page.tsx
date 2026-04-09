@@ -1,23 +1,28 @@
 import { HomeContent } from '@/components/home/HomeContent'
 import { getProducts, getCategories, getSiteStats } from '@/lib/payload'
-import { getPayload } from 'payload'
-import config from '@payload-config'
+import { unstable_cache } from 'next/cache'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
 
-/** Fetch site content from DB for SSR (no flash) */
-async function getSiteContentSSR() {
-  try {
-    const payload = await getPayload({ config })
-    const data = await payload.findGlobal({ slug: 'site-content' }) as any
-    return {
-      settings: data?.settings || null,
-      categoryDescriptions: data?.categoryDescriptions || null,
+/** Fetch site content from DB — cached for 60s */
+const getSiteContentSSR = unstable_cache(
+  async () => {
+    try {
+      const { getPayload } = await import('payload')
+      const config = (await import('@payload-config')).default
+      const payload = await getPayload({ config })
+      const data = await payload.findGlobal({ slug: 'site-content' }) as any
+      return {
+        settings: data?.settings || null,
+        categoryDescriptions: data?.categoryDescriptions || null,
+      }
+    } catch {
+      return { settings: null, categoryDescriptions: null }
     }
-  } catch {
-    return { settings: null, categoryDescriptions: null }
-  }
-}
+  },
+  ['home-site-content'],
+  { revalidate: 60, tags: ['site-content'] }
+)
 
 export default async function HomePage() {
   const [products, categories, siteStats, siteContent] = await Promise.all([

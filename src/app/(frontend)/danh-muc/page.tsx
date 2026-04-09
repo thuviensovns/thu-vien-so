@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60
+
 import { getCategoryStats } from '@/lib/payload'
 import { CategoriesContent } from '@/components/product/CategoriesContent'
 

@@ -77,19 +77,21 @@ export function MobileNav() {
         <Separator />
 
         <nav className="flex flex-col gap-0.5 p-2">
-          {mobileNavItems.map((item) => {
+          {mobileNavItems.map((item, index) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none animate-fade-in-up',
                   isActive
                     ? 'text-primary bg-primary/10'
-                    : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
+                    : 'text-muted-foreground hover:text-primary hover:bg-primary/5 active:scale-[0.98]'
                 )}
+                style={{ animationDelay: `${index * 30}ms` }}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 {item.label}
@@ -107,12 +109,13 @@ export function MobileNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                   isActive
                     ? 'text-primary bg-primary/10'
-                    : 'text-muted-foreground hover:text-primary hover:bg-primary/5'
+                    : 'text-muted-foreground hover:text-primary hover:bg-primary/5 active:scale-[0.98]'
                 )}
               >
                 <item.icon className="h-4 w-4 shrink-0" />

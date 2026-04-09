@@ -20,7 +20,7 @@ interface ProductGridProps {
 export function ProductGrid({ products }: ProductGridProps) {
   if (products.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 sm:py-28 text-center">
+      <div className="flex flex-col items-center justify-center py-20 sm:py-28 text-center animate-fade-in">
         <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
           <Package className="h-8 w-8 text-muted-foreground" />
         </div>
@@ -34,7 +34,7 @@ export function ProductGrid({ products }: ProductGridProps) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-      {products.map((product) => {
+      {products.map((product, index) => {
         const rawUrl =
           typeof product.thumbnail === 'string'
             ? product.thumbnail
@@ -43,21 +43,26 @@ export function ProductGrid({ products }: ProductGridProps) {
           rawUrl && !rawUrl.endsWith('/placeholder.jpg') ? rawUrl : '/images/placeholder.jpg'
 
         return (
-          <ProductCard
+          <div
             key={product.id}
-            id={product.id}
-            name={product.name}
-            slug={product.slug}
-            type={product.type}
-            thumbnail={thumbnailUrl}
-            price={product.pricing.price}
-            originalPrice={product.pricing.originalPrice}
-            isFree={product.pricing.isFree}
-            downloadCount={product.downloadCount}
-            bpm={product.preview?.bpm}
-            musicalKey={product.preview?.musicalKey}
-            featured={product.featured}
-          />
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${Math.min(index * 50, 400)}ms` }}
+          >
+            <ProductCard
+              id={product.id}
+              name={product.name}
+              slug={product.slug}
+              type={product.type}
+              thumbnail={thumbnailUrl}
+              price={product.pricing.price}
+              originalPrice={product.pricing.originalPrice}
+              isFree={product.pricing.isFree}
+              downloadCount={product.downloadCount}
+              bpm={product.preview?.bpm}
+              musicalKey={product.preview?.musicalKey}
+              featured={product.featured}
+            />
+          </div>
         )
       })}
     </div>

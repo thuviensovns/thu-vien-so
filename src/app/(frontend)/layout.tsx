@@ -1,14 +1,16 @@
 import type { Metadata } from 'next'
+import { unstable_cache } from 'next/cache'
 import { Inter, Space_Grotesk, JetBrains_Mono } from 'next/font/google'
+import { Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ChatWidgetLazy } from '@/components/chat/ChatWidgetLazy'
 import { Providers } from '@/components/providers/Providers'
 import SiteContentSync from '@/components/providers/SiteContentSync'
 import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
+import { RouteProgress } from '@/components/shared/RouteProgress'
+import { ScrollToTop } from '@/components/shared/ScrollToTop'
 import '@/styles/globals.css'
-
-export const dynamic = 'force-dynamic'
 
 const inter = Inter({
   subsets: ['latin', 'vietnamese'],
@@ -64,21 +66,25 @@ export const metadata: Metadata = {
   },
 }
 
-/** Fetch site content from Payload DB at SSR time */
-async function getSiteContentFromDB(): Promise<{ settings: Record<string, unknown> | null; categoryDescriptions: Record<string, string> | null }> {
-  try {
-    const { getPayload } = await import('payload')
-    const config = (await import('@payload-config')).default
-    const payload = await getPayload({ config })
-    const data = await payload.findGlobal({ slug: 'site-content' }) as any
-    return {
-      settings: data?.settings || null,
-      categoryDescriptions: data?.categoryDescriptions || null,
+/** Fetch site content from Payload DB — cached for 60s */
+const getSiteContentFromDB = unstable_cache(
+  async (): Promise<{ settings: Record<string, unknown> | null; categoryDescriptions: Record<string, string> | null }> => {
+    try {
+      const { getPayload } = await import('payload')
+      const config = (await import('@payload-config')).default
+      const payload = await getPayload({ config })
+      const data = await payload.findGlobal({ slug: 'site-content' }) as any
+      return {
+        settings: data?.settings || null,
+        categoryDescriptions: data?.categoryDescriptions || null,
+      }
+    } catch {
+      return { settings: null, categoryDescriptions: null }
     }
-  } catch {
-    return { settings: null, categoryDescriptions: null }
-  }
-}
+  },
+  ['site-content'],
+  { revalidate: 60, tags: ['site-content'] }
+)
 
 export default async function FrontendLayout({
   children,
@@ -98,6 +104,10 @@ export default async function FrontendLayout({
           categoryDescriptions={siteContent.categoryDescriptions}
         />
         <Providers>
+          <Suspense fallback={null}>
+            <RouteProgress />
+            <ScrollToTop />
+          </Suspense>
           <SiteContentSync />
           {/* Skip to content — keyboard accessibility */}
           <a
@@ -109,7 +119,7 @@ export default async function FrontendLayout({
 
           <div className="flex min-h-screen flex-col">
             <Header />
-            <main id="main-content" className="flex-1">{children}</main>
+            <main id="main-content" className="flex-1 animate-page-in">{children}</main>
             <Footer initialSettings={siteContent.settings} />
             <ChatWidgetLazy />
           </div>
