@@ -12,6 +12,7 @@ import {
   getAdminProducts, addAdminProduct, updateAdminProduct, deleteAdminProduct,
   getDeletedDemoIds, deleteDemoProduct, restoreDemoProduct,
   getDemoOverrides, saveDemoOverride, removeDemoOverride,
+  logActivity,
   type AdminProduct,
 } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
@@ -34,6 +35,7 @@ export default function ProductsPage() {
   const [dbProducts, setDbProducts] = useState<AnyProduct[]>([])
   const [useDb, setUseDb] = useState(false)
   const [catIdMap, setCatIdMap] = useState<Record<string, number>>({})
+  const [dbError, setDbError] = useState<string | null>(null)
 
   // Ensure Payload auth before write operations
   const ensureAuth = useCallback(async (): Promise<boolean> => {
@@ -58,35 +60,54 @@ export default function ProductsPage() {
   // Load products + categories from database on mount (with retry for cold starts)
   useEffect(() => {
     let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let cancelled = false
 
     async function loadFromDb(attempt = 1) {
+      if (cancelled) return
+      setDbError(null)
       try {
         const [data, catData] = await Promise.all([fetchProducts({ limit: 200 }), fetchCategories()])
+        if (cancelled) return
+
         // Build category slug -> id map
         if (catData && catData.docs) {
           const map: Record<string, number> = {}
           for (const c of catData.docs) map[String(c.slug)] = Number(c.id)
           setCatIdMap(map)
         }
+
         if (data && data.docs) {
+          const apiError = (data as any).error
+          if (apiError && data.docs.length === 0) {
+            // API returned an error with no docs — treat as failed, retry
+            console.warn('[Admin] API error (attempt', attempt + '):', apiError)
+            setDbError(apiError)
+            throw new Error(apiError)
+          }
+          // Success — we have a valid response (even if 0 products legitimately)
           setDbProducts(mapPayloadDocs(data.docs))
           setUseDb(true)
           setDbStatus('connected')
+          setDbError(null)
           return
         }
-      } catch {}
+      } catch (e) {
+        console.error('[Admin] loadFromDb error:', e)
+        setDbError(String(e))
+      }
 
-      // Retry up to 3 times (covers Neon cold start + Vercel function warmup)
-      if (attempt < 3) {
+      // Retry up to 4 times with increasing delay (covers Neon cold start)
+      if (attempt < 4) {
         setDbStatus('loading')
-        retryTimer = setTimeout(() => loadFromDb(attempt + 1), 3000)
+        retryTimer = setTimeout(() => loadFromDb(attempt + 1), attempt * 3000)
       } else {
         setDbStatus('offline')
+        setDbError('Không thể kết nối database sau nhiều lần thử')
       }
     }
 
     loadFromDb()
-    return () => { if (retryTimer) clearTimeout(retryTimer) }
+    return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
   }, [])
 
   // Reload DB products after changes + revalidate customer pages
@@ -95,15 +116,18 @@ export default function ProductsPage() {
       const data = await fetchProducts({ limit: 200 })
       if (data && data.docs) {
         setDbProducts(mapPayloadDocs(data.docs))
-
+        logActivity('product', 'Đồng bộ sản phẩm', `${data.docs.length} sản phẩm từ database`)
       }
     } catch (err) {
       console.error('[Admin] Failed to reload products:', err)
+      toast.error('Lỗi tải lại danh sách sản phẩm')
     }
-    // Await revalidation so customer pages get fresh data
+    // Revalidate customer pages so changes appear immediately
     try {
-      await revalidateProductPages()
-
+      const result = await revalidateProductPages()
+      if (result?.revalidated) {
+        console.log('[Admin] Customer pages revalidated successfully')
+      }
     } catch (err) {
       console.error('[Admin] Revalidation failed:', err)
     }
@@ -126,7 +150,8 @@ export default function ProductsPage() {
   }, [allProducts, search, filterType, showDeleted])
 
   const activeCount = allProducts.filter((p) => !('isDeleted' in p && p.isDeleted)).length
-  const deletedCount = deletedDemoIds.length
+  // Only show demo deleted count when NOT using database
+  const deletedCount = useDb ? 0 : deletedDemoIds.length
 
   function openEditForm(product: AnyProduct) {
     const isCustom = 'isCustom' in product && product.isCustom === true
@@ -369,21 +394,32 @@ export default function ProductsPage() {
             <Package className="h-5 w-5 text-primary" />
             Quản lý sản phẩm
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap">
             <span>{activeCount} sản phẩm</span>
             {deletedCount > 0 && <span className="text-destructive">• {deletedCount} đã xóa</span>}
             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
               dbStatus === 'connected' ? 'bg-success/10 text-success' :
-              dbStatus === 'offline' ? 'bg-warning/10 text-warning' :
+              dbStatus === 'offline' ? 'bg-destructive/10 text-destructive' :
               'bg-muted text-muted-foreground'
             }`}>
               <span className={`h-1.5 w-1.5 rounded-full ${
                 dbStatus === 'connected' ? 'bg-success' :
-                dbStatus === 'offline' ? 'bg-warning' :
+                dbStatus === 'offline' ? 'bg-destructive' :
                 'bg-muted-foreground animate-pulse'
               }`} />
-              {dbStatus === 'connected' ? 'Database' : dbStatus === 'offline' ? 'Demo mode' : 'Connecting...'}
+              {dbStatus === 'connected' ? 'Database' : dbStatus === 'offline' ? 'Offline' : 'Đang kết nối...'}
             </span>
+            {dbStatus === 'offline' && (
+              <button
+                onClick={() => window.location.reload()}
+                className="text-[10px] text-primary underline"
+              >
+                Thử lại
+              </button>
+            )}
+            {dbError && dbStatus === 'offline' && (
+              <span className="text-[10px] text-destructive/70">{dbError}</span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -492,8 +528,10 @@ export default function ProductsPage() {
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <div className="space-y-1">
-            <p>Tất cả sản phẩm đều có thể chỉnh sửa và xóa. Sản phẩm demo đã chỉnh sửa sẽ hiện badge &quot;Đã sửa&quot; — bạn có thể khôi phục về bản gốc bất cứ lúc nào.</p>
-            <p>Sản phẩm demo đã xóa có thể khôi phục. Click &quot;Hiện đã xóa&quot; để xem và khôi phục.</p>
+            <p>Sản phẩm được lưu trực tiếp vào database PostgreSQL. Thay đổi sẽ tự động đồng bộ với trang khách hàng.</p>
+            {dbStatus === 'offline' && (
+              <p className="text-destructive">Không thể kết nối database. Kiểm tra Console (F12) để xem chi tiết lỗi. Bấm &quot;Thử lại&quot; để kết nối lại.</p>
+            )}
           </div>
         </div>
       </div>

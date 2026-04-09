@@ -7,7 +7,7 @@ export const Products: CollectionConfig = {
   admin: {
     useAsTitle: 'name',
     group: 'Nội dung',
-    defaultColumns: ['name', 'type', 'category', 'pricing.price', 'featured', '_status', 'updatedAt'],
+    defaultColumns: ['name', 'type', 'category', 'pricing.price', 'featured', 'updatedAt'],
     description: 'Quản lý sản phẩm: Sample Pack, FLP, VST, Preset',
     listSearchableFields: ['name', 'slug'],
   },

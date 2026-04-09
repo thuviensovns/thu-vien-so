@@ -121,44 +121,51 @@ export async function fetchProducts(opts?: { limit?: number; type?: string; cate
 
   // Add timeout to handle Neon cold starts
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 20000)
+  const timer = setTimeout(() => controller.abort(), 25000)
   try {
     const res = await fetch(`${API}/products?${params}`, {
       credentials: 'include',
       signal: controller.signal,
     })
     clearTimeout(timer)
-    if (!res.ok) return null
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      console.error('[fetchProducts] HTTP', res.status, text.slice(0, 300))
+      return { docs: [], totalDocs: 0, error: `HTTP ${res.status}` }
+    }
     return res.json()
-  } catch {
+  } catch (e) {
     clearTimeout(timer)
-    return null
+    console.error('[fetchProducts] Error:', e)
+    return { docs: [], totalDocs: 0, error: String(e) }
   }
 }
 
 export async function createProduct(data: Record<string, unknown>) {
-  const res = await fetch(`${API}/products?draft=false`, {
+  const res = await fetch(`${API}/products`, {
     method: 'POST',
     headers: JSON_HEADERS,
     credentials: 'include',
-    body: JSON.stringify({ ...data, _status: 'published' }),
+    body: JSON.stringify(data),
   })
   if (!res.ok) {
     const text = await res.text()
+    console.error('[createProduct] HTTP', res.status, text.slice(0, 300))
     try { return JSON.parse(text) } catch { return { message: `HTTP ${res.status}: ${text.slice(0, 200)}` } }
   }
   return res.json()
 }
 
 export async function updateProduct(id: string | number, data: Record<string, unknown>) {
-  const res = await fetch(`${API}/products/${id}?draft=false`, {
+  const res = await fetch(`${API}/products/${id}`, {
     method: 'PATCH',
     headers: JSON_HEADERS,
     credentials: 'include',
-    body: JSON.stringify({ ...data, _status: 'published' }),
+    body: JSON.stringify(data),
   })
   if (!res.ok) {
     const text = await res.text()
+    console.error('[updateProduct] HTTP', res.status, text.slice(0, 300))
     try { return JSON.parse(text) } catch { return { message: `HTTP ${res.status}: ${text.slice(0, 200)}` } }
   }
   return res.json()
@@ -179,17 +186,21 @@ export async function deleteProduct(id: string | number) {
 
 export async function fetchCategories() {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 20000)
+  const timer = setTimeout(() => controller.abort(), 25000)
   try {
     const res = await fetch(`${API}/categories?limit=100&sort=order&depth=0`, {
       credentials: 'include',
       signal: controller.signal,
     })
     clearTimeout(timer)
-    if (!res.ok) return null
+    if (!res.ok) {
+      console.error('[fetchCategories] HTTP', res.status)
+      return null
+    }
     return res.json()
-  } catch {
+  } catch (e) {
     clearTimeout(timer)
+    console.error('[fetchCategories] Error:', e)
     return null
   }
 }
