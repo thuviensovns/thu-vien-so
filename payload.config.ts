@@ -14,8 +14,8 @@ import { Downloads } from '@/collections/Downloads'
 import { BlogPosts } from '@/collections/BlogPosts'
 import { ContactMessages } from '@/collections/ContactMessages'
 import { TopUps } from '@/collections/TopUps'
-import { Coupons } from '@/collections/Coupons'
-import { ActivityLogs } from '@/collections/ActivityLogs'
+// Coupons and ActivityLogs use raw SQL (not Payload collections) to avoid
+// payload_locked_documents_rels column sync issues on Vercel serverless
 import { BankConfig } from '@/globals/BankConfig'
 import { SiteContent } from '@/globals/SiteContent'
 
@@ -31,7 +31,7 @@ export default buildConfig({
     },
     dateFormat: 'dd/MM/yyyy HH:mm',
   },
-  collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages, Coupons, ActivityLogs],
+  collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages],
   globals: [BankConfig, SiteContent],
   db: postgresAdapter({
     push: true,
