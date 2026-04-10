@@ -92,10 +92,10 @@ describe('mapPayloadDoc', () => {
 })
 
 describe('mapPayloadDocs', () => {
-  it('adds createdAt and isCustom fields', () => {
+  it('adds createdAt and isDb fields', () => {
     const results = mapPayloadDocs([mockProduct as any])
     expect(results[0].createdAt).toBe('2026-01-01T00:00:00Z')
-    expect(results[0].isCustom).toBe(true)
+    expect(results[0].isDb).toBe(true)
   })
 
   it('handles empty array', () => {

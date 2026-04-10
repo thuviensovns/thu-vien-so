@@ -13,7 +13,7 @@ import { typeLabels } from '@/lib/config'
 import type { DemoProduct } from '@/lib/demo-data'
 import type { AdminProduct } from '@/lib/admin-helpers'
 
-export type AnyProduct = (DemoProduct & { isCustom?: false; isDeleted?: boolean }) | AdminProduct
+export type AnyProduct = (DemoProduct & { isCustom?: false; isDeleted?: boolean; isDb?: boolean }) | AdminProduct
 
 interface ProductTableProps {
   products: AnyProduct[]

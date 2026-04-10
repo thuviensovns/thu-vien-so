@@ -7,6 +7,14 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 /** POST: Upload a product thumbnail to R2, return a public URL */
 export async function POST(req: NextRequest) {
+  // Early check: R2 must be configured
+  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !process.env.R2_BUCKET_NAME) {
+    return NextResponse.json(
+      { error: 'R2 storage chưa được cấu hình. Vui lòng thêm R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME vào environment variables.' },
+      { status: 503 },
+    )
+  }
+
   try {
     const payload = await getPayloadForApi()
     const { user } = await payload.auth({ headers: req.headers })

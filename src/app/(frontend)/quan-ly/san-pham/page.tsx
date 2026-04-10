@@ -159,7 +159,7 @@ export default function ProductsPage() {
     return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
   }, [])
 
-  // Reload DB products after changes + revalidate customer pages
+  // Reload DB products after changes + revalidate customer pages (non-blocking)
   const reloadDb = useCallback(async () => {
     try {
       const data = await fetchProducts({ limit: 200 })
@@ -171,15 +171,8 @@ export default function ProductsPage() {
       console.error('[Admin] Failed to reload products:', err)
       toast.error('Lỗi tải lại danh sách sản phẩm')
     }
-    // Revalidate customer pages so changes appear immediately
-    try {
-      const result = await revalidateProductPages()
-      if (result?.revalidated) {
-        console.log('[Admin] Customer pages revalidated successfully')
-      }
-    } catch (err) {
-      console.error('[Admin] Revalidation failed:', err)
-    }
+    // Fire-and-forget: revalidate customer pages in background (can take 30s+)
+    revalidateProductPages().catch(err => console.error('[Admin] Revalidation failed:', err))
   }, [])
 
   // Use DB products when available, otherwise empty
@@ -308,13 +301,12 @@ export default function ProductsPage() {
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
           if (Object.keys(filePayload).length > 0) payload.file = filePayload
           const res = await updateProduct(editingId, payload)
-          if (res.doc || res.id) {
-            toast.success('Đã cập nhật & đồng bộ sản phẩm', { description: 'Trang khách hàng đã được cập nhật.' })
-          } else {
+          if (!res.doc && !res.id) {
             toast.error('Lỗi cập nhật: ' + (res.errors?.[0]?.message || res.message || 'Unknown'))
             setSaving(false)
             return
           }
+          toast.success('Đã cập nhật sản phẩm')
         } else {
           // --- CREATE new product ---
           const payload: Record<string, unknown> = {
@@ -325,21 +317,24 @@ export default function ProductsPage() {
             featured: productData.featured,
             category: categoryId,
           }
-          // Only set thumbnail fields if we have a valid result (no hardcoded fallback)
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
           if (Object.keys(filePayload).length > 0) payload.file = filePayload
           const res = await createProduct(payload)
-          if (res.doc || res.id) {
-            toast.success('Đã thêm & đồng bộ sản phẩm mới', { description: 'Trang khách hàng đã được cập nhật.' })
-          } else {
+          if (!res.doc && !res.id) {
             toast.error('Lỗi tạo: ' + (res.errors?.[0]?.message || res.message || 'Unknown'))
             setSaving(false)
             return
           }
+          toast.success('Đã thêm sản phẩm mới')
         }
-        await reloadDb()
+
+        // Close form & stop spinner IMMEDIATELY — don't wait for revalidation
         setSaving(false)
+        handleCancel()
+
+        // Reload products from DB + revalidate customer pages in background
+        reloadDb()
       } catch (err) {
         console.error('[Save] Exception:', err)
         toast.error('Lỗi kết nối database')

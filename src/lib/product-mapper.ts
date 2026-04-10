@@ -52,10 +52,10 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
 }
 
 /** Map an array of Payload docs, with extra fields for admin product table */
-export function mapPayloadDocs(docs: Record<string, unknown>[]): (DemoProduct & { createdAt: string; isCustom: true })[] {
+export function mapPayloadDocs(docs: Record<string, unknown>[]): (DemoProduct & { createdAt: string; isDb: true })[] {
   return docs.map((doc) => ({
     ...mapPayloadDoc(doc),
     createdAt: String(doc.createdAt || doc.updatedAt || ''),
-    isCustom: true as const,
+    isDb: true as const,
   }))
 }
