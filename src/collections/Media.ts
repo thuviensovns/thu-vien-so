@@ -10,9 +10,9 @@ export const Media: CollectionConfig = {
   upload: {
     mimeTypes: ['image/*', 'audio/*'],
     imageSizes: [
-      { name: 'thumbnail', width: 400, height: 300 },
-      { name: 'card', width: 600, height: 450 },
-      { name: 'hero', width: 1200, height: 600 },
+      { name: 'thumbnail', width: 480, height: 270 },
+      { name: 'card', width: 800, height: 450 },
+      { name: 'hero', width: 1920, height: 1080 },
     ],
   },
   access: {
