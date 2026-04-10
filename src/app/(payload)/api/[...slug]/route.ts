@@ -1,5 +1,6 @@
 /* THIS FILE WAS GENERATED AUTOMATICALLY BY PAYLOAD. */
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
+export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 import config from '@payload-config'
 import {

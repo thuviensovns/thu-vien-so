@@ -17,32 +17,17 @@ export async function POST(req: NextRequest) {
       authorized = true
     }
 
-    // Check admin auth via payload-token cookie
-    // Use the Payload REST API to verify — this piggybacks on existing Payload instance
+    // Check admin auth via payload-token cookie using Payload's local API directly
+    // (avoids internal HTTP fetch that can timeout on cold starts)
     if (!authorized) {
       const payloadToken = req.cookies.get('payload-token')?.value
       if (payloadToken) {
         try {
-          // Verify token by calling Payload's /api/users/me endpoint internally
-          const origin = req.nextUrl.origin
-          const meRes = await fetch(`${origin}/api/users/me`, {
-            headers: {
-              'Authorization': `JWT ${payloadToken}`,
-            },
-          })
-          if (meRes.ok) {
-            const meData = await meRes.json()
-            if (meData.user?.role === 'admin') authorized = true
-          }
-        } catch {
-          // If internal fetch fails, try direct Payload auth as fallback
-          try {
-            const { getPayloadForApi } = await import('@/lib/payload')
-            const payload = await getPayloadForApi()
-            const { user } = await payload.auth({ headers: req.headers })
-            if (user?.role === 'admin') authorized = true
-          } catch { /* auth failed */ }
-        }
+          const { getPayloadForApi } = await import('@/lib/payload')
+          const payload = await getPayloadForApi()
+          const { user } = await payload.auth({ headers: req.headers })
+          if (user?.role === 'admin') authorized = true
+        } catch { /* auth failed */ }
       }
     }
 

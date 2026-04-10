@@ -65,8 +65,19 @@ export const Users: CollectionConfig = {
       min: 0,
       label: 'Số dư (VND)',
       admin: { description: 'Số dư tài khoản người dùng' },
-      access: {
-        update: ({ req: { user } }) => user?.role === 'admin',
+      hooks: {
+        beforeChange: [
+          ({ value, originalDoc, operation, req, overrideAccess }) => {
+            // Allow on create (default value)
+            if (operation === 'create') return value ?? 0
+            // Allow server-side operations (admin topup, webhook, etc.)
+            if (overrideAccess) return value
+            // Allow admin users
+            if (req?.user?.role === 'admin') return value
+            // Prevent non-admin users from changing their own balance
+            return originalDoc?.balance ?? 0
+          },
+        ],
       },
     },
   ],

@@ -181,6 +181,7 @@ export async function POST(req: NextRequest) {
       data: {
         balance: currentBalance + creditAmount,
       },
+      overrideAccess: true,
     })
 
     console.log(`[Sepay Webhook] Credited ${creditAmount} VND to user ${userId}. New balance: ${currentBalance + creditAmount}`)

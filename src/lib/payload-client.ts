@@ -93,6 +93,7 @@ export async function fetchProducts(opts?: { limit?: number; type?: string; cate
   try {
     const res = await fetch(`${API}/products?${params}`, {
       credentials: 'include',
+      cache: 'no-store',
       signal: controller.signal,
     })
     clearTimeout(timer)
@@ -158,6 +159,7 @@ export async function fetchCategories() {
   try {
     const res = await fetch(`${API}/categories?limit=100&sort=order&depth=0`, {
       credentials: 'include',
+      cache: 'no-store',
       signal: controller.signal,
     })
     clearTimeout(timer)

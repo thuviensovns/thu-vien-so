@@ -159,7 +159,7 @@ export default function ProductsPage() {
     return () => { cancelled = true; if (retryTimer) clearTimeout(retryTimer) }
   }, [])
 
-  // Reload DB products after changes + revalidate customer pages (non-blocking)
+  // Reload DB products after changes + revalidate customer pages
   const reloadDb = useCallback(async () => {
     try {
       const data = await fetchProducts({ limit: 200 })
@@ -171,8 +171,13 @@ export default function ProductsPage() {
       console.error('[Admin] Failed to reload products:', err)
       toast.error('Lỗi tải lại danh sách sản phẩm')
     }
-    // Fire-and-forget: revalidate customer pages in background (can take 30s+)
-    revalidateProductPages().catch(err => console.error('[Admin] Revalidation failed:', err))
+    // Revalidate customer-facing pages so new products appear immediately
+    try {
+      await revalidateProductPages()
+    } catch (err) {
+      console.error('[Admin] Revalidation failed:', err)
+      toast.warning('Sản phẩm đã lưu nhưng trang khách hàng có thể cần ~60s để cập nhật')
+    }
   }, [])
 
   // Use DB products when available, otherwise empty
@@ -333,12 +338,10 @@ export default function ProductsPage() {
           toast.success('Đã thêm sản phẩm mới')
         }
 
-        // Close form & stop spinner IMMEDIATELY — don't wait for revalidation
-        setSaving(false)
+        // Close form & reload products from DB
         handleCancel()
-
-        // Reload products from DB + revalidate customer pages in background
-        reloadDb()
+        await reloadDb()
+        setSaving(false)
       } catch (err) {
         console.error('[Save] Exception:', err)
         toast.error('Lỗi kết nối database')
