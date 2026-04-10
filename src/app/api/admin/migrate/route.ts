@@ -6,12 +6,20 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 /**
- * POST: Run database migrations for new collections.
- * Uses REVALIDATE_SECRET for auth (bypasses Payload which is broken without these migrations).
+ * GET/POST: Run database migrations for new collections.
+ * Uses PAYLOAD_SECRET for auth (bypasses Payload which is broken without these migrations).
  *
- * Usage: fetch('/api/admin/migrate?secret=YOUR_SECRET', { method: 'POST' })
+ * Usage: Just visit /api/admin/migrate?secret=YOUR_PAYLOAD_SECRET in browser
  */
+export async function GET(req: NextRequest) {
+  return runMigration(req)
+}
+
 export async function POST(req: NextRequest) {
+  return runMigration(req)
+}
+
+async function runMigration(req: NextRequest) {
   try {
     // Auth via secret (can't use Payload auth since it's broken without these migrations)
     const secret = process.env.REVALIDATE_SECRET || process.env.PAYLOAD_SECRET
