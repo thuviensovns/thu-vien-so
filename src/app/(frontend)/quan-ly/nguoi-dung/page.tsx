@@ -21,6 +21,7 @@ interface PayloadUser {
   email: string
   displayName?: string
   role?: string
+  balance?: number
   createdAt?: string
 }
 
@@ -43,6 +44,7 @@ export default function UsersPage() {
           email: u.email,
           displayName: u.displayName || '',
           role: (u.role as 'admin' | 'customer') || 'customer',
+          balance: Number(u.balance || 0),
         }))
         setDbUsers(users)
       }
@@ -123,16 +125,36 @@ export default function UsersPage() {
     }
   }
 
-  function handleAddBalance(userId: string) {
+  async function handleAddBalance(userId: string) {
     const amount = parseInt(balanceAmount)
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Số tiền không hợp lệ')
+    if (isNaN(amount) || amount < 1000) {
+      toast.error('Số tiền tối thiểu 1.000₫')
       return
     }
     const user = allUsers.find((u) => u.id === userId)
-    if (user) {
-      logActivity('topup', 'Admin cộng tiền', `${user.email} +${formatVND(amount)}`)
-      toast.success(`Đã cộng ${formatVND(amount)} cho ${user.email}`)
+    if (!user) return
+
+    try {
+      const res = await fetch('/api/admin/topups', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, amount }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Lỗi cộng tiền')
+        return
+      }
+      toast.success(`Đã cộng ${formatVND(amount)} cho ${user.displayName || user.email}`, {
+        description: `Số dư mới: ${formatVND(data.newBalance)}`,
+      })
+      // Update balance locally
+      setDbUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, balance: data.newBalance } : u
+      ))
+    } catch {
+      toast.error('Lỗi kết nối')
     }
     setBalanceUserId(null)
     setBalanceAmount('')
@@ -260,10 +282,18 @@ export default function UsersPage() {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                      <Mail className="h-3 w-3 shrink-0" />
-                      {user.email}
-                    </p>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1 truncate">
+                        <Mail className="h-3 w-3 shrink-0" />
+                        {user.email}
+                      </span>
+                      {typeof user.balance === 'number' && (
+                        <span className="flex items-center gap-1 text-success font-medium shrink-0">
+                          <Wallet className="h-3 w-3" />
+                          {formatVND(user.balance)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Actions */}
