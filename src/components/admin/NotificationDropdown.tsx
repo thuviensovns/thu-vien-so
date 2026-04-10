@@ -9,11 +9,13 @@ import { formatVND } from '@/lib/format'
 interface TopUpNotification {
   id: number
   type: 'topup'
+  status: string
   userName: string | null
   userEmail: string | null
   amount: number
   transferCode: string
   confirmedAt: string | null
+  createdAt: string | null
 }
 
 interface NotificationData {
@@ -134,40 +136,50 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
                     <div className="px-4 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/20">
                       Nạp tiền ({unreadTopUps})
                     </div>
-                    {recentTopUps.map((t) => (
-                      <div
-                        key={t.id}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer border-b border-border/50 last:border-0"
-                        onClick={() => {
-                          router.push('/quan-ly/nap-tien')
-                          setOpen(false)
-                        }}
-                      >
-                        <div className="h-8 w-8 rounded-full bg-success/10 flex items-center justify-center shrink-0 mt-0.5">
-                          <Wallet className="h-4 w-4 text-success" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium leading-snug">
-                            <span className="text-foreground">{t.userName || t.userEmail || 'Khách'}</span>
-                            {' '}nạp{' '}
-                            <span className="text-success font-bold">{formatVND(t.amount)}</span>
-                          </p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
-                            Mã: {t.transferCode} · {timeAgo(t.confirmedAt)}
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            markOneRead(t.id)
+                    {recentTopUps.map((t) => {
+                      const isPending = t.status === 'pending'
+                      return (
+                        <div
+                          key={t.id}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer border-b border-border/50 last:border-0"
+                          onClick={() => {
+                            router.push('/quan-ly/nap-tien')
+                            setOpen(false)
                           }}
-                          className="text-muted-foreground hover:text-foreground shrink-0 mt-1"
-                          title="Đánh dấu đã đọc"
                         >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isPending ? 'bg-warning/10' : 'bg-success/10'}`}>
+                            <Wallet className={`h-4 w-4 ${isPending ? 'text-warning' : 'text-success'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium leading-snug">
+                              <span className="text-foreground">{t.userName || t.userEmail || 'Khách'}</span>
+                              {isPending ? ' yêu cầu nạp ' : ' đã nạp '}
+                              <span className={`font-bold ${isPending ? 'text-warning' : 'text-success'}`}>{formatVND(t.amount)}</span>
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`inline-block text-[9px] px-1.5 py-0 rounded-full font-medium ${isPending ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}`}>
+                                {isPending ? 'Đang chờ' : 'Thành công'}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {t.transferCode} · {timeAgo(isPending ? t.createdAt : t.confirmedAt)}
+                              </span>
+                            </div>
+                          </div>
+                          {!isPending && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                markOneRead(t.id)
+                              }}
+                              className="text-muted-foreground hover:text-foreground shrink-0 mt-1"
+                              title="Đánh dấu đã đọc"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
 

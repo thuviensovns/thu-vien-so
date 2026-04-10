@@ -34,16 +34,24 @@ export async function GET(req: NextRequest) {
 
     // Topup notifications — wrapped in try/catch in case readByAdmin column
     // hasn't been synced to DB yet (Payload push: true runs on first access)
+    // Topup notifications: both pending (customer just created) and completed (confirmed)
     let unreadTopUpCount = 0
     let topUpDocs: Record<string, unknown>[] = []
     try {
       const unreadTopUps = await payload.find({
         collection: 'topups',
         where: {
-          status: { equals: 'completed' },
-          readByAdmin: { not_equals: true },
+          or: [
+            { status: { equals: 'pending' } },
+            {
+              and: [
+                { status: { equals: 'completed' } },
+                { readByAdmin: { not_equals: true } },
+              ],
+            },
+          ],
         },
-        sort: '-confirmedAt',
+        sort: '-createdAt',
         limit: 20,
         depth: 1,
         overrideAccess: true,
@@ -51,13 +59,17 @@ export async function GET(req: NextRequest) {
       unreadTopUpCount = unreadTopUps.totalDocs
       topUpDocs = unreadTopUps.docs as unknown as Record<string, unknown>[]
     } catch (e) {
-      // readByAdmin column may not exist yet — fallback: query without it
       console.warn('[Notifications] topup query failed, trying fallback:', (e as Error).message)
       try {
         const fallback = await payload.find({
           collection: 'topups',
-          where: { status: { equals: 'completed' } },
-          sort: '-confirmedAt',
+          where: {
+            or: [
+              { status: { equals: 'pending' } },
+              { status: { equals: 'completed' } },
+            ],
+          },
+          sort: '-createdAt',
           limit: 20,
           depth: 1,
           overrideAccess: true,
@@ -88,11 +100,13 @@ export async function GET(req: NextRequest) {
         return {
           id: t.id,
           type: 'topup' as const,
+          status: t.status as string,
           userName: (user?.displayName as string) || null,
           userEmail: (user?.email as string) || null,
           amount: t.amount,
           transferCode: t.transferCode,
           confirmedAt: t.confirmedAt,
+          createdAt: t.createdAt,
         }
       }),
     })

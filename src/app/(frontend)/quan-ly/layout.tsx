@@ -36,8 +36,8 @@ interface NotificationState {
   unreadMessages: number
   unreadTopUps: number
   recentTopUps: {
-    id: number; type: 'topup'; userName: string | null; userEmail: string | null;
-    amount: number; transferCode: string; confirmedAt: string | null;
+    id: number; type: 'topup'; status: string; userName: string | null; userEmail: string | null;
+    amount: number; transferCode: string; confirmedAt: string | null; createdAt: string | null;
   }[]
 }
 
