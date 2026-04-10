@@ -259,15 +259,19 @@ export default function ProductsPage() {
         return
       }
       try {
-        // Upload image if user selected a new one (data URL)
+        // Handle thumbnail: external URL, data URL upload, or keep existing
         let thumbnailResult: number | string | null = null
-        if (form.thumbnailUrl.startsWith('data:')) {
+        if (form.thumbnailUrl.startsWith('http')) {
+          // External URL (imgur, google drive, etc.) — use directly, no upload needed
+          thumbnailResult = form.thumbnailUrl
+          productData.thumbnail = { url: form.thumbnailUrl }
+        } else if (form.thumbnailUrl.startsWith('data:')) {
+          // Local file selected — try uploading to R2 or Payload media
           toast.loading('Đang upload hình ảnh...', { id: 'img-upload' })
           thumbnailResult = await uploadMedia(form.thumbnailUrl, productData.slug)
           toast.dismiss('img-upload')
           if (!thumbnailResult) {
-            // R2 not configured or upload failed — skip image, continue saving product
-            toast.warning('Không thể upload ảnh (R2 chưa cấu hình?). Sản phẩm sẽ dùng ảnh mặc định.', { duration: 5000 })
+            toast.warning('Không thể upload ảnh (R2 chưa cấu hình?). Hãy dùng link ảnh URL thay thế.', { duration: 5000 })
             thumbnailResult = null
           }
           if (typeof thumbnailResult === 'string') {
