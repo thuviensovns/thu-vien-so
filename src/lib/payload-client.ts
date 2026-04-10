@@ -54,57 +54,25 @@ export async function uploadMedia(dataUrl: string, slugName?: string): Promise<n
       ? `${slugName.replace(/\.[^.]+$/, '')}-${Date.now()}.${ext}`
       : `product-${Date.now()}.${ext}`
 
-    // Try R2 thumbnail upload first (bypasses Vercel 4.5MB body limit)
-    try {
-      const r2Form = new FormData()
-      r2Form.append('file', blob, name)
-      r2Form.append('productSlug', slugName || 'product')
-
-      const r2Res = await fetch('/api/upload/thumbnail', {
-        method: 'POST',
-        credentials: 'include',
-        body: r2Form,
-      })
-
-      if (r2Res.ok) {
-        const r2Data = await r2Res.json()
-        if (r2Data.url) {
-          // Return URL string — caller must handle both number (media ID) and string (URL)
-          return r2Data.url
-        }
-      }
-    } catch (e) {
-      console.warn('[uploadMedia] R2 thumbnail upload failed, trying Payload media:', e)
-    }
-
-    // Fallback: try Payload /api/media (may hit 413 on Vercel Hobby for large images)
+    // Upload via /api/upload/thumbnail (handles R2 or Vercel Blob)
     const formData = new FormData()
     formData.append('file', blob, name)
-    formData.append('alt', slugName?.replace(/\.[^.]+$/, '') || 'Product image')
+    formData.append('productSlug', slugName || 'product')
 
-    const uploadRes = await fetch(`${API}/media`, {
+    const res = await fetch('/api/upload/thumbnail', {
       method: 'POST',
       credentials: 'include',
       body: formData,
     })
 
-    const responseText = await uploadRes.text()
-    let data: Record<string, unknown>
-    try {
-      data = JSON.parse(responseText)
-    } catch {
-      console.error('[uploadMedia] Invalid response:', responseText.slice(0, 200))
-      return null
+    if (res.ok) {
+      const data = await res.json()
+      if (data.url) return data.url as string
     }
 
-    if (!uploadRes.ok) {
-      console.error('[uploadMedia] Failed:', uploadRes.status, data)
-      return null
-    }
-
-    const doc = (data.doc as Record<string, unknown>) || data
-    const id = doc.id
-    return id ? Number(id) : null
+    const errData = await res.json().catch(() => ({}))
+    console.error('[uploadMedia] Upload failed:', res.status, errData)
+    return null
   } catch (e) {
     console.error('[uploadMedia] Error:', e)
     return null

@@ -271,7 +271,7 @@ export default function ProductsPage() {
           thumbnailResult = await uploadMedia(form.thumbnailUrl, productData.slug)
           toast.dismiss('img-upload')
           if (!thumbnailResult) {
-            toast.warning('Không thể upload ảnh (R2 chưa cấu hình?). Hãy dùng link ảnh URL thay thế.', { duration: 5000 })
+            toast.warning('Không thể upload ảnh. Hãy thêm BLOB_READ_WRITE_TOKEN vào Vercel hoặc dùng link ảnh URL.', { duration: 6000 })
             thumbnailResult = null
           }
           if (typeof thumbnailResult === 'string') {
