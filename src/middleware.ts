@@ -21,6 +21,7 @@ export function middleware(req: NextRequest) {
     && !pathname.startsWith('/api/balance')
     && !pathname.startsWith('/api/topup')
     && !pathname.startsWith('/api/notifications')
+    && !pathname.startsWith('/api/admin')
     && !pathname.startsWith('/api/my-messages')
     && !pathname.startsWith('/api/messages')
     && !pathname.startsWith('/api/bank-config')
