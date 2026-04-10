@@ -107,19 +107,35 @@ export async function POST(req: NextRequest) {
 
     // 2. Create topup record
     const transferCode = `ADMIN${Date.now().toString(36).toUpperCase()}`
-    await payload.create({
-      collection: 'topups',
-      data: {
-        user: targetUser.id,
-        amount,
-        transferCode,
-        status: 'completed',
-        confirmedAt: new Date().toISOString(),
-        readByAdmin: true, // admin did it themselves, no need to notify
-        bankDescription: `Admin cộng thủ công bởi ${user.email}`,
-      },
-      overrideAccess: true,
-    })
+    try {
+      await payload.create({
+        collection: 'topups',
+        data: {
+          user: targetUser.id,
+          amount,
+          transferCode,
+          status: 'completed',
+          confirmedAt: new Date().toISOString(),
+          readByAdmin: true,
+          bankDescription: `Admin cộng thủ công bởi ${user.email}`,
+        },
+        overrideAccess: true,
+      })
+    } catch (topupErr) {
+      // Retry without optional fields that may not exist in DB yet
+      console.warn('[Admin topup] Retrying without optional fields:', topupErr)
+      await payload.create({
+        collection: 'topups',
+        data: {
+          user: targetUser.id,
+          amount,
+          transferCode,
+          status: 'completed',
+          confirmedAt: new Date().toISOString(),
+        },
+        overrideAccess: true,
+      })
+    }
 
     return NextResponse.json({
       success: true,
@@ -128,7 +144,8 @@ export async function POST(req: NextRequest) {
       userName: targetUser.displayName || targetUser.email,
     })
   } catch (error) {
-    console.error('[Admin manual topup] Error:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[Admin manual topup] Error:', msg, error)
+    return NextResponse.json({ error: `Lỗi: ${msg}` }, { status: 500 })
   }
 }
