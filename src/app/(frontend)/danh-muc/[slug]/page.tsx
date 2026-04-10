@@ -12,7 +12,7 @@ import {
 import { getCategoryBySlug, getProducts, getCategoryStats } from '@/lib/payload'
 import { demoCategoryDescriptions } from '@/lib/demo-data'
 import { ProductListingClient } from '@/components/product/ProductListingClient'
-import type { ProductGridItem } from '@/components/product/ProductGrid'
+import { mapPayloadToGridItems } from '@/lib/product-mapper'
 import { CategoryStatsBar } from '@/components/product/CategoryStatsBar'
 import { CategoryDescClient } from '@/components/product/CategoryDescClient'
 import { ProductSort } from '@/components/product/ProductSort'
@@ -255,7 +255,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
 
             {/* Product grid — client component for localStorage reactivity */}
             <ProductListingClient
-              serverProducts={products.docs as ProductGridItem[]}
+              serverProducts={mapPayloadToGridItems(products.docs as Record<string, unknown>[])}
               hasRealData={hasRealData}
               categorySlug={slug}
               isFree={isFree}

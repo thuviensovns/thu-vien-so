@@ -51,6 +51,28 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
   }
 }
 
+/** Map raw Payload docs to ProductGridItem shape for storefront listing pages */
+export function mapPayloadToGridItems(docs: Record<string, unknown>[]): {
+  id: string; name: string; slug: string; type: string;
+  thumbnail: { url?: string }; pricing: { price: number; originalPrice?: number | null; isFree?: boolean };
+  preview?: { bpm?: number | null; musicalKey?: string | null }; downloadCount?: number; featured?: boolean;
+}[] {
+  return docs.map((doc) => {
+    const mapped = mapPayloadDoc(doc)
+    return {
+      id: mapped.id,
+      name: mapped.name,
+      slug: mapped.slug,
+      type: mapped.type,
+      thumbnail: mapped.thumbnail,
+      pricing: mapped.pricing,
+      preview: mapped.preview,
+      downloadCount: mapped.downloadCount,
+      featured: mapped.featured,
+    }
+  })
+}
+
 /** Map an array of Payload docs, with extra fields for admin product table */
 export function mapPayloadDocs(docs: Record<string, unknown>[]): (DemoProduct & { createdAt: string; isDb: true })[] {
   return docs.map((doc) => ({

@@ -11,6 +11,7 @@ import {
 import { getProducts, getCategoryStats } from '@/lib/payload'
 import { ProductListingClient } from '@/components/product/ProductListingClient'
 import type { ProductGridItem } from '@/components/product/ProductGrid'
+import { mapPayloadToGridItems } from '@/lib/product-mapper'
 import { CategoryStatsBar, CategoryStatsCount } from '@/components/product/CategoryStatsBar'
 import { ProductFilters } from '@/components/product/ProductFilters'
 import { ProductSort } from '@/components/product/ProductSort'
@@ -168,7 +169,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
             {/* Product grid — client component for localStorage reactivity */}
             <ProductListingClient
-              serverProducts={products.docs as ProductGridItem[]}
+              serverProducts={mapPayloadToGridItems(products.docs as Record<string, unknown>[])}
               hasRealData={hasRealData}
               typeFilter={params.type}
               isFree={isFree}

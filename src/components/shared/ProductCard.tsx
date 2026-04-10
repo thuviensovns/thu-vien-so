@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { confirmDialog } from '@/components/ui/confirm-dialog'
 
 export interface ProductCardProps {
-  id?: string
+  id?: string | number
   name: string
   slug: string
   type: string
@@ -51,11 +51,13 @@ export const ProductCard = memo(function ProductCard({
   const router = useRouter()
   const [justAdded, setJustAdded] = useState(false)
   const isAdmin = user?.role === 'admin'
+  // Ensure id is always a string (Payload returns numeric IDs)
+  const productId = id != null ? String(id) : slug
   const isAdminProduct = useMemo(
-    () => isAdmin ? getAdminProducts().some((p) => p.id === (id || slug)) : false,
-    [isAdmin, id, slug],
+    () => isAdmin ? getAdminProducts().some((p) => p.id === productId) : false,
+    [isAdmin, productId],
   )
-  const isInCart = items.some((i) => i.id === (id || slug))
+  const isInCart = items.some((i) => i.id === productId)
   const isFreeItem = isFree || price === 0
   const hasDiscount = originalPrice && originalPrice > price
   const discountPercent = hasDiscount ? Math.round((1 - price / originalPrice) * 100) : 0
@@ -64,7 +66,7 @@ export const ProductCard = memo(function ProductCard({
     e.preventDefault()
     e.stopPropagation()
     if (isInCart) return
-    addItem({ id: id || slug, name, slug, price, thumbnail, type })
+    addItem({ id: productId, name, slug, price, thumbnail, type })
     setJustAdded(true)
     setTimeout(() => setJustAdded(false), 1500)
     toast.success('Đã thêm vào giỏ hàng', {
@@ -79,7 +81,7 @@ export const ProductCard = memo(function ProductCard({
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
-    if (!id) return
+    if (!productId) return
     const confirmed = await confirmDialog({
       title: 'Xóa sản phẩm',
       description: `Bạn có chắc muốn xóa "${name}"? Hành động này không thể hoàn tác.`,
@@ -87,7 +89,7 @@ export const ProductCard = memo(function ProductCard({
       variant: 'destructive',
     })
     if (!confirmed) return
-    deleteAdminProduct(id)
+    deleteAdminProduct(productId)
     toast.success('Đã xóa sản phẩm', { description: name })
     onDeleted?.()
   }
@@ -98,7 +100,7 @@ export const ProductCard = memo(function ProductCard({
       const res = await fetch('/api/download/free', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: id || slug }),
+        body: JSON.stringify({ productId }),
       })
       let data: { url?: string; fileName?: string; error?: string } | null = null
       try { data = await res.json() } catch {}
@@ -137,7 +139,7 @@ export const ProductCard = memo(function ProductCard({
       return
     }
     if (!isInCart) {
-      addItem({ id: id || slug, name, slug, price, thumbnail, type })
+      addItem({ id: productId, name, slug, price, thumbnail, type })
     }
     router.push('/thanh-toan')
   }

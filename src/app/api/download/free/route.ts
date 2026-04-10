@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
-    const productId = typeof body?.productId === 'string' ? body.productId.trim().slice(0, 100) : ''
+    // Accept both string and number productId (raw Payload docs have numeric IDs)
+    const rawId = body?.productId
+    const productId = typeof rawId === 'number' ? String(rawId) : typeof rawId === 'string' ? rawId.trim().slice(0, 100) : ''
     if (!productId || /[<>"';]/.test(productId)) {
       return NextResponse.json({ error: 'Invalid productId' }, { status: 400 })
     }

@@ -212,7 +212,7 @@ export default function ProductForm({
                 <p className="text-[10px] text-muted-foreground">
                   JPG, PNG, WebP — tối đa 5MB
                 </p>
-                {form.thumbnailUrl !== '/images/placeholder.jpg' && form.thumbnailUrl.startsWith('data:') && (
+                {form.thumbnailUrl !== '/images/placeholder.jpg' && (form.thumbnailUrl.startsWith('data:') || form.thumbnailUrl.startsWith('http')) && (
                   <button
                     type="button"
                     onClick={() => setForm((p) => ({ ...p, thumbnailUrl: '/images/placeholder.jpg' }))}
@@ -222,6 +222,18 @@ export default function ProductForm({
                   </button>
                 )}
               </div>
+            </div>
+            <div className="mt-2">
+              <label className="text-[10px] text-muted-foreground mb-1 block">Hoặc dán link ảnh trực tiếp (URL)</label>
+              <Input
+                value={form.thumbnailUrl.startsWith('data:') || form.thumbnailUrl === '/images/placeholder.jpg' ? '' : form.thumbnailUrl}
+                onChange={(e) => {
+                  const url = e.target.value.trim()
+                  setForm((p) => ({ ...p, thumbnailUrl: url || '/images/placeholder.jpg' }))
+                }}
+                placeholder="https://i.imgur.com/... hoặc link ảnh khác"
+                className="bg-muted/50 font-mono text-xs"
+              />
             </div>
           </div>
 
