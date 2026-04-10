@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
-import type { ContactMessage } from '@/types/payload-types'
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,24 +16,37 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Get unread contact messages count
-    const newMessages = await payload.find({
-      collection: 'contact-messages',
-      where: { status: { equals: 'new' } },
-      limit: 0,
-      overrideAccess: true,
-    })
-
-    // Get recent contact messages (last 20)
-    const recentMessages = await payload.find({
-      collection: 'contact-messages',
-      sort: '-createdAt',
-      limit: 20,
-      overrideAccess: true,
-    })
+    // Get unread contact messages count + recent messages
+    const [newMessages, recentMessages, unreadTopUps] = await Promise.all([
+      payload.find({
+        collection: 'contact-messages',
+        where: { status: { equals: 'new' } },
+        limit: 0,
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'contact-messages',
+        sort: '-createdAt',
+        limit: 20,
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'topups',
+        where: {
+          status: { equals: 'completed' },
+          readByAdmin: { not_equals: true },
+        },
+        sort: '-confirmedAt',
+        limit: 20,
+        depth: 1,
+        overrideAccess: true,
+      }),
+    ])
 
     return NextResponse.json({
-      unreadCount: newMessages.totalDocs,
+      unreadCount: newMessages.totalDocs + unreadTopUps.totalDocs,
+      unreadMessages: newMessages.totalDocs,
+      unreadTopUps: unreadTopUps.totalDocs,
       recent: recentMessages.docs.map((msg) => ({
         id: msg.id,
         name: msg.name,
@@ -47,6 +59,18 @@ export async function GET(req: NextRequest) {
         createdAt: msg.createdAt,
         updatedAt: msg.updatedAt,
       })),
+      recentTopUps: unreadTopUps.docs.map((t) => {
+        const user = typeof t.user === 'object' && t.user ? t.user : null
+        return {
+          id: t.id,
+          type: 'topup' as const,
+          userName: (user as Record<string, unknown>)?.displayName as string || null,
+          userEmail: (user as Record<string, unknown>)?.email as string || null,
+          amount: t.amount,
+          transferCode: t.transferCode,
+          confirmedAt: t.confirmedAt,
+        }
+      }),
     })
   } catch (error) {
     console.error('Notifications error:', error)

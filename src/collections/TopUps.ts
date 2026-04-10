@@ -72,6 +72,13 @@ export const TopUps: CollectionConfig = {
       label: 'Ngày xác nhận',
     },
     {
+      name: 'readByAdmin',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Admin đã xem',
+      admin: { position: 'sidebar' },
+    },
+    {
       name: 'expiresAt',
       type: 'date',
       label: 'Hết hạn lúc',

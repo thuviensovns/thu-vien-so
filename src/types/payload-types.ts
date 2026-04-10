@@ -157,6 +157,7 @@ export interface TopUp extends PayloadBase {
   bankTransactionId?: string | null
   bankDescription?: string | null
   confirmedAt?: string | null
+  readByAdmin?: boolean | null
   expiresAt?: string | null
 }
 

@@ -1,27 +1,28 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, CreditCard, Users, ShoppingCart,
   Package, ChevronLeft, ShieldCheck, Settings,
   Wallet, Tag, ScrollText, RefreshCw, MessageCircle,
-  Bell, Mail, Keyboard,
+  Mail, Keyboard,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { usePolling } from '@/hooks/use-polling'
 import { checkSystemHealth, updateSessionActivity, getCurrentSessionId, recordSession } from '@/lib/admin-security'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import NotificationDropdown from '@/components/admin/NotificationDropdown'
 
 const adminNav = [
   { label: 'Tổng quan', href: '/quan-ly', icon: LayoutDashboard },
-  { label: 'Tin nhắn hỗ trợ', href: '/quan-ly/tin-nhan', icon: Mail, notifiable: true },
+  { label: 'Tin nhắn hỗ trợ', href: '/quan-ly/tin-nhan', icon: Mail, badgeKey: 'messages' as const },
   { label: 'Đơn hàng', href: '/quan-ly/don-hang', icon: ShoppingCart },
   { label: 'Sản phẩm', href: '/quan-ly/san-pham', icon: Package },
   { label: 'Người dùng', href: '/quan-ly/nguoi-dung', icon: Users },
-  { label: 'Nạp tiền', href: '/quan-ly/nap-tien', icon: Wallet },
+  { label: 'Nạp tiền', href: '/quan-ly/nap-tien', icon: Wallet, badgeKey: 'topups' as const },
   { label: 'Mã giảm giá', href: '/quan-ly/khuyen-mai', icon: Tag },
   { label: 'Ngân hàng & QR', href: '/quan-ly/ngan-hang', icon: CreditCard },
   { label: 'Spin nội dung', href: '/quan-ly/noi-dung', icon: RefreshCw },
@@ -30,12 +31,27 @@ const adminNav = [
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
 ]
 
+interface NotificationState {
+  unreadCount: number
+  unreadMessages: number
+  unreadTopUps: number
+  recentTopUps: {
+    id: number; type: 'topup'; userName: string | null; userEmail: string | null;
+    amount: number; transferCode: string; confirmedAt: string | null;
+  }[]
+}
+
+const emptyNotifications: NotificationState = {
+  unreadCount: 0, unreadMessages: 0, unreadTopUps: 0, recentTopUps: [],
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const pathname = usePathname()
   const router = useRouter()
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifications, setNotifications] = useState<NotificationState>(emptyNotifications)
   const [apiStatus, setApiStatus] = useState<'online' | 'degraded' | 'offline'>('online')
+  const prevTopUpCount = useRef(0)
 
   // System health indicator
   const healthCheck = useCallback(async () => {
@@ -47,7 +63,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Session tracking
   useEffect(() => {
     if (user?.role !== 'admin') return
-    // Record session on mount if not already recorded
     if (!getCurrentSessionId()) {
       recordSession(user.email)
     }
@@ -58,6 +73,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }, 30000)
     return () => clearInterval(interval)
   }, [user?.role, user?.email])
+
+  // Request browser notification permission
+  useEffect(() => {
+    if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [user?.role])
 
   // Keyboard shortcuts: G+D/U/O/P/S/M/L
   useEffect(() => {
@@ -99,7 +121,34 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       const res = await fetch('/api/notifications', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        setUnreadCount(data.unreadCount || 0)
+        const newTopUps = data.unreadTopUps || 0
+
+        // Play sound + browser notification when new topups arrive
+        if (newTopUps > prevTopUpCount.current && prevTopUpCount.current !== 0) {
+          // Sound
+          try {
+            const audio = new Audio('/sounds/notification.wav')
+            audio.volume = 0.5
+            audio.play().catch(() => {})
+          } catch { /* ignore */ }
+
+          // Browser notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const count = newTopUps - prevTopUpCount.current
+            new Notification('Nạp tiền mới', {
+              body: `Có ${count} giao dịch nạp tiền mới`,
+              icon: '/favicon.ico',
+            })
+          }
+        }
+        prevTopUpCount.current = newTopUps
+
+        setNotifications({
+          unreadCount: data.unreadCount || 0,
+          unreadMessages: data.unreadMessages || 0,
+          unreadTopUps: newTopUps,
+          recentTopUps: data.recentTopUps || [],
+        })
       }
     } catch { /* ignore */ }
   }, [])
@@ -163,20 +212,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Keyboard className="h-4 w-4" />
           </Button>
-          {/* Notification bell */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            onClick={() => router.push('/quan-ly/tin-nhan')}
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Button>
+          {/* Notification dropdown */}
+          <NotificationDropdown
+            data={notifications}
+            onMarkedRead={fetchNotifications}
+          />
           <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
             <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
             {user.displayName || user.email}
@@ -191,7 +231,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {adminNav.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
-              const showBadge = item.notifiable && unreadCount > 0
+              const badgeCount = item.badgeKey === 'messages' ? notifications.unreadMessages
+                : item.badgeKey === 'topups' ? notifications.unreadTopUps
+                : 0
               return (
                 <Link
                   key={item.href}
@@ -204,9 +246,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {item.label}
-                  {showBadge && (
+                  {badgeCount > 0 && (
                     <Badge variant="destructive" className="text-[9px] px-1 py-0 h-4 ml-auto">
-                      {unreadCount}
+                      {badgeCount}
                     </Badge>
                   )}
                 </Link>
