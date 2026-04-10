@@ -17,6 +17,7 @@ export interface ActivityEntry {
 }
 
 export function logActivity(type: ActivityEntry['type'], action: string, detail: string, adminEmail?: string) {
+  // Write to localStorage for backward compat
   try {
     const entries: ActivityEntry[] = JSON.parse(localStorage.getItem('admin_activity_log') || '[]')
     entries.unshift({
@@ -27,8 +28,17 @@ export function logActivity(type: ActivityEntry['type'], action: string, detail:
       timestamp: new Date().toISOString(),
       ...(adminEmail ? { adminEmail } : {}),
     })
-    // Keep last 200 entries
     localStorage.setItem('admin_activity_log', JSON.stringify(entries.slice(0, 200)))
+  } catch {}
+
+  // Also write to DB (fire and forget)
+  try {
+    fetch('/api/admin/activity-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ type, action, detail }),
+    }).catch(() => {})
   } catch {}
 }
 

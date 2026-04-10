@@ -14,6 +14,8 @@ import { Downloads } from '@/collections/Downloads'
 import { BlogPosts } from '@/collections/BlogPosts'
 import { ContactMessages } from '@/collections/ContactMessages'
 import { TopUps } from '@/collections/TopUps'
+import { Coupons } from '@/collections/Coupons'
+import { ActivityLogs } from '@/collections/ActivityLogs'
 import { BankConfig } from '@/globals/BankConfig'
 import { SiteContent } from '@/globals/SiteContent'
 
@@ -29,7 +31,7 @@ export default buildConfig({
     },
     dateFormat: 'dd/MM/yyyy HH:mm',
   },
-  collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages],
+  collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages, Coupons, ActivityLogs],
   globals: [BankConfig, SiteContent],
   db: postgresAdapter({
     push: true,

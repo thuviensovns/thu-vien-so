@@ -1,16 +1,24 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   ScrollText, Trash2, Search, ShoppingCart, Users,
-  Wallet, Tag, CreditCard, AlertCircle, Filter, Package,
+  Wallet, Tag, CreditCard, AlertCircle, Filter, Package, Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { getActivityLog, clearActivityLog, type ActivityEntry } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
+
+interface ActivityEntry {
+  id: number
+  type: string
+  action: string
+  detail: string
+  adminEmail: string
+  timestamp: string
+}
 
 const typeConfig: Record<string, { label: string; icon: typeof ShoppingCart; color: string; bg: string }> = {
   order: { label: 'Đơn hàng', icon: ShoppingCart, color: 'text-warning', bg: 'bg-warning/10' },
@@ -23,30 +31,44 @@ const typeConfig: Record<string, { label: string; icon: typeof ShoppingCart; col
 }
 
 export default function ActivityLogPage() {
-  const [entries, setEntries] = useState<ActivityEntry[]>(() => getActivityLog())
+  const [entries, setEntries] = useState<ActivityEntry[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
 
-  const filtered = useMemo(() => {
-    let result = entries
-    if (filterType !== 'all') {
-      result = result.filter((e) => e.type === filterType)
-    }
-    if (search) {
-      const q = search.toLowerCase()
-      result = result.filter((e) =>
-        e.action.toLowerCase().includes(q) ||
-        e.detail.toLowerCase().includes(q)
-      )
-    }
-    return result
-  }, [entries, search, filterType])
+  const fetchLogs = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filterType !== 'all') params.set('type', filterType)
+      const res = await fetch(`/api/admin/activity-logs?${params}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setEntries(data.docs || [])
+      }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [filterType])
 
-  function handleClear() {
+  useEffect(() => { fetchLogs() }, [fetchLogs])
+
+  const filtered = useMemo(() => {
+    if (!search) return entries
+    const q = search.toLowerCase()
+    return entries.filter((e) =>
+      e.action.toLowerCase().includes(q) ||
+      e.detail.toLowerCase().includes(q)
+    )
+  }, [entries, search])
+
+  async function handleClear() {
     if (entries.length === 0) return
-    clearActivityLog()
-    setEntries([])
-    toast.info('Đã xóa nhật ký hoạt động')
+    try {
+      await fetch('/api/admin/activity-logs', { method: 'DELETE', credentials: 'include' })
+      setEntries([])
+      toast.info('Đã xóa nhật ký hoạt động')
+    } catch {
+      toast.error('Lỗi xóa nhật ký')
+    }
   }
 
   // Group entries by date
@@ -122,7 +144,12 @@ export default function ActivityLogPage() {
       </div>
 
       {/* Log entries */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Đang tải...</span>
+        </div>
+      ) : filtered.length === 0 ? (
         <Card className="border-border">
           <CardContent className="p-8 text-center">
             <ScrollText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
@@ -154,6 +181,11 @@ export default function ActivityLogPage() {
                         <p className="text-sm font-medium">{entry.action}</p>
                         <p className="text-xs text-muted-foreground truncate">{entry.detail}</p>
                       </div>
+                      {entry.adminEmail && (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal shrink-0">
+                          {entry.adminEmail}
+                        </Badge>
+                      )}
                       <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
                         {new Date(entry.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>

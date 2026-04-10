@@ -44,8 +44,23 @@ export default function BankSettingsPage() {
   const [showProfileForm, setShowProfileForm] = useState(false)
 
   useEffect(() => {
-    setForm(getBankAccount())
-    setProfiles(getSavedProfiles())
+    // Load from DB first, fallback to localStorage
+    async function loadBankConfig() {
+      try {
+        const res = await fetch('/api/bank-config', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.accountNumber) {
+            setForm({ bankBin: data.bankBin, bankName: data.bankName, accountNumber: data.accountNumber, accountName: data.accountName })
+            setProfiles(getSavedProfiles())
+            return
+          }
+        }
+      } catch { /* fallback */ }
+      setForm(getBankAccount())
+      setProfiles(getSavedProfiles())
+    }
+    loadBankConfig()
   }, [])
 
   const previewQr = useMemo(

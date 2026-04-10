@@ -41,7 +41,21 @@ export default function SettingsPage() {
   const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
-    setForm(getSiteSettings())
+    // Load from DB first, fallback to localStorage
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/site-content', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.settings && Object.keys(data.settings).length > 0) {
+            setForm({ ...defaultSiteSettings, ...data.settings })
+            return
+          }
+        }
+      } catch { /* fallback */ }
+      setForm(getSiteSettings())
+    }
+    loadSettings()
   }, [])
 
   function handleSave() {

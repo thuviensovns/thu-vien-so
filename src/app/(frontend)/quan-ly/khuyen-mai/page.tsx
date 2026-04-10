@@ -1,21 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Tag, Plus, Trash2, ToggleLeft, ToggleRight,
-  Percent, Banknote, Calendar, Hash, AlertCircle,
+  Percent, Banknote, Calendar, Hash, Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { formatVND, formatDate } from '@/lib/format'
-import { getCoupons, addCoupon, toggleCoupon, deleteCoupon, type Coupon } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
 
+interface Coupon {
+  id: number
+  code: string
+  type: 'percent' | 'fixed'
+  value: number
+  minOrder: number
+  maxUses: number
+  usedCount: number
+  active: boolean
+  expiresAt: string | null
+  createdAt: string
+}
+
 export default function CouponPage() {
-  const [coupons, setCoupons] = useState<Coupon[]>(() => getCoupons())
+  const [coupons, setCoupons] = useState<Coupon[]>([])
+  const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     code: '',
@@ -26,7 +38,20 @@ export default function CouponPage() {
     expiresAt: '',
   })
 
-  function handleCreate() {
+  const fetchCoupons = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/coupons', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setCoupons(data.docs || [])
+      }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchCoupons() }, [fetchCoupons])
+
+  async function handleCreate() {
     if (!form.code.trim()) {
       toast.error('Vui lòng nhập mã giảm giá')
       return
@@ -40,37 +65,65 @@ export default function CouponPage() {
       toast.error('Phần trăm không thể lớn hơn 100%')
       return
     }
-    // Check duplicate code
     if (coupons.some((c) => c.code.toUpperCase() === form.code.toUpperCase())) {
       toast.error('Mã giảm giá đã tồn tại')
       return
     }
 
-    addCoupon({
-      code: form.code.toUpperCase().trim(),
-      type: form.type,
-      value,
-      minOrder: parseInt(form.minOrder) || 0,
-      maxUses: parseInt(form.maxUses) || 0,
-      active: true,
-      expiresAt: form.expiresAt || null,
-    })
-
-    toast.success(`Đã tạo mã ${form.code.toUpperCase()}`)
-    setCoupons(getCoupons())
-    setForm({ code: '', type: 'percent', value: '', minOrder: '', maxUses: '', expiresAt: '' })
-    setShowForm(false)
+    try {
+      const res = await fetch('/api/admin/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          code: form.code.toUpperCase().trim(),
+          type: form.type,
+          value,
+          minOrder: parseInt(form.minOrder) || 0,
+          maxUses: parseInt(form.maxUses) || 0,
+          expiresAt: form.expiresAt || undefined,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error(data.error || 'Lỗi tạo mã giảm giá')
+        return
+      }
+      toast.success(`Đã tạo mã ${form.code.toUpperCase()}`)
+      setForm({ code: '', type: 'percent', value: '', minOrder: '', maxUses: '', expiresAt: '' })
+      setShowForm(false)
+      fetchCoupons()
+    } catch {
+      toast.error('Lỗi kết nối')
+    }
   }
 
-  function handleToggle(id: string) {
-    toggleCoupon(id)
-    setCoupons(getCoupons())
+  async function handleToggle(id: number, currentActive: boolean) {
+    try {
+      await fetch('/api/admin/coupons', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id, active: !currentActive }),
+      })
+      setCoupons((prev) => prev.map((c) => c.id === id ? { ...c, active: !currentActive } : c))
+    } catch {
+      toast.error('Lỗi cập nhật')
+    }
   }
 
-  function handleDelete(id: string) {
-    deleteCoupon(id)
-    setCoupons(getCoupons())
-    toast.info('Đã xóa mã giảm giá')
+  async function handleDelete(id: number) {
+    try {
+      const res = await fetch(`/api/admin/coupons?id=${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error()
+      setCoupons((prev) => prev.filter((c) => c.id !== id))
+      toast.info('Đã xóa mã giảm giá')
+    } catch {
+      toast.error('Lỗi xóa mã giảm giá')
+    }
   }
 
   function generateCode() {
@@ -81,7 +134,6 @@ export default function CouponPage() {
   }
 
   const activeCoupons = coupons.filter((c) => c.active)
-  const inactiveCoupons = coupons.filter((c) => !c.active)
 
   return (
     <div className="space-y-6">
@@ -111,7 +163,6 @@ export default function CouponPage() {
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Code */}
               <div>
                 <label className="text-xs font-medium mb-1 block">Mã giảm giá</label>
                 <div className="flex gap-2">
@@ -128,7 +179,6 @@ export default function CouponPage() {
                 </div>
               </div>
 
-              {/* Type + Value */}
               <div>
                 <label className="text-xs font-medium mb-1 block">Loại & Giá trị</label>
                 <div className="flex gap-2">
@@ -150,7 +200,6 @@ export default function CouponPage() {
                 </div>
               </div>
 
-              {/* Min order */}
               <div>
                 <label className="text-xs font-medium mb-1 block">Đơn tối thiểu (VND)</label>
                 <Input
@@ -162,7 +211,6 @@ export default function CouponPage() {
                 />
               </div>
 
-              {/* Max uses */}
               <div>
                 <label className="text-xs font-medium mb-1 block">Số lần sử dụng tối đa</label>
                 <Input
@@ -174,7 +222,6 @@ export default function CouponPage() {
                 />
               </div>
 
-              {/* Expires */}
               <div className="sm:col-span-2">
                 <label className="text-xs font-medium mb-1 block">Ngày hết hạn (để trống = vô thời hạn)</label>
                 <Input
@@ -200,7 +247,12 @@ export default function CouponPage() {
       )}
 
       {/* Coupons list */}
-      {coupons.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Đang tải...</span>
+        </div>
+      ) : coupons.length === 0 ? (
         <Card className="border-border">
           <CardContent className="p-8 text-center">
             <Tag className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
@@ -216,8 +268,7 @@ export default function CouponPage() {
             return (
               <Card key={coupon.id} className={`border-border bg-card ${!coupon.active ? 'opacity-60' : ''}`}>
                 <CardContent className="p-4 flex items-center gap-3">
-                  {/* Toggle */}
-                  <button type="button" onClick={() => handleToggle(coupon.id)} className="shrink-0">
+                  <button type="button" onClick={() => handleToggle(coupon.id, coupon.active)} className="shrink-0">
                     {coupon.active ? (
                       <ToggleRight className="h-6 w-6 text-success" />
                     ) : (
@@ -225,7 +276,6 @@ export default function CouponPage() {
                     )}
                   </button>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-bold text-sm text-primary">{coupon.code}</span>
@@ -251,7 +301,6 @@ export default function CouponPage() {
                     </div>
                   </div>
 
-                  {/* Delete */}
                   <Button
                     variant="ghost"
                     size="icon"

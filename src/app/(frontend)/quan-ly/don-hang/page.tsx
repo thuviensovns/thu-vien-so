@@ -1,34 +1,64 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   ShoppingCart, Package, Calendar, CreditCard, Search,
   CheckCircle2, Clock, XCircle, AlertCircle, Filter,
-  ArrowUpDown, FileDown,
+  ArrowUpDown, FileDown, Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatVND, formatDate } from '@/lib/format'
-import { getDemoOrders, updateOrderStatus, saveDemoOrders, logActivity, type DemoOrder } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
 import AdminPagination, { paginate } from '@/components/admin/AdminPagination'
 
 const ITEMS_PER_PAGE = 10
 
+interface OrderItem {
+  name: string
+  price: number
+}
+
+interface Order {
+  id: number
+  orderNumber: string
+  email: string
+  total: number
+  status: 'paid' | 'pending' | 'failed' | 'refunded'
+  method: string
+  items: OrderItem[]
+  createdAt: string
+}
+
 const statusConfig = {
   paid: { label: 'Đã thanh toán', icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10 border-success/20' },
   pending: { label: 'Chờ xử lý', icon: Clock, color: 'text-warning', bg: 'bg-warning/10 border-warning/20' },
   failed: { label: 'Thất bại', icon: XCircle, color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/20' },
+  refunded: { label: 'Hoàn tiền', icon: XCircle, color: 'text-muted-foreground', bg: 'bg-muted/10 border-muted/20' },
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<DemoOrder[]>(() => getDemoOrders())
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [sortDesc, setSortDesc] = useState(true)
   const [page, setPage] = useState(1)
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/orders?limit=500', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setOrders(data.docs || [])
+      }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchOrders() }, [fetchOrders])
 
   const filtered = useMemo(() => {
     let result = [...orders]
@@ -53,10 +83,20 @@ export default function OrdersPage() {
   const paidCount = orders.filter((o) => o.status === 'paid').length
   const pendingCount = orders.filter((o) => o.status === 'pending').length
 
-  function handleStatusChange(orderId: string, newStatus: DemoOrder['status']) {
-    updateOrderStatus(orderId, newStatus)
-    setOrders(getDemoOrders())
-    toast.success(`Đã cập nhật trạng thái → ${statusConfig[newStatus].label}`)
+  async function handleStatusChange(orderId: number, newStatus: Order['status']) {
+    try {
+      const res = await fetch('/api/admin/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: orderId, status: newStatus }),
+      })
+      if (!res.ok) throw new Error('API error')
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: newStatus } : o))
+      toast.success(`Đã cập nhật trạng thái → ${statusConfig[newStatus].label}`)
+    } catch {
+      toast.error('Không thể cập nhật trạng thái')
+    }
   }
 
   function handleExport() {
@@ -74,7 +114,6 @@ export default function OrdersPage() {
     a.click()
     URL.revokeObjectURL(url)
     toast.success('Đã xuất file CSV')
-    logActivity('order', 'Xuất dữ liệu đơn hàng', `${orders.length} đơn hàng`)
   }
 
   return (
@@ -155,7 +194,12 @@ export default function OrdersPage() {
       </div>
 
       {/* Orders list */}
-      {(() => {
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">Đang tải đơn hàng...</span>
+        </div>
+      ) : (() => {
         const { paged: pagedOrders, totalPages } = paginate(filtered, page, ITEMS_PER_PAGE)
         return (<>
       {filtered.length === 0 ? (
