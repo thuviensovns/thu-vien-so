@@ -13,12 +13,12 @@ export const maxDuration = 30
  */
 export async function POST(req: NextRequest) {
   try {
-    // Auth via secret (can't use Payload auth since it's broken)
-    const secret = process.env.REVALIDATE_SECRET
+    // Auth via secret (can't use Payload auth since it's broken without these migrations)
+    const secret = process.env.REVALIDATE_SECRET || process.env.PAYLOAD_SECRET
     const provided = req.nextUrl.searchParams.get('secret') || req.headers.get('x-secret')
 
     if (!secret || provided !== secret) {
-      return NextResponse.json({ error: 'Forbidden - provide ?secret=YOUR_REVALIDATE_SECRET' }, { status: 403 })
+      return NextResponse.json({ error: 'Forbidden - provide ?secret=YOUR_PAYLOAD_SECRET' }, { status: 403 })
     }
 
     const results: { executed: string[]; errors: string[] } = { executed: [], errors: [] }
