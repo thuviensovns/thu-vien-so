@@ -54,3 +54,5 @@ media/
 
 # Development plans/docs
 plans/
+
+.vercel
