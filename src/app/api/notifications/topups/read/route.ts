@@ -21,24 +21,28 @@ export async function POST(req: NextRequest) {
 
     if (body.all) {
       // Find all unread completed topups
-      const unread = await payload.find({
-        collection: 'topups',
-        where: {
-          status: { equals: 'completed' },
-          readByAdmin: { not_equals: true },
-        },
-        limit: 100,
-        overrideAccess: true,
-      })
-
-      for (const doc of unread.docs) {
-        await payload.update({
+      try {
+        const unread = await payload.find({
           collection: 'topups',
-          id: doc.id,
-          data: { readByAdmin: true },
+          where: {
+            status: { equals: 'completed' },
+            readByAdmin: { not_equals: true },
+          },
+          limit: 100,
           overrideAccess: true,
         })
-        marked++
+
+        for (const doc of unread.docs) {
+          await payload.update({
+            collection: 'topups',
+            id: doc.id,
+            data: { readByAdmin: true },
+            overrideAccess: true,
+          })
+          marked++
+        }
+      } catch (e) {
+        console.warn('[MarkRead] readByAdmin query failed:', (e as Error).message)
       }
     } else if (body.ids?.length) {
       for (const id of body.ids.slice(0, 50)) {
