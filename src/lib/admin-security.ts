@@ -136,18 +136,25 @@ export function getFailedLoginsLast24h(): number {
 export async function checkSystemHealth(): Promise<SystemHealth> {
   const start = Date.now()
   let apiStatus: SystemHealth['apiStatus'] = 'offline'
+  let dbStatus: SystemHealth['dbStatus'] = 'unknown'
   let responseTimeMs = -1
 
+  // Use the dedicated /api/ping endpoint — single SELECT 1 against the shared
+  // pg pool, no Payload boot. The resulting latency is a realistic view of
+  // Next route overhead + DB round-trip.
   try {
-    const res = await fetch('/api/users/me', { credentials: 'include' })
+    const res = await fetch('/api/ping', { cache: 'no-store' })
     responseTimeMs = Date.now() - start
-    if (res.ok || res.status === 401) {
+    if (res.ok) {
       apiStatus = responseTimeMs < 500 ? 'online' : 'degraded'
+      dbStatus = 'online'
     } else {
       apiStatus = 'degraded'
+      dbStatus = 'offline'
     }
   } catch {
     apiStatus = 'offline'
+    dbStatus = 'offline'
     responseTimeMs = -1
   }
 
@@ -166,9 +173,6 @@ export async function checkSystemHealth(): Promise<SystemHealth> {
   const maxMb = 5
   const storageUsed = mb < 0.01 ? '< 0.01 MB' : `${mb.toFixed(2)} MB`
   const storagePercent = Math.round((mb / maxMb) * 100)
-
-  const dbStatus: SystemHealth['dbStatus'] =
-    apiStatus === 'online' ? 'online' : 'unknown'
 
   return {
     apiStatus,
