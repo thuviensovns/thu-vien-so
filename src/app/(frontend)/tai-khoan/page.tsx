@@ -37,7 +37,13 @@ export default function AccountPage() {
   const { user, isLoading, logout } = useAuth()
   const { balance } = useBalance()
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<string>('profile')
+  // Read ?tab=<id> from URL synchronously so fetchOrders/fetchDownloads can start
+  // on the first render (parallel with auth) instead of waiting an extra cycle.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'profile'
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    return tab && ['profile', 'orders', 'downloads', 'settings'].includes(tab) ? tab : 'profile'
+  })
   const [orders, setOrders] = useState<Order[]>([])
   const [downloads, setDownloads] = useState<DownloadRecord[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
@@ -87,13 +93,17 @@ export default function AccountPage() {
     setLoadingDownloads(false)
   }, [])
 
+  // Fire data fetches in parallel with auth resolution — the cookie is already
+  // present on the request, so /api/orders and /api/downloads work before
+  // useAuth finishes. Avoids a serial wait (auth → then fetch) on navigation
+  // from payment success.
   useEffect(() => {
-    if (activeTab === 'orders' && user) fetchOrders()
-  }, [activeTab, user, fetchOrders])
+    if (activeTab === 'orders') fetchOrders()
+  }, [activeTab, fetchOrders])
 
   useEffect(() => {
-    if (activeTab === 'downloads' && user) fetchDownloads()
-  }, [activeTab, user, fetchDownloads])
+    if (activeTab === 'downloads') fetchDownloads()
+  }, [activeTab, fetchDownloads])
 
   function handleUpdateName() {
     if (!newDisplayName.trim()) return

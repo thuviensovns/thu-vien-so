@@ -12,11 +12,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: { downloadId?: string }
+    let body: { downloadId?: string | number }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
-    const downloadId = typeof body?.downloadId === 'string' ? body.downloadId.trim().slice(0, 100) : ''
+    // Payload IDs can be numbers (Postgres) or strings — accept both, coerce to string.
+    const rawId = body?.downloadId
+    const downloadId =
+      (typeof rawId === 'string' || typeof rawId === 'number') ? String(rawId).trim().slice(0, 100) : ''
     if (!downloadId || /[<>"';]/.test(downloadId)) {
       return NextResponse.json({ error: 'Invalid downloadId' }, { status: 400 })
     }
