@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 /** Verify admin role — returns payload instance + user, or error response */
 async function requireAdmin(req: NextRequest) {
   const payload = await getPayloadForApi()

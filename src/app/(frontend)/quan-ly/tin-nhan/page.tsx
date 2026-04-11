@@ -42,7 +42,8 @@ export default function MessengerPage() {
   const [filter, setFilter] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [adminNote, setAdminNote] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [replying, setReplying] = useState(false)
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -56,20 +57,23 @@ export default function MessengerPage() {
 
   usePolling(fetchMessages, 15000)
 
-  const updateStatus = async (id: number, status: string) => {
-    setSaving(true)
+  const updateStatus = async (id: number, status: string, silent = false) => {
+    setUpdatingStatus(true)
     try {
       const res = await fetch(`/api/messages/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({ status }),
       })
       if (res.ok) {
         const updated = await res.json()
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)))
-        if (selected?.id === id) setSelected((prev) => prev ? { ...prev, status: status as Message['status'] } : null)
-        toast.success(`Đã cập nhật trạng thái: ${statusConfig[status as keyof typeof statusConfig]?.label}`)
+        setSelected((prev) => (prev?.id === id ? { ...prev, status: status as Message['status'] } : prev))
+        if (!silent) {
+          toast.success(`Đã cập nhật trạng thái: ${statusConfig[status as keyof typeof statusConfig]?.label}`)
+        }
       } else {
         const err = await res.json().catch(() => ({}))
         toast.error(err?.error || `Lỗi cập nhật (HTTP ${res.status})`)
@@ -77,23 +81,29 @@ export default function MessengerPage() {
     } catch (e) {
       toast.error('Lỗi kết nối: ' + ((e as Error)?.message || 'unknown'))
     }
-    setSaving(false)
+    setUpdatingStatus(false)
   }
 
   const saveNote = async () => {
     if (!selected) return
-    setSaving(true)
+    const note = adminNote.trim()
+    if (!note) {
+      toast.error('Vui lòng nhập nội dung phản hồi')
+      return
+    }
+    setReplying(true)
     try {
       const res = await fetch(`/api/messages/${selected.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ adminNote, status: 'replied' }),
+        cache: 'no-store',
+        body: JSON.stringify({ adminNote: note, status: 'replied' }),
       })
       if (res.ok) {
         const updated = await res.json()
         setMessages((prev) => prev.map((m) => (m.id === selected.id ? { ...m, ...updated } : m)))
-        setSelected((prev) => prev ? { ...prev, adminNote: updated.adminNote ?? adminNote, status: 'replied' } : null)
+        setSelected((prev) => (prev?.id === selected.id ? { ...prev, adminNote: updated.adminNote ?? note, status: 'replied' } : prev))
         toast.success('Đã lưu phản hồi', {
           description: `Khách hàng ${selected.email} sẽ thấy phản hồi trong trang Hộp thư.`,
         })
@@ -106,7 +116,7 @@ export default function MessengerPage() {
       console.error('[saveNote] exception:', e)
       toast.error('Lỗi kết nối: ' + ((e as Error)?.message || 'unknown'))
     }
-    setSaving(false)
+    setReplying(false)
   }
 
   const deleteMessage = async (id: number) => {
@@ -222,7 +232,7 @@ export default function MessengerPage() {
                   onClick={() => {
                     setSelected(msg)
                     setAdminNote(msg.adminNote || '')
-                    if (msg.status === 'new') updateStatus(msg.id, 'processing')
+                    if (msg.status === 'new') updateStatus(msg.id, 'processing', true)
                   }}
                 >
                   <CardContent className="p-3">
@@ -324,7 +334,7 @@ export default function MessengerPage() {
                       variant={selected.status === s ? 'default' : 'outline'}
                       size="sm"
                       className="text-xs h-7"
-                      disabled={saving}
+                      disabled={updatingStatus || replying}
                       onClick={() => updateStatus(selected.id, s)}
                     >
                       {statusConfig[s].label}
@@ -345,10 +355,10 @@ export default function MessengerPage() {
                   <Button
                     size="sm"
                     className="mt-2"
-                    disabled={saving || !adminNote.trim()}
+                    disabled={replying || !adminNote.trim()}
                     onClick={saveNote}
                   >
-                    {saving ? (
+                    {replying ? (
                       <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                     ) : (
                       <Send className="h-3.5 w-3.5 mr-1.5" />
