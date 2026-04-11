@@ -1,0 +1,44 @@
+name: Keepalive
+
+# Pings /api/ping every 4 minutes so the Neon free-tier database never
+# reaches its 5-minute idle suspend threshold. Each ping runs a real
+# SELECT 1 through the pg pool, which is what resets Neon's idle timer.
+#
+# Cost: ~10 GitHub Actions minutes/day, well under the 2000 min/month
+# free allowance for public or private repos on the Free plan.
+
+on:
+  schedule:
+    # GitHub cron is UTC and only supports a minimum of 5 minutes.
+    # 5-minute cadence is still within Neon's 5-minute idle window on
+    # a warm pool (the previous ping keeps the pool alive for the next).
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping /api/ping
+        run: |
+          set -euo pipefail
+          URL="${KEEPALIVE_URL:-https://thuvienso.top/api/ping}"
+          echo "Pinging $URL"
+          RESPONSE=$(curl -sS --max-time 30 -w '\n%{http_code} %{time_total}' "$URL" || true)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          STATUS_LINE=$(echo "$RESPONSE" | tail -n 1)
+          STATUS=$(echo "$STATUS_LINE" | awk '{print $1}')
+          TIME=$(echo "$STATUS_LINE" | awk '{print $2}')
+          echo "HTTP $STATUS in ${TIME}s"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Ping failed with HTTP $STATUS"
+            exit 1
+          fi
+        env:
+          KEEPALIVE_URL: ${{ vars.KEEPALIVE_URL }}
