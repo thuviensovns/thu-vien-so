@@ -42,19 +42,23 @@ export default function UsersPage() {
         credentials: 'include',
         cache: 'no-store',
       })
-      if (res.ok) {
-        const data = await res.json()
-        const users: DemoUser[] = (data.docs || []).map((u: PayloadUser) => ({
-          id: String(u.id),
-          email: u.email,
-          displayName: u.displayName || '',
-          role: (u.role as 'admin' | 'customer') || 'customer',
-          balance: Number(u.balance || 0),
-        }))
-        setDbUsers(users)
+      if (!res.ok) {
+        toast.error(`Không thể tải danh sách người dùng (HTTP ${res.status})`)
+        setDbUsers([])
+        return
       }
-    } catch {
-      // Fallback to demo users if API fails
+      const data = await res.json()
+      const users: DemoUser[] = (data.docs || []).map((u: PayloadUser) => ({
+        id: String(u.id),
+        email: u.email,
+        displayName: u.displayName || '',
+        role: (u.role as 'admin' | 'customer') || 'customer',
+        balance: Number(u.balance || 0),
+      }))
+      setDbUsers(users)
+    } catch (err) {
+      console.error('[UsersPage] fetch failed:', err)
+      toast.error('Lỗi kết nối API người dùng')
       setDbUsers(getDemoUsers())
     } finally {
       setLoading(false)
