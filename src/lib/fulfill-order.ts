@@ -3,6 +3,8 @@ import type { Payload } from 'payload'
 import type { Order, OrderItem, Product } from '@/types/payload-types'
 
 const DOWNLOAD_EXPIRY_HOURS = 72
+const REDOWNLOAD_EXPIRY_DAYS = 365
+const REDOWNLOAD_MAX_COUNT = 10
 
 export interface FulfillResult {
   downloadToken: string
@@ -60,12 +62,51 @@ export async function fulfillOrder(
     overrideAccess: true,
   })
 
-  // Increment downloadCount on each product (non-blocking, best-effort)
+  // Create per-product download records + bump product.downloadCount.
+  // Download records power the /tai-khoan?tab=downloads re-download UI.
+  const orderUserId = typeof order.user === 'object' ? (order.user as { id: number | string }).id : order.user
+  const redownloadExpiresAt = new Date()
+  redownloadExpiresAt.setDate(redownloadExpiresAt.getDate() + REDOWNLOAD_EXPIRY_DAYS)
+  const redownloadExpiresAtIso = redownloadExpiresAt.toISOString()
+
   if (order.items && Array.isArray(order.items)) {
     await Promise.allSettled(
       order.items.map(async (item: OrderItem) => {
         const productId = typeof item.product === 'object' ? (item.product as Product).id : item.product
-        if (!productId) return
+        if (!productId || !orderUserId) return
+
+        // 1. Idempotent download record (skip if this order already has one for this product)
+        try {
+          const existing = await payload.find({
+            collection: 'downloads',
+            where: {
+              and: [
+                { order: { equals: orderId } },
+                { product: { equals: productId } },
+              ],
+            },
+            limit: 1,
+            overrideAccess: true,
+          })
+          if (existing.docs.length === 0) {
+            await payload.create({
+              collection: 'downloads',
+              data: {
+                user: orderUserId as number,
+                order: orderId as number,
+                product: productId as number,
+                downloadCount: 0,
+                maxDownloads: REDOWNLOAD_MAX_COUNT,
+                expiresAt: redownloadExpiresAtIso,
+              },
+              overrideAccess: true,
+            })
+          }
+        } catch (e) {
+          console.error(`[fulfillOrder] Failed to create download record for product ${productId}:`, e)
+        }
+
+        // 2. Bump product.downloadCount (best-effort)
         try {
           const product = await payload.findByID({ collection: 'products', id: productId, depth: 0 }) as Product
           await payload.update({
