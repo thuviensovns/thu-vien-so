@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   CheckCircle, XCircle, Loader2, Download, ShoppingCart,
-  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw,
+  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw, Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -25,6 +25,7 @@ interface DownloadItem {
 interface DownloadStatus extends DownloadItem {
   status: 'pending' | 'downloading' | 'done' | 'error'
   error?: string
+  url?: string
 }
 
 export default function PaymentResultContent() {
@@ -36,6 +37,7 @@ export default function PaymentResultContent() {
   const [allDone, setAllDone] = useState(false)
   const [polling, setPolling] = useState(false)
   const downloadStarted = useRef(false)
+  const downloadFrameRef = useRef<HTMLIFrameElement | null>(null)
 
   // Determine payment result from URL params
   useEffect(() => {
@@ -129,8 +131,11 @@ export default function PaymentResultContent() {
             if (dlRes.ok) {
               const dlData = await dlRes.json()
               if (dlData.url) {
-                triggerDownload(dlData.url, dlData.fileName || `${statuses[i].name}.zip`)
-                statuses[i] = { ...statuses[i], status: 'done' }
+                // Only the first item auto-triggers via iframe — chained iframe
+                // navigations hit popup-blocker heuristics too. Remaining files
+                // surface as "Tải" buttons (user gesture = always allowed).
+                if (i === 0) triggerDownload(dlData.url)
+                statuses[i] = { ...statuses[i], status: 'done', url: dlData.url }
               } else {
                 statuses[i] = { ...statuses[i], status: 'error', error: 'Không có URL' }
               }
@@ -143,11 +148,6 @@ export default function PaymentResultContent() {
           }
 
           setDownloads([...statuses])
-
-          // Small delay between downloads
-          if (i < statuses.length - 1) {
-            await new Promise((r) => setTimeout(r, 800))
-          }
         }
 
         setAllDone(true)
@@ -159,13 +159,22 @@ export default function PaymentResultContent() {
     startDownloads()
   }, [status, downloadToken, orderNumber, pollForToken])
 
-  function triggerDownload(url: string, fileName: string) {
+  // Hidden-iframe navigation — Google Drive's `uc?export=download` URL returns
+  // Content-Disposition: attachment, so the browser starts a file download and
+  // the iframe stays blank. This bypasses the popup blocker entirely because
+  // no window.open / target=_blank is involved.
+  function triggerDownload(url: string) {
+    if (!downloadFrameRef.current) return
+    downloadFrameRef.current.src = url
+  }
+
+  // Manual click handler — user gesture, so cross-origin downloads always work.
+  function manualDownload(url: string, fileName: string) {
     const a = document.createElement('a')
     a.href = url
     a.download = fileName
-    a.style.display = 'none'
-    a.target = '_blank'
     a.rel = 'noopener noreferrer'
+    a.style.display = 'none'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -182,8 +191,9 @@ export default function PaymentResultContent() {
       if (res.ok) {
         const data = await res.json()
         if (data.url) {
-          triggerDownload(data.url, data.fileName || `${updated[index].name}.zip`)
-          updated[index] = { ...updated[index], status: 'done' }
+          // Retry IS a user-gesture click — use manualDownload (honours filename).
+          manualDownload(data.url, data.fileName || `${updated[index].name}.zip`)
+          updated[index] = { ...updated[index], status: 'done', url: data.url }
         } else {
           updated[index] = { ...updated[index], status: 'error', error: 'Không có URL' }
         }
@@ -290,8 +300,15 @@ export default function PaymentResultContent() {
                 <div className="flex items-center gap-2 justify-center mb-3">
                   <FileDown className="h-4 w-4 text-primary" />
                   <h2 className="font-semibold text-sm">
-                    {allDone ? 'Tải xuống hoàn tất' : 'Đang tải sản phẩm...'}
+                    {allDone ? 'Sẵn sàng tải xuống' : 'Đang chuẩn bị tải...'}
                   </h2>
+                </div>
+
+                <div className="flex items-start gap-2 p-3 mb-3 rounded-lg border border-primary/20 bg-primary/5 text-left max-w-sm mx-auto">
+                  <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Nếu trình duyệt chặn tải xuống, vui lòng nhấn nút <strong className="text-primary">Tải</strong> bên cạnh mỗi sản phẩm. Cho phép pop-up từ trang web để file tự tải lần sau.
+                  </p>
                 </div>
 
                 <div className="space-y-2 text-left max-w-sm mx-auto">
@@ -321,8 +338,13 @@ export default function PaymentResultContent() {
                         {dl.error && <p className="text-[10px] text-destructive">{dl.error}</p>}
                       </div>
 
-                      {dl.status === 'done' && (
-                        <Badge className="bg-success/10 text-success border-success/20 text-[10px] shrink-0">Xong</Badge>
+                      {dl.status === 'done' && dl.url && (
+                        <button
+                          onClick={() => manualDownload(dl.url!, dl.fileName || `${dl.name}.zip`)}
+                          className="text-[10px] px-2 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1 shrink-0 font-medium"
+                        >
+                          <Download className="h-3 w-3" /> Tải
+                        </button>
                       )}
                       {dl.status === 'downloading' && (
                         <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] shrink-0">Đang tải</Badge>
@@ -338,9 +360,16 @@ export default function PaymentResultContent() {
 
                 {allDone && (
                   <p className="text-xs text-success mt-2 font-medium">
-                    Tất cả sản phẩm đã được tải về máy của bạn!
+                    Nhấn nút Tải để lưu từng sản phẩm về máy.
                   </p>
                 )}
+
+                <iframe
+                  ref={downloadFrameRef}
+                  className="hidden"
+                  title="download-frame"
+                  aria-hidden="true"
+                />
 
                 <Separator className="mt-4" />
               </div>

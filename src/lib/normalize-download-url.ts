@@ -19,7 +19,10 @@ export function normalizeDownloadUrl(url: string | null | undefined): string {
   if (!url) return ''
   const driveShareMatch = url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/i)
   if (driveShareMatch) {
-    return `https://drive.google.com/uc?export=download&id=${driveShareMatch[1]}`
+    // `confirm=t` skips the "Google can't scan this file for viruses" interstitial
+    // that Drive shows for files larger than ~100 MB. Without it, the endpoint
+    // returns HTML instead of the file bytes.
+    return `https://drive.google.com/uc?export=download&confirm=t&id=${driveShareMatch[1]}`
   }
   return url
 }
