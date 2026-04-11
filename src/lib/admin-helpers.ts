@@ -16,22 +16,9 @@ export interface ActivityEntry {
   adminEmail?: string
 }
 
-export function logActivity(type: ActivityEntry['type'], action: string, detail: string, adminEmail?: string) {
-  // Write to localStorage for backward compat
-  try {
-    const entries: ActivityEntry[] = JSON.parse(localStorage.getItem('admin_activity_log') || '[]')
-    entries.unshift({
-      id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      type,
-      action,
-      detail,
-      timestamp: new Date().toISOString(),
-      ...(adminEmail ? { adminEmail } : {}),
-    })
-    localStorage.setItem('admin_activity_log', JSON.stringify(entries.slice(0, 200)))
-  } catch {}
-
-  // Also write to DB (fire and forget)
+export function logActivity(type: ActivityEntry['type'], action: string, detail: string, _adminEmail?: string) {
+  // DB write (fire-and-forget) — the API route reads the caller's cookie to
+  // resolve adminEmail, so we don't need to pass it from the client.
   try {
     fetch('/api/admin/activity-logs', {
       method: 'POST',

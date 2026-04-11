@@ -26,15 +26,8 @@ const tabs = [
   { id: 'settings', label: 'Cài đặt', icon: Settings },
 ] as const
 
-function getDemoOrders(): Order[] {
-  try {
-    const raw = localStorage.getItem('demo_orders')
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
 export default function AccountPage() {
-  const { user, isLoading, logout } = useAuth()
+  const { user, isLoading, logout, refreshUser } = useAuth()
   const { balance } = useBalance()
   const router = useRouter()
   // Read ?tab=<id> from URL synchronously so fetchOrders/fetchDownloads can start
@@ -65,10 +58,13 @@ export default function AccountPage() {
       const res = await fetch('/api/orders?depth=1&sort=-createdAt&limit=20', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
-        if (data.docs?.length > 0) { setOrders(data.docs); setLoadingOrders(false); return }
+        setOrders(data.docs || [])
+      } else {
+        setOrders([])
       }
-    } catch {}
-    setOrders(getDemoOrders())
+    } catch {
+      setOrders([])
+    }
     setLoadingOrders(false)
   }, [])
 
@@ -105,27 +101,27 @@ export default function AccountPage() {
     if (activeTab === 'downloads') fetchDownloads()
   }, [activeTab, fetchDownloads])
 
-  function handleUpdateName() {
-    if (!newDisplayName.trim()) return
+  async function handleUpdateName() {
+    const name = newDisplayName.trim()
+    if (!name || !user?.id) return
     try {
-      const raw = localStorage.getItem('demo_session')
-      if (raw) {
-        const session = JSON.parse(raw)
-        session.displayName = newDisplayName.trim()
-        localStorage.setItem('demo_session', JSON.stringify(session))
+      const res = await fetch(`/api/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ displayName: name }),
+      })
+      if (!res.ok) {
+        toast.error('Không thể cập nhật tên. Vui lòng thử lại.')
+        return
       }
-      const usersRaw = localStorage.getItem('demo_users')
-      if (usersRaw) {
-        const users = JSON.parse(usersRaw)
-        const updated = users.map((u: { id: string; displayName?: string }) =>
-          u.id === user?.id ? { ...u, displayName: newDisplayName.trim() } : u
-        )
-        localStorage.setItem('demo_users', JSON.stringify(updated))
-      }
-    } catch {}
-    setNameSaved(true)
-    toast.success('Đã cập nhật tên hiển thị!')
-    setTimeout(() => setNameSaved(false), 2000)
+      await refreshUser()
+      setNameSaved(true)
+      toast.success('Đã cập nhật tên hiển thị!')
+      setTimeout(() => setNameSaved(false), 2000)
+    } catch {
+      toast.error('Lỗi kết nối. Vui lòng thử lại.')
+    }
   }
 
   async function handleChangePassword() {

@@ -16,10 +16,20 @@ import { useBalance } from '@/hooks/use-balance'
 import { formatVND } from '@/lib/format'
 import { paymentMethods, buildVietQRUrl } from '@/lib/config'
 import { useBankConfig } from '@/hooks/use-bank-config'
-import { getDemoOrders, saveDemoOrders, logActivity, getCoupons, saveCoupons, type Coupon } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
 import OrderSummary from './OrderSummary'
 import BankTransferQR from './BankTransferQR'
+
+interface ApiCoupon {
+  id: number
+  code: string
+  type: 'percent' | 'fixed'
+  value: number
+  minOrder: number
+  maxUses: number
+  usedCount: number
+  discount: number
+}
 
 const paymentIcons: Record<string, typeof CreditCard> = {
   vnpay: CreditCard, momo: CreditCard, 'bank-transfer': QrCode, 'balance': Wallet,
@@ -44,14 +54,11 @@ export default function CheckoutPage() {
   const [error, setError] = useState('')
   const [agreedTerms, setAgreedTerms] = useState(false)
   const [couponCode, setCouponCode] = useState('')
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null)
+  const [appliedCoupon, setAppliedCoupon] = useState<ApiCoupon | null>(null)
   const [couponError, setCouponError] = useState('')
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false)
 
-  const discount = appliedCoupon
-    ? appliedCoupon.type === 'percent'
-      ? Math.round(total * appliedCoupon.value / 100)
-      : Math.min(appliedCoupon.value, total)
-    : 0
+  const discount = appliedCoupon?.discount || 0
   const finalTotal = total - discount
   const canPayWithBalance = balance >= finalTotal && finalTotal > 0
 
@@ -69,19 +76,25 @@ export default function CheckoutPage() {
     ...paymentMethods,
   ], [balance, canPayWithBalance])
 
-  function handleApplyCoupon() {
+  async function handleApplyCoupon() {
     setCouponError('')
     const code = couponCode.trim().toUpperCase()
     if (!code) return
-    const coupons = getCoupons()
-    const coupon = coupons.find((c) => c.code.toUpperCase() === code)
-    if (!coupon) { setCouponError('Mã giảm giá không tồn tại'); return }
-    if (!coupon.active) { setCouponError('Mã giảm giá đã hết hiệu lực'); return }
-    if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) { setCouponError('Mã giảm giá đã hết hạn'); return }
-    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) { setCouponError('Mã giảm giá đã hết lượt sử dụng'); return }
-    if (coupon.minOrder > 0 && total < coupon.minOrder) { setCouponError(`Đơn hàng tối thiểu ${formatVND(coupon.minOrder)}`); return }
-    setAppliedCoupon(coupon)
-    toast.success('Đã áp dụng mã giảm giá!')
+    setIsApplyingCoupon(true)
+    try {
+      const res = await fetch(`/api/coupons/validate?code=${encodeURIComponent(code)}&total=${total}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setCouponError(data.error || 'Mã giảm giá không hợp lệ')
+        return
+      }
+      setAppliedCoupon(data as ApiCoupon)
+      toast.success('Đã áp dụng mã giảm giá!')
+    } catch {
+      setCouponError('Lỗi kết nối. Vui lòng thử lại.')
+    } finally {
+      setIsApplyingCoupon(false)
+    }
   }
 
   function handleRemoveCoupon() {
@@ -97,25 +110,23 @@ export default function CheckoutPage() {
     setError('')
     setIsSubmitting(true)
 
-    function saveOrderToLocal(method: string, status: 'paid' | 'pending') {
-      try {
-        const existing = getDemoOrders()
-        existing.unshift({
-          id: `order-${Date.now()}`, orderNumber, email: email || 'guest',
-          items: items.map((i) => ({ name: i.name, price: i.price })),
-          total: finalTotal, method, status, createdAt: new Date().toISOString(),
-          note: appliedCoupon ? `Mã giảm giá: ${appliedCoupon.code} (-${formatVND(discount)})` : undefined,
-        })
-        saveDemoOrders(existing)
-        logActivity('order', `Đơn hàng mới — ${status === 'paid' ? 'Đã thanh toán' : 'Chờ xử lý'}`, `${orderNumber} — ${formatVND(finalTotal)}`)
-      } catch {}
-    }
+    // Heads-up for users on Chrome/Edge/Firefox: after payment the site will
+    // auto-trigger file downloads. If popups/downloads are blocked, a manual
+    // "Tải" button appears on the result page. Toast stays until payment completes.
+    toast.info('Sau khi thanh toán thành công, sản phẩm sẽ tự động tải về máy. Nếu trình duyệt chặn, hãy nhấn nút Tải xuống thủ công.', {
+      duration: 6000,
+    })
 
-    function consumeCoupon() {
+    async function consumeCoupon() {
       if (!appliedCoupon) return
-      const coupons = getCoupons()
-      const idx = coupons.findIndex((c) => c.id === appliedCoupon.id)
-      if (idx !== -1) { coupons[idx].usedCount++; saveCoupons(coupons) }
+      try {
+        await fetch('/api/coupons/consume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ id: appliedCoupon.id }),
+        })
+      } catch {}
     }
 
     if (paymentMethod === 'balance') {
@@ -158,8 +169,7 @@ export default function CheckoutPage() {
         }
 
         const payData = await payRes.json()
-        consumeCoupon()
-        saveOrderToLocal('Số dư TK', 'paid')
+        await consumeCoupon()
         clearCart()
         refreshBalance()
         setIsSubmitting(false)
@@ -185,10 +195,8 @@ export default function CheckoutPage() {
       })
       if (res.ok) {
         const data = await res.json()
-        consumeCoupon()
+        await consumeCoupon()
         // Bank-transfer stays pending until webhook confirms; VNPay redirects to payment gateway
-        const orderStatus = paymentMethod === 'bank-transfer' ? 'pending' : 'paid'
-        saveOrderToLocal(paymentMethod === 'bank-transfer' ? 'QR Bank' : paymentMethod, orderStatus)
         clearCart()
         setIsSubmitting(false)
         if (data.paymentUrl) { window.location.href = data.paymentUrl }
@@ -356,8 +364,8 @@ export default function CheckoutPage() {
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setCouponError('') }} placeholder="Nhập mã giảm giá" className="bg-muted/50 font-mono uppercase" disabled={isSubmitting} />
-                      <Button type="button" variant="outline" onClick={handleApplyCoupon} disabled={isSubmitting} className="shrink-0">Áp dụng</Button>
+                      <Input value={couponCode} onChange={(e) => { setCouponCode(e.target.value); setCouponError('') }} placeholder="Nhập mã giảm giá" className="bg-muted/50 font-mono uppercase" disabled={isSubmitting || isApplyingCoupon} />
+                      <Button type="button" variant="outline" onClick={handleApplyCoupon} disabled={isSubmitting || isApplyingCoupon} className="shrink-0">{isApplyingCoupon ? 'Đang KT...' : 'Áp dụng'}</Button>
                     </div>
                   )}
                   {couponError && <p className="text-xs text-destructive">{couponError}</p>}
