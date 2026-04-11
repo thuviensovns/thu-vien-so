@@ -36,7 +36,12 @@ export default function UsersPage() {
   // Fetch real users from Payload API
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch('/api/users?limit=500&sort=-createdAt', { credentials: 'include' })
+      // cache: 'no-store' + cache-buster so balance updates land immediately
+      // after admin credits a user (Vercel prod otherwise returns stale docs)
+      const res = await fetch(`/api/users?limit=500&sort=-createdAt&_t=${Date.now()}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
       if (res.ok) {
         const data = await res.json()
         const users: DemoUser[] = (data.docs || []).map((u: PayloadUser) => ({
@@ -153,6 +158,8 @@ export default function UsersPage() {
       setDbUsers((prev) => prev.map((u) =>
         u.id === userId ? { ...u, balance: data.newBalance } : u
       ))
+      // Re-fetch from server so any concurrent change is reflected too
+      fetchUsers()
     } catch {
       toast.error('Lỗi kết nối')
     }

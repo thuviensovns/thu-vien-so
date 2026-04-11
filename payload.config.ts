@@ -34,7 +34,10 @@ export default buildConfig({
   collections: [Users, Media, Products, Categories, Orders, Downloads, TopUps, BlogPosts, ContactMessages],
   globals: [BankConfig, SiteContent],
   db: postgresAdapter({
-    push: true,
+    // Disable schema auto-push: current schema has orphan tables (activity_logs
+    // with live data, _status column on products) that Payload would delete on
+    // every startup. Preserve them until a proper migration is authored.
+    push: false,
     pool: {
       connectionString: process.env.DATABASE_URL!,
       connectionTimeoutMillis: 10000,
