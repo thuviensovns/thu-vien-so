@@ -34,7 +34,7 @@ function generateDemoOrderNumber() {
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, total, itemCount, clearCart } = useCart()
-  const { balance } = useBalance()
+  const { balance, refreshBalance } = useBalance()
   const bank = useBankConfig()
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -161,6 +161,7 @@ export default function CheckoutPage() {
         consumeCoupon()
         saveOrderToLocal('Số dư TK', 'paid')
         clearCart()
+        refreshBalance()
         setIsSubmitting(false)
         toast.success('Thanh toán thành công bằng số dư!')
         const token = payData.downloadToken || ''

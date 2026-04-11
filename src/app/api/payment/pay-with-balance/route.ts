@@ -97,10 +97,37 @@ export async function POST(req: NextRequest) {
       overrideAccess: true,
     })
 
-    // Step 5: Fulfill order — generates downloadToken, marks as paid, increments download counts
-    const result = await fulfillOrder(payload, orderId, {
-      paidAt: new Date().toISOString(),
-    })
+    // Step 5: Fulfill order — generates downloadToken, marks as paid, increments download counts.
+    // If this throws we MUST refund the balance we just deducted, otherwise the customer pays
+    // without receiving the product (the root cause of the ~10k VND losses seen in production).
+    let result
+    try {
+      result = await fulfillOrder(payload, orderId, {
+        paidAt: new Date().toISOString(),
+      })
+    } catch (fulfillErr) {
+      console.error('[Balance Pay] fulfillOrder failed — refunding balance:', fulfillErr)
+      try {
+        const refundUser = await payload.findByID({ collection: 'users', id: user.id }) as User
+        await payload.update({
+          collection: 'users',
+          id: user.id,
+          data: { balance: (refundUser.balance || 0) + total },
+          overrideAccess: true,
+        })
+        await payload.update({
+          collection: 'orders',
+          id: orderId,
+          data: { status: 'pending' },
+          overrideAccess: true,
+        })
+      } catch (refundErr) {
+        console.error('[Balance Pay] CRITICAL: refund also failed:', refundErr)
+      }
+      return NextResponse.json({
+        error: 'Không thể hoàn tất đơn hàng. Số dư đã được hoàn lại, vui lòng thử lại.',
+      }, { status: 500 })
+    }
 
     try { revalidatePath('/', 'layout') } catch {}
 

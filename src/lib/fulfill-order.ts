@@ -75,13 +75,15 @@ export async function fulfillOrder(
         const productId = typeof item.product === 'object' ? (item.product as Product).id : item.product
         if (!productId || !orderUserId) return
 
-        // 1. Idempotent download record (skip if this order already has one for this product)
+        // 1. Idempotent download record — dedupe by (user, product), NOT (order, product).
+        // Re-purchasing the same product should refresh the existing download (extend
+        // expiry, reset quota), not create a second row that bloats the downloads UI.
         try {
           const existing = await payload.find({
             collection: 'downloads',
             where: {
               and: [
-                { order: { equals: orderId } },
+                { user: { equals: orderUserId } },
                 { product: { equals: productId } },
               ],
             },
@@ -101,9 +103,22 @@ export async function fulfillOrder(
               },
               overrideAccess: true,
             })
+          } else {
+            // Refresh the existing row so the customer gets a fresh re-download window
+            await payload.update({
+              collection: 'downloads',
+              id: existing.docs[0].id,
+              data: {
+                order: orderId as number,
+                downloadCount: 0,
+                maxDownloads: REDOWNLOAD_MAX_COUNT,
+                expiresAt: redownloadExpiresAtIso,
+              },
+              overrideAccess: true,
+            })
           }
         } catch (e) {
-          console.error(`[fulfillOrder] Failed to create download record for product ${productId}:`, e)
+          console.error(`[fulfillOrder] Failed to upsert download record for product ${productId}:`, e)
         }
 
         // 2. Bump product.downloadCount (best-effort)

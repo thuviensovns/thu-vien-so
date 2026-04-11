@@ -34,15 +34,30 @@ export function useBalanceState(): BalanceContextType {
     } catch {}
   }, [])
 
-  // Fetch balance from DB on mount and when tab becomes visible
+  // Fetch balance on mount, on tab focus, on a custom 'balance:refresh' event
+  // (dispatched by payment/topup success handlers), and poll every 20s as a
+  // safety net so admin credits land in the UI without a page reload.
   useEffect(() => {
     refreshBalance()
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refreshBalance()
     }
+    const onFocus = () => refreshBalance()
+    const onCustom = () => refreshBalance()
+
     document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('balance:refresh', onCustom)
+
+    const interval = setInterval(refreshBalance, 20000)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('balance:refresh', onCustom)
+      clearInterval(interval)
+    }
   }, [refreshBalance])
 
   const deductBalance = useCallback((amount: number): boolean => {
