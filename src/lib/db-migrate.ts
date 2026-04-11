@@ -1,12 +1,8 @@
 import { getDbPool } from './db-pool'
 
-let migrated = false
-
-/** Ensure coupons and activity_logs tables exist. Idempotent, runs once per process. */
+/** Ensure additional tables/columns exist. Idempotent via IF NOT EXISTS. */
 export async function ensureTablesExist(): Promise<{ executed: string[]; errors: string[] }> {
   const results: { executed: string[]; errors: string[] } = { executed: [], errors: [] }
-
-  if (migrated) return results
 
   const pool = getDbPool()
 
@@ -39,6 +35,22 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
         created_at TIMESTAMPTZ DEFAULT NOW()
       )`,
     },
+    {
+      label: 'Add orders.download_token',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS download_token VARCHAR`,
+    },
+    {
+      label: 'Add orders.download_expires_at',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS download_expires_at TIMESTAMPTZ`,
+    },
+    {
+      label: 'Create unique index orders.download_token',
+      q: `CREATE UNIQUE INDEX IF NOT EXISTS orders_download_token_idx ON orders(download_token)`,
+    },
+    {
+      label: 'Add balance to enum_orders_payment_method',
+      q: `ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'balance'`,
+    },
   ]
 
   for (const { label, q } of queries) {
@@ -50,6 +62,5 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
     }
   }
 
-  migrated = true
   return results
 }
