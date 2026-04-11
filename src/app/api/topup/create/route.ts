@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: { amount?: number }
+    let body: { amount?: number; transferCode?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -22,41 +22,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid amount (min 10,000 VND)' }, { status: 400 })
     }
 
-    // SECURITY: Always generate server-side transfer code (ignore client input to prevent collisions)
-    let transferCode = `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+    // Prefer the client-generated transferCode when it matches the expected
+    // NAP + 8 hex-uppercase format (same entropy as server-side crypto.randomBytes(4)).
+    // This is required because the client already rendered the QR with that code and
+    // the user transfers with that exact memo — if we swap it server-side, the Sepay
+    // webhook cannot match the transaction to this topup and the balance never lands.
+    // Collisions are rejected by the `unique: true` DB constraint on `topupCode` → we
+    // retry once with a server-generated code.
+    const clientCode = typeof body?.transferCode === 'string' ? body.transferCode.trim().toUpperCase() : ''
+    const NAP_RE = /^NAP[0-9A-F]{8}$/
+    let transferCode = NAP_RE.test(clientCode)
+      ? clientCode
+      : `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
 
-    // Check for duplicate transferCode
-    const existing = await payload.find({
-      collection: 'topups',
-      where: { transferCode: { equals: transferCode } },
-      limit: 1,
-    })
-    if (existing.totalDocs > 0) {
-      // Generate a new server-side code
-      transferCode = `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
-      const existing2 = await payload.find({
-        collection: 'topups',
-        where: { transferCode: { equals: transferCode } },
-        limit: 1,
-      })
-      if (existing2.totalDocs > 0) {
-        return NextResponse.json({ error: 'Please try again' }, { status: 503 })
-      }
-    }
-
-    // Create pending top-up with 30-minute expiry
+    // Create pending top-up with 30-minute expiry. Retry once with a fresh server-side
+    // code if the client code happens to collide with the unique index.
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
 
-    const topup = await payload.create({
-      collection: 'topups',
-      data: {
-        user: user.id,
-        amount,
-        transferCode,
-        status: 'pending',
-        expiresAt,
-      },
-    })
+    let topup
+    try {
+      topup = await payload.create({
+        collection: 'topups',
+        data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
+      })
+    } catch (createErr) {
+      const m = (createErr as Error).message || ''
+      if (/unique|duplicate/i.test(m)) {
+        transferCode = `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+        topup = await payload.create({
+          collection: 'topups',
+          data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
+        })
+      } else {
+        throw createErr
+      }
+    }
 
     return NextResponse.json({
       id: topup.id,

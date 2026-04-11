@@ -75,6 +75,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // No file available — bail out before we count a download or create a phantom order
+    if (!url) {
+      return NextResponse.json(
+        { error: 'Chưa có file tải cho sản phẩm này' },
+        { status: 404 },
+      )
+    }
+
     // Increment download count (non-blocking)
     try {
       await payload.update({
