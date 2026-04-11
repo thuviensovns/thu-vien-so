@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { usePolling } from '@/hooks/use-polling'
+import { useTick } from '@/hooks/use-tick'
+import { timeAgoVN, formatVNDateTime } from '@/lib/format'
 
 interface Message {
   id: number
@@ -32,18 +34,8 @@ const statusConfig = {
   closed: { label: 'Đã đóng', icon: XCircle, color: 'bg-muted text-muted-foreground border-border' },
 }
 
-function timeAgo(date: string) {
-  const diff = Date.now() - new Date(date).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Vừa xong'
-  if (mins < 60) return `${mins} phút trước`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs} giờ trước`
-  const days = Math.floor(hrs / 24)
-  return `${days} ngày trước`
-}
-
 export default function MessengerPage() {
+  useTick()
   const [messages, setMessages] = useState<Message[]>([])
   const [selected, setSelected] = useState<Message | null>(null)
   const [search, setSearch] = useState('')
@@ -245,8 +237,11 @@ export default function MessengerPage() {
                           <span className={`text-sm font-medium truncate ${msg.status === 'new' ? 'font-bold' : ''}`}>
                             {msg.name}
                           </span>
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                            {timeAgo(msg.createdAt)}
+                          <span
+                            className="text-[10px] text-muted-foreground whitespace-nowrap"
+                            title={formatVNDateTime(msg.createdAt)}
+                          >
+                            {timeAgoVN(msg.createdAt)}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{msg.email}</p>
@@ -279,11 +274,22 @@ export default function MessengerPage() {
                         {statusConfig[selected.status].label}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                       <span className="font-medium text-foreground">{selected.name}</span>
                       <span>{selected.email}</span>
-                      <span>{timeAgo(selected.createdAt)}</span>
+                      <span title={formatVNDateTime(selected.createdAt)}>
+                        {timeAgoVN(selected.createdAt)}
+                      </span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Gửi lúc {formatVNDateTime(selected.createdAt)}
+                      {selected.status === 'replied' && selected.adminNote && selected.updatedAt && (
+                        <>
+                          <span className="mx-1.5">·</span>
+                          Phản hồi lúc {formatVNDateTime(selected.updatedAt)}
+                        </>
+                      )}
+                    </p>
                   </div>
                   <div className="flex gap-1 ml-2">
                     <Button

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/use-auth'
 import { usePolling } from '@/hooks/use-polling'
+import { useTick } from '@/hooks/use-tick'
+import { timeAgoVN, formatVNDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import {
   Mail, MessageCircle, Clock, CheckCircle2, AlertCircle,
@@ -29,19 +31,8 @@ const statusConfig = {
   closed: { label: 'Đã đóng', icon: CheckCircle2, color: 'text-muted-foreground bg-muted' },
 }
 
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Vừa xong'
-  if (mins < 60) return `${mins} phút trước`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} giờ trước`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} ngày trước`
-  return new Date(dateStr).toLocaleDateString('vi-VN')
-}
-
 export default function CustomerInboxPage() {
+  useTick()
   const { user, isLoading: authLoading } = useAuth()
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,7 +128,7 @@ export default function CustomerInboxPage() {
               <div className="min-w-0">
                 <h2 className="text-lg font-bold truncate">{selected.subject || 'Không có tiêu đề'}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Gửi lúc {new Date(selected.createdAt).toLocaleString('vi-VN')}
+                  Gửi lúc {formatVNDateTime(selected.createdAt)}
                 </p>
               </div>
               <span className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${sc.color}`}>
@@ -167,7 +158,7 @@ export default function CustomerInboxPage() {
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{selected.adminNote}</p>
                 {selected.updatedAt && (
                   <p className="text-[10px] text-muted-foreground mt-3">
-                    Phản hồi lúc {new Date(selected.updatedAt).toLocaleString('vi-VN')}
+                    Phản hồi lúc {formatVNDateTime(selected.updatedAt)}
                   </p>
                 )}
               </div>
@@ -303,8 +294,11 @@ export default function CustomerInboxPage() {
                       <h3 className="text-sm font-semibold truncate">
                         {msg.subject || 'Không có tiêu đề'}
                       </h3>
-                      <span className="text-[11px] text-muted-foreground shrink-0">
-                        {timeAgo(msg.createdAt)}
+                      <span
+                        className="text-[11px] text-muted-foreground shrink-0"
+                        title={formatVNDateTime(msg.createdAt)}
+                      >
+                        {timeAgoVN(msg.createdAt)}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
