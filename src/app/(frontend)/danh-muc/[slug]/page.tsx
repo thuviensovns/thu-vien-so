@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import {

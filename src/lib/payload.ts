@@ -5,8 +5,10 @@ const emptyResult = { docs: [] as unknown[], totalDocs: 0, totalPages: 0, page: 
 
 const PAYLOAD_TIMEOUT_MS = 15000
 
-/** Default revalidation interval for cached queries (seconds) */
-const CACHE_TTL = 60
+/** Default revalidation interval for cached queries (seconds). Kept short so any
+ *  transient empty state recovers quickly — products must stay publicly visible. */
+const CACHE_TTL = 30
+const PRODUCT_CACHE_TTL = 15
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -42,6 +44,12 @@ async function safeGetPayload() {
   }
 }
 
+/** Force a fresh Payload init on next call — use after transient DB/connection errors. */
+function resetPayloadCache() {
+  _cachedPayload = undefined
+  _cacheExpiry = 0
+}
+
 export async function getPayloadClient() {
   return safeGetPayload()
 }
@@ -63,7 +71,7 @@ export async function getPayloadForApi(timeoutMs = 15000) {
 
 // ─── Cached query functions ───────────────────────────────────────────
 
-async function _getProducts(opts: {
+type GetProductsOpts = {
   category?: string
   type?: string
   page?: number
@@ -71,316 +79,403 @@ async function _getProducts(opts: {
   sort?: string
   search?: string
   isFree?: boolean
-}) {
+}
+
+async function _fetchProducts(opts: GetProductsOpts) {
   const payload = await safeGetPayload()
-  if (!payload) return emptyResult
+  if (!payload) throw new Error('Payload unavailable')
 
-  try {
-    const conditions: Where[] = []
-    if (opts.category) conditions.push({ 'category.slug': { equals: opts.category } })
-    if (opts.type) conditions.push({ type: { equals: opts.type } })
-    if (opts.isFree === true) conditions.push({ 'pricing.isFree': { equals: true } })
-    if (opts.isFree === false) conditions.push({ 'pricing.isFree': { equals: false } })
-    if (opts.search) conditions.push({ name: { like: opts.search } })
+  const conditions: Where[] = []
 
-    const where: Where = conditions.length > 0 ? { and: conditions } : {}
-
-    return await payload.find({
-      collection: 'products',
-      where,
-      page: opts.page || 1,
-      limit: opts.limit || 12,
-      sort: opts.sort || '-createdAt',
-      depth: 2,
+  // Resolve category slug → id before query. This is more reliable than
+  // relationship dot-notation traversal, which can silently fail on some
+  // Payload/Postgres combinations.
+  if (opts.category) {
+    const catResult = await payload.find({
+      collection: 'categories',
+      where: { slug: { equals: opts.category } },
+      limit: 1,
+      depth: 0,
     })
-  } catch (error) {
-    console.error('[Payload] getProducts error:', (error as Error).message)
-    return emptyResult
+    const catDoc = catResult.docs[0] as { id?: number } | undefined
+    if (!catDoc?.id) {
+      // Category doesn't exist — return empty (this is a legitimate not-found, safe to cache)
+      return {
+        docs: [],
+        totalDocs: 0,
+        totalPages: 0,
+        page: opts.page || 1,
+        limit: opts.limit || 12,
+        hasNextPage: false,
+        hasPrevPage: false,
+        nextPage: null,
+        prevPage: null,
+        pagingCounter: 0,
+      }
+    }
+    conditions.push({ category: { equals: catDoc.id } })
   }
+
+  if (opts.type) conditions.push({ type: { equals: opts.type } })
+  if (opts.isFree === true) conditions.push({ 'pricing.isFree': { equals: true } })
+  if (opts.isFree === false) conditions.push({ 'pricing.isFree': { equals: false } })
+  if (opts.search) conditions.push({ name: { like: opts.search } })
+
+  const where: Where = conditions.length > 0 ? { and: conditions } : {}
+
+  return await payload.find({
+    collection: 'products',
+    where,
+    page: opts.page || 1,
+    limit: opts.limit || 12,
+    sort: opts.sort || '-createdAt',
+    depth: 2,
+  })
 }
 
 // Module-scoped cached fetcher — ensures revalidateTag('products') works reliably
 const _getProductsCached = unstable_cache(
-  async (serializedOpts: string) => _getProducts(JSON.parse(serializedOpts)),
+  async (serializedOpts: string) => _fetchProducts(JSON.parse(serializedOpts)),
   ['products-query'],
-  { revalidate: CACHE_TTL, tags: ['products'] }
+  { revalidate: PRODUCT_CACHE_TTL, tags: ['products'] }
 )
 
-export async function getProducts(opts: Parameters<typeof _getProducts>[0]) {
-  return _getProductsCached(JSON.stringify(opts))
+export async function getProducts(opts: GetProductsOpts) {
+  try {
+    return await _getProductsCached(JSON.stringify(opts))
+  } catch (error) {
+    console.error('[Payload] getProducts cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchProducts(opts)
+    } catch (retryError) {
+      console.error('[Payload] getProducts retry failed:', (retryError as Error).message)
+      return emptyResult
+    }
+  }
 }
 
-async function _getProductBySlug(slug: string) {
+async function _fetchProductBySlug(slug: string) {
   const payload = await safeGetPayload()
-  if (!payload) return null
+  if (!payload) throw new Error('Payload unavailable')
 
-  try {
-    const result = await payload.find({
-      collection: 'products',
-      where: { slug: { equals: slug } },
-      limit: 1,
-      depth: 2,
-    })
-    return result.docs[0] || null
-  } catch (error) {
-    console.error('[Payload] getProductBySlug error:', (error as Error).message)
-    return null
-  }
+  const result = await payload.find({
+    collection: 'products',
+    where: { slug: { equals: slug } },
+    limit: 1,
+    depth: 2,
+  })
+  return result.docs[0] || null
 }
 
 const _getProductBySlugCached = unstable_cache(
-  async (slug: string) => _getProductBySlug(slug),
+  async (slug: string) => _fetchProductBySlug(slug),
   ['product-by-slug'],
-  { revalidate: CACHE_TTL, tags: ['products'] }
+  { revalidate: PRODUCT_CACHE_TTL, tags: ['products'] }
 )
 
 export async function getProductBySlug(slug: string) {
-  return _getProductBySlugCached(slug)
-}
-
-async function _getCategories() {
-  const payload = await safeGetPayload()
-  if (!payload) return emptyResult
-
   try {
-    return await payload.find({
-      collection: 'categories',
-      sort: 'order',
-      limit: 100,
-    })
+    return await _getProductBySlugCached(slug)
   } catch (error) {
-    console.error('[Payload] getCategories error:', (error as Error).message)
-    return emptyResult
+    console.error('[Payload] getProductBySlug cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchProductBySlug(slug)
+    } catch (retryError) {
+      console.error('[Payload] getProductBySlug retry failed:', (retryError as Error).message)
+      return null
+    }
   }
 }
 
+async function _fetchCategories() {
+  const payload = await safeGetPayload()
+  if (!payload) throw new Error('Payload unavailable')
+
+  return await payload.find({
+    collection: 'categories',
+    sort: 'order',
+    limit: 100,
+  })
+}
+
 const _getCategoriesCached = unstable_cache(
-  _getCategories,
+  _fetchCategories,
   ['categories'],
   { revalidate: CACHE_TTL, tags: ['categories'] }
 )
 
 export async function getCategories() {
-  return _getCategoriesCached()
-}
-
-async function _getCategoryBySlug(slug: string) {
-  const payload = await safeGetPayload()
-  if (!payload) return null
-
   try {
-    const result = await payload.find({
-      collection: 'categories',
-      where: { slug: { equals: slug } },
-      limit: 1,
-    })
-    return result.docs[0] || null
+    return await _getCategoriesCached()
   } catch (error) {
-    console.error('[Payload] getCategoryBySlug error:', (error as Error).message)
-    return null
+    console.error('[Payload] getCategories cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchCategories()
+    } catch (retryError) {
+      console.error('[Payload] getCategories retry failed:', (retryError as Error).message)
+      return emptyResult
+    }
   }
 }
 
+async function _fetchCategoryBySlug(slug: string) {
+  const payload = await safeGetPayload()
+  if (!payload) throw new Error('Payload unavailable')
+
+  const result = await payload.find({
+    collection: 'categories',
+    where: { slug: { equals: slug } },
+    limit: 1,
+  })
+  return result.docs[0] || null
+}
+
 const _getCategoryBySlugCached = unstable_cache(
-  async (slug: string) => _getCategoryBySlug(slug),
+  async (slug: string) => _fetchCategoryBySlug(slug),
   ['category-by-slug'],
   { revalidate: CACHE_TTL, tags: ['categories'] }
 )
 
 export async function getCategoryBySlug(slug: string) {
-  return _getCategoryBySlugCached(slug)
-}
-
-async function _getBlogPosts(opts?: {
-  page?: number
-  limit?: number
-  category?: string
-}) {
-  const payload = await safeGetPayload()
-  if (!payload) return emptyResult
-
   try {
-    const conditions: Where[] = [{ _status: { equals: 'published' } }]
-    if (opts?.category) conditions.push({ blogCategory: { equals: opts.category } })
-    const where: Where = { and: conditions }
-
-    return await payload.find({
-      collection: 'blog-posts',
-      where,
-      page: opts?.page || 1,
-      limit: opts?.limit || 10,
-      sort: '-publishedAt',
-      depth: 2,
-    })
+    return await _getCategoryBySlugCached(slug)
   } catch (error) {
-    console.error('[Payload] getBlogPosts error:', (error as Error).message)
-    return emptyResult
+    console.error('[Payload] getCategoryBySlug cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchCategoryBySlug(slug)
+    } catch (retryError) {
+      console.error('[Payload] getCategoryBySlug retry failed:', (retryError as Error).message)
+      return null
+    }
   }
 }
 
+type GetBlogPostsOpts = {
+  page?: number
+  limit?: number
+  category?: string
+}
+
+async function _fetchBlogPosts(opts?: GetBlogPostsOpts) {
+  const payload = await safeGetPayload()
+  if (!payload) throw new Error('Payload unavailable')
+
+  const conditions: Where[] = [{ _status: { equals: 'published' } }]
+  if (opts?.category) conditions.push({ blogCategory: { equals: opts.category } })
+  const where: Where = { and: conditions }
+
+  return await payload.find({
+    collection: 'blog-posts',
+    where,
+    page: opts?.page || 1,
+    limit: opts?.limit || 10,
+    sort: '-publishedAt',
+    depth: 2,
+  })
+}
+
 const _getBlogPostsCached = unstable_cache(
-  async (serializedOpts: string) => _getBlogPosts(JSON.parse(serializedOpts)),
+  async (serializedOpts: string) => _fetchBlogPosts(JSON.parse(serializedOpts)),
   ['blog-posts-query'],
   { revalidate: CACHE_TTL, tags: ['blog-posts'] }
 )
 
-export async function getBlogPosts(opts?: Parameters<typeof _getBlogPosts>[0]) {
-  return _getBlogPostsCached(JSON.stringify(opts || {}))
+export async function getBlogPosts(opts?: GetBlogPostsOpts) {
+  try {
+    return await _getBlogPostsCached(JSON.stringify(opts || {}))
+  } catch (error) {
+    console.error('[Payload] getBlogPosts cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchBlogPosts(opts)
+    } catch (retryError) {
+      console.error('[Payload] getBlogPosts retry failed:', (retryError as Error).message)
+      return emptyResult
+    }
+  }
 }
 
 /** Get site-wide stats — cached for 2 minutes */
-async function _getSiteStats() {
+async function _fetchSiteStats() {
   const payload = await safeGetPayload()
-  if (!payload) return null
+  if (!payload) throw new Error('Payload unavailable')
 
-  try {
-    const [allProducts, freeProducts, users] = await Promise.all([
-      payload.find({ collection: 'products', limit: 0, depth: 0 }),
-      payload.find({ collection: 'products', where: { 'pricing.isFree': { equals: true } }, limit: 0, depth: 0 }),
-      payload.find({ collection: 'users', limit: 0, depth: 0 }),
-    ])
+  const [allProducts, freeProducts, users] = await Promise.all([
+    payload.find({ collection: 'products', limit: 0, depth: 0 }),
+    payload.find({ collection: 'products', where: { 'pricing.isFree': { equals: true } }, limit: 0, depth: 0 }),
+    payload.find({ collection: 'users', limit: 0, depth: 0 }),
+  ])
 
-    return {
-      totalProducts: allProducts.totalDocs,
-      freeProducts: freeProducts.totalDocs,
-      totalUsers: users.totalDocs,
-      totalDownloads: 0, // Skip expensive full-scan; use a counter collection later
-    }
-  } catch (error) {
-    console.error('[Payload] getSiteStats error:', (error as Error).message)
-    return null
+  return {
+    totalProducts: allProducts.totalDocs,
+    freeProducts: freeProducts.totalDocs,
+    totalUsers: users.totalDocs,
+    totalDownloads: 0, // Skip expensive full-scan; use a counter collection later
   }
 }
 
 const _getSiteStatsCached = unstable_cache(
-  _getSiteStats,
+  _fetchSiteStats,
   ['site-stats'],
   { revalidate: 120, tags: ['products', 'users'] }
 )
 
 export async function getSiteStats() {
-  return _getSiteStatsCached()
-}
-
-/** Get per-category stats — uses count queries instead of loading all products */
-async function _getCategoryStats() {
-  const payload = await safeGetPayload()
-  if (!payload) return null
-
   try {
-    const categories = await payload.find({ collection: 'categories', sort: 'order', limit: 100, depth: 0 })
-
-    const stats: Record<string, { totalProducts: number; freeProducts: number; totalDownloads: number }> = {}
-
-    // Use parallel count queries per category instead of loading ALL products
-    await Promise.all(
-      categories.docs.map(async (cat) => {
-        const category = cat as unknown as { id: number; slug: string }
-        const [total, free] = await Promise.all([
-          payload.find({
-            collection: 'products',
-            where: { 'category.slug': { equals: category.slug } },
-            limit: 0,
-            depth: 0,
-          }),
-          payload.find({
-            collection: 'products',
-            where: {
-              and: [
-                { 'category.slug': { equals: category.slug } },
-                { 'pricing.isFree': { equals: true } },
-              ],
-            },
-            limit: 0,
-            depth: 0,
-          }),
-        ])
-        stats[category.slug] = {
-          totalProducts: total.totalDocs,
-          freeProducts: free.totalDocs,
-          totalDownloads: 0,
-        }
-      })
-    )
-
-    return stats
+    return await _getSiteStatsCached()
   } catch (error) {
-    console.error('[Payload] getCategoryStats error:', (error as Error).message)
-    return null
+    console.error('[Payload] getSiteStats cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchSiteStats()
+    } catch (retryError) {
+      console.error('[Payload] getSiteStats retry failed:', (retryError as Error).message)
+      return null
+    }
   }
 }
 
+/** Get per-category stats — uses count queries by category ID (avoids relationship-slug traversal) */
+async function _fetchCategoryStats() {
+  const payload = await safeGetPayload()
+  if (!payload) throw new Error('Payload unavailable')
+
+  const categories = await payload.find({ collection: 'categories', sort: 'order', limit: 100, depth: 0 })
+
+  const stats: Record<string, { totalProducts: number; freeProducts: number; totalDownloads: number }> = {}
+
+  // Count queries per category using direct ID match (more reliable than slug traversal)
+  await Promise.all(
+    categories.docs.map(async (cat) => {
+      const category = cat as unknown as { id: number; slug: string }
+      const [total, free] = await Promise.all([
+        payload.find({
+          collection: 'products',
+          where: { category: { equals: category.id } },
+          limit: 0,
+          depth: 0,
+        }),
+        payload.find({
+          collection: 'products',
+          where: {
+            and: [
+              { category: { equals: category.id } },
+              { 'pricing.isFree': { equals: true } },
+            ],
+          },
+          limit: 0,
+          depth: 0,
+        }),
+      ])
+      stats[category.slug] = {
+        totalProducts: total.totalDocs,
+        freeProducts: free.totalDocs,
+        totalDownloads: 0,
+      }
+    })
+  )
+
+  return stats
+}
+
 const _getCategoryStatsCached = unstable_cache(
-  _getCategoryStats,
+  _fetchCategoryStats,
   ['category-stats'],
   { revalidate: 120, tags: ['products', 'categories'] }
 )
 
 export async function getCategoryStats() {
-  return _getCategoryStatsCached()
+  try {
+    return await _getCategoryStatsCached()
+  } catch (error) {
+    console.error('[Payload] getCategoryStats cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchCategoryStats()
+    } catch (retryError) {
+      console.error('[Payload] getCategoryStats retry failed:', (retryError as Error).message)
+      return null
+    }
+  }
 }
 
 /** Get order stats — cached for 2 minutes */
-async function _getOrderStats() {
+async function _fetchOrderStats() {
   const payload = await safeGetPayload()
-  if (!payload) return null
+  if (!payload) throw new Error('Payload unavailable')
 
-  try {
-    const [allOrders, paidOrders] = await Promise.all([
-      payload.find({ collection: 'orders', limit: 0, depth: 0 }),
-      payload.find({ collection: 'orders', where: { status: { equals: 'paid' } }, limit: 1000, depth: 0 }),
-    ])
+  const [allOrders, paidOrders] = await Promise.all([
+    payload.find({ collection: 'orders', limit: 0, depth: 0 }),
+    payload.find({ collection: 'orders', where: { status: { equals: 'paid' } }, limit: 1000, depth: 0 }),
+  ])
 
-    const revenue = paidOrders.docs.reduce((sum, doc) => {
-      const order = doc as unknown as { total?: number }
-      return sum + (order.total || 0)
-    }, 0)
+  const revenue = paidOrders.docs.reduce((sum, doc) => {
+    const order = doc as unknown as { total?: number }
+    return sum + (order.total || 0)
+  }, 0)
 
-    return {
-      totalOrders: allOrders.totalDocs,
-      paidOrders: paidOrders.totalDocs,
-      revenue,
-    }
-  } catch (error) {
-    console.error('[Payload] getOrderStats error:', (error as Error).message)
-    return null
+  return {
+    totalOrders: allOrders.totalDocs,
+    paidOrders: paidOrders.totalDocs,
+    revenue,
   }
 }
 
 const _getOrderStatsCached = unstable_cache(
-  _getOrderStats,
+  _fetchOrderStats,
   ['order-stats'],
   { revalidate: 120, tags: ['orders'] }
 )
 
 export async function getOrderStats() {
-  return _getOrderStatsCached()
-}
-
-async function _getBlogPostBySlug(slug: string) {
-  const payload = await safeGetPayload()
-  if (!payload) return null
-
   try {
-    const result = await payload.find({
-      collection: 'blog-posts',
-      where: { slug: { equals: slug } },
-      limit: 1,
-      depth: 2,
-    })
-    return result.docs[0] || null
+    return await _getOrderStatsCached()
   } catch (error) {
-    console.error('[Payload] getBlogPostBySlug error:', (error as Error).message)
-    return null
+    console.error('[Payload] getOrderStats cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchOrderStats()
+    } catch (retryError) {
+      console.error('[Payload] getOrderStats retry failed:', (retryError as Error).message)
+      return null
+    }
   }
 }
 
+async function _fetchBlogPostBySlug(slug: string) {
+  const payload = await safeGetPayload()
+  if (!payload) throw new Error('Payload unavailable')
+
+  const result = await payload.find({
+    collection: 'blog-posts',
+    where: { slug: { equals: slug } },
+    limit: 1,
+    depth: 2,
+  })
+  return result.docs[0] || null
+}
+
 const _getBlogPostBySlugCached = unstable_cache(
-  async (slug: string) => _getBlogPostBySlug(slug),
+  async (slug: string) => _fetchBlogPostBySlug(slug),
   ['blog-post-by-slug'],
   { revalidate: CACHE_TTL, tags: ['blog-posts'] }
 )
 
 export async function getBlogPostBySlug(slug: string) {
-  return _getBlogPostBySlugCached(slug)
+  try {
+    return await _getBlogPostBySlugCached(slug)
+  } catch (error) {
+    console.error('[Payload] getBlogPostBySlug cached error:', (error as Error).message)
+    resetPayloadCache()
+    try {
+      return await _fetchBlogPostBySlug(slug)
+    } catch (retryError) {
+      console.error('[Payload] getBlogPostBySlug retry failed:', (retryError as Error).message)
+      return null
+    }
+  }
 }

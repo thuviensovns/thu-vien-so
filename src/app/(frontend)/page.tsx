@@ -2,7 +2,7 @@ import { HomeContent } from '@/components/home/HomeContent'
 import { getProducts, getCategories, getSiteStats } from '@/lib/payload'
 import { unstable_cache } from 'next/cache'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 /** Fetch site content from DB — cached for 60s */
 const getSiteContentSSR = unstable_cache(

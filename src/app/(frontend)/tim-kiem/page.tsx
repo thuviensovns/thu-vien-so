@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { Search, ChevronRight } from 'lucide-react'
