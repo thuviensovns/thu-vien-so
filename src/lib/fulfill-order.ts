@@ -40,6 +40,8 @@ export async function fulfillOrder(
   const downloadExpiresAt = expiresAt.toISOString()
 
   // Update order: status=paid + downloadToken
+  // overrideAccess: this runs from trusted payment webhooks and the balance-pay flow;
+  // customers cannot otherwise update orders (admin-only per Orders.access.update).
   await payload.update({
     collection: 'orders',
     id: orderId,
@@ -55,6 +57,7 @@ export async function fulfillOrder(
         },
       } : {}),
     },
+    overrideAccess: true,
   })
 
   // Increment downloadCount on each product (non-blocking, best-effort)
@@ -69,6 +72,7 @@ export async function fulfillOrder(
             collection: 'products',
             id: productId,
             data: { downloadCount: (product.downloadCount || 0) + 1 },
+            overrideAccess: true,
           })
         } catch (e) {
           console.error(`[fulfillOrder] Failed to update downloadCount for product ${productId}:`, e)

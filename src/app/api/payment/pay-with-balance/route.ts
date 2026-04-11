@@ -63,10 +63,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 2: Mark order as processing FIRST (prevents concurrent requests on same order)
+    // overrideAccess: trusted server-side transition; customers cannot otherwise update orders.
     await payload.update({
       collection: 'orders',
       id: orderId,
       data: { status: 'processing' },
+      overrideAccess: true,
     })
 
     // Step 3: Re-fetch balance to minimize TOCTOU window
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
         collection: 'orders',
         id: orderId,
         data: { status: 'pending' },
+        overrideAccess: true,
       })
       return NextResponse.json({
         error: `Số dư không đủ. Cần ${total}, hiện có ${recheckBalance}`,

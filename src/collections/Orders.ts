@@ -42,6 +42,7 @@ export const Orders: CollectionConfig = {
       label: 'Trạng thái',
       options: [
         { label: 'Chờ xử lý', value: 'pending' },
+        { label: 'Đang xử lý', value: 'processing' },
         { label: 'Đã thanh toán', value: 'paid' },
         { label: 'Thất bại', value: 'failed' },
         { label: 'Hoàn tiền', value: 'refunded' },

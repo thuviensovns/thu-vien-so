@@ -51,6 +51,10 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       label: 'Add balance to enum_orders_payment_method',
       q: `ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'balance'`,
     },
+    {
+      label: 'Add processing to enum_orders_status',
+      q: `ALTER TYPE enum_orders_status ADD VALUE IF NOT EXISTS 'processing'`,
+    },
   ]
 
   for (const { label, q } of queries) {
