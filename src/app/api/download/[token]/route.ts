@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { generateDownloadUrl } from '@/lib/r2'
+import { normalizeDownloadUrl } from '@/lib/normalize-download-url'
 import type { Order, OrderItem, Product } from '@/types/payload-types'
 
 export const maxDuration = 30
@@ -110,8 +111,15 @@ async function generateFileResponse(product: Product) {
   }
 
   // Priority 2: Direct download URL (Google Drive, Mediafire, etc.)
+  // Rewrite Drive share links to force-download form so the browser saves
+  // the file instead of opening a preview — root cause of the payment
+  // success page "treo" complaint.
   if (file.downloadUrl) {
-    return NextResponse.json({ url: file.downloadUrl, fileName, source: 'direct' })
+    return NextResponse.json({
+      url: normalizeDownloadUrl(file.downloadUrl),
+      fileName,
+      source: 'direct',
+    })
   }
 
   return NextResponse.json({
