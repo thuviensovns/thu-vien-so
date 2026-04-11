@@ -4,13 +4,14 @@ import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   ShoppingCart, Package, Calendar, CreditCard, Search,
   CheckCircle2, Clock, XCircle, AlertCircle, Filter,
-  ArrowUpDown, FileDown, Loader2,
+  ArrowUpDown, FileDown, Loader2, ScanSearch, User, Wallet,
+  Mail, Phone, Hash, X,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatVND, formatDate } from '@/lib/format'
+import { formatVND, formatDate, formatVNDateTime } from '@/lib/format'
 import { toast } from 'sonner'
 import AdminPagination, { paginate } from '@/components/admin/AdminPagination'
 
@@ -32,6 +33,40 @@ interface Order {
   createdAt: string
 }
 
+interface LookupResult {
+  order: {
+    id: number
+    orderNumber: string
+    total: number
+    status: string
+    method: string | null
+    transactionId: string | null
+    paidAt: string | null
+    customerEmail: string | null
+    customerPhone: string | null
+    note: string | null
+    items: { productId: number | string | null; name: string; price: number }[]
+    createdAt: string
+    updatedAt: string
+  }
+  customer: {
+    id: number
+    email: string | null
+    displayName: string | null
+    phone: string | null
+    role: string
+    balance: number
+    createdAt: string | null
+    stats: {
+      totalOrders: number
+      paidOrders: number
+      pendingOrders: number
+      totalSpent: number
+      lastOrderAt: string | null
+    }
+  } | null
+}
+
 const statusConfig = {
   paid: { label: 'Đã thanh toán', icon: CheckCircle2, color: 'text-success', bg: 'bg-success/10 border-success/20' },
   pending: { label: 'Chờ xử lý', icon: Clock, color: 'text-warning', bg: 'bg-warning/10 border-warning/20' },
@@ -46,6 +81,42 @@ export default function OrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [sortDesc, setSortDesc] = useState(true)
   const [page, setPage] = useState(1)
+
+  const [lookupCode, setLookupCode] = useState('')
+  const [lookupLoading, setLookupLoading] = useState(false)
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null)
+  const [lookupError, setLookupError] = useState<string | null>(null)
+
+  async function runLookup(codeOverride?: string) {
+    const code = (codeOverride ?? lookupCode).trim()
+    if (!code) {
+      toast.error('Vui lòng nhập mã đơn hàng')
+      return
+    }
+    setLookupLoading(true)
+    setLookupError(null)
+    setLookupResult(null)
+    try {
+      const res = await fetch(`/api/admin/orders/lookup/${encodeURIComponent(code)}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLookupResult(data)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        const msg = err?.error || `Không tìm thấy (HTTP ${res.status})`
+        setLookupError(msg)
+        toast.error(msg)
+      }
+    } catch (e) {
+      const msg = 'Lỗi kết nối: ' + ((e as Error)?.message || 'unknown')
+      setLookupError(msg)
+      toast.error(msg)
+    }
+    setLookupLoading(false)
+  }
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -133,6 +204,190 @@ export default function OrdersPage() {
           Xuất CSV
         </Button>
       </div>
+
+      {/* Order lookup — admin enters an order code to see customer info */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <ScanSearch className="h-4 w-4 text-primary" />
+            Kiểm tra mã đơn hàng
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">
+            Nhập chính xác mã đơn hàng để xem thông tin tài khoản khách hàng đã đặt đơn đó.
+          </p>
+          <form
+            className="flex flex-col sm:flex-row gap-2"
+            onSubmit={(e) => { e.preventDefault(); runLookup() }}
+          >
+            <div className="relative flex-1">
+              <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={lookupCode}
+                onChange={(e) => setLookupCode(e.target.value)}
+                placeholder="Ví dụ: TVS-20250110-ABC123"
+                className="pl-9 bg-background font-mono"
+                autoComplete="off"
+              />
+            </div>
+            <Button type="submit" disabled={lookupLoading || !lookupCode.trim()}>
+              {lookupLoading ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4 mr-1.5" />
+              )}
+              Kiểm tra
+            </Button>
+            {lookupResult && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => { setLookupResult(null); setLookupError(null); setLookupCode('') }}
+                title="Đóng kết quả"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </form>
+
+          {lookupError && !lookupResult && (
+            <div className="flex items-center gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              {lookupError}
+            </div>
+          )}
+
+          {lookupResult && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              {/* Order details */}
+              <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Đơn hàng
+                  </p>
+                  <Badge variant="outline" className={`text-[10px] ${
+                    statusConfig[lookupResult.order.status as keyof typeof statusConfig]?.bg || ''
+                  } ${statusConfig[lookupResult.order.status as keyof typeof statusConfig]?.color || ''}`}>
+                    {statusConfig[lookupResult.order.status as keyof typeof statusConfig]?.label || lookupResult.order.status}
+                  </Badge>
+                </div>
+                <p className="font-mono text-sm font-bold text-primary">
+                  {lookupResult.order.orderNumber}
+                </p>
+                <div className="text-xs space-y-1 pt-1 border-t border-border/50">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tổng tiền</span>
+                    <span className="font-bold text-primary">{formatVND(lookupResult.order.total)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Phương thức</span>
+                    <span className="font-medium">{lookupResult.order.method || '—'}</span>
+                  </div>
+                  {lookupResult.order.transactionId && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground">Mã giao dịch</span>
+                      <span className="font-mono text-[10px] truncate">{lookupResult.order.transactionId}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tạo lúc</span>
+                    <span>{formatVNDateTime(lookupResult.order.createdAt)}</span>
+                  </div>
+                  {lookupResult.order.paidAt && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Thanh toán</span>
+                      <span>{formatVNDateTime(lookupResult.order.paidAt)}</span>
+                    </div>
+                  )}
+                </div>
+                {lookupResult.order.items.length > 0 && (
+                  <div className="pt-2 border-t border-border/50 space-y-1">
+                    <p className="text-[10px] text-muted-foreground uppercase">Sản phẩm</p>
+                    {lookupResult.order.items.map((it, i) => (
+                      <div key={i} className="flex justify-between text-xs gap-2">
+                        <span className="truncate flex items-center gap-1">
+                          <Package className="h-3 w-3 text-muted-foreground shrink-0" />
+                          {it.name}
+                        </span>
+                        <span className="font-medium shrink-0">{formatVND(it.price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Customer info */}
+              <div className="rounded-lg border border-border bg-background p-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Tài khoản khách hàng
+                </p>
+                {lookupResult.customer ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold truncate">
+                          {lookupResult.customer.displayName || lookupResult.customer.email || `#${lookupResult.customer.id}`}
+                        </p>
+                        <Badge variant="outline" className="text-[9px] px-1 py-0">
+                          {lookupResult.customer.role}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-xs space-y-1 pt-1 border-t border-border/50">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Mail className="h-3 w-3" />
+                        <span className="truncate">{lookupResult.customer.email || '—'}</span>
+                      </div>
+                      {lookupResult.customer.phone && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Phone className="h-3 w-3" />
+                          <span>{lookupResult.customer.phone}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <Wallet className="h-3 w-3 text-success" />
+                        <span className="text-muted-foreground">Số dư:</span>
+                        <span className="font-bold text-success">{formatVND(lookupResult.customer.balance)}</span>
+                      </div>
+                      {lookupResult.customer.createdAt && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>Đăng ký: {formatVNDateTime(lookupResult.customer.createdAt)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-border/50">
+                      <div className="text-center rounded bg-muted/50 p-1.5">
+                        <p className="text-[9px] text-muted-foreground uppercase">Tổng đơn</p>
+                        <p className="text-sm font-bold">{lookupResult.customer.stats.totalOrders}</p>
+                      </div>
+                      <div className="text-center rounded bg-success/10 p-1.5">
+                        <p className="text-[9px] text-muted-foreground uppercase">Đã trả</p>
+                        <p className="text-sm font-bold text-success">{lookupResult.customer.stats.paidOrders}</p>
+                      </div>
+                      <div className="text-center rounded bg-warning/10 p-1.5">
+                        <p className="text-[9px] text-muted-foreground uppercase">Chờ xử lý</p>
+                        <p className="text-sm font-bold text-warning">{lookupResult.customer.stats.pendingOrders}</p>
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-xs pt-1">
+                      <span className="text-muted-foreground">Đã chi:</span>
+                      <span className="font-bold text-primary">{formatVND(lookupResult.customer.stats.totalSpent)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    Đơn hàng này không liên kết với tài khoản nào.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
