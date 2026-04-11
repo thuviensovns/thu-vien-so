@@ -34,6 +34,18 @@ export async function GET(req: NextRequest) {
       overrideAccess: true,
     })
 
+    // Unread count is computed on the client side against localStorage (per-user
+    // last-seen timestamp) so we don't need a new DB column. Here we just return
+    // the latest replied-message updatedAt so the client can diff cheaply.
+    let latestReplyAt: string | null = null
+    for (const msg of messages.docs) {
+      if (msg.status === 'replied' && msg.adminNote) {
+        if (!latestReplyAt || new Date(msg.updatedAt) > new Date(latestReplyAt)) {
+          latestReplyAt = msg.updatedAt
+        }
+      }
+    }
+
     return NextResponse.json({
       messages: messages.docs.map((msg) => ({
         id: msg.id,
@@ -47,6 +59,7 @@ export async function GET(req: NextRequest) {
         updatedAt: msg.updatedAt,
       })),
       totalDocs: messages.totalDocs,
+      latestReplyAt,
     })
   } catch (error) {
     console.error('My messages error:', error)

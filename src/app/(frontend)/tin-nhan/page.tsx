@@ -57,10 +57,15 @@ export default function CustomerInboxPage() {
     if (showRefresh) setRefreshing(true)
     setError(null)
     try {
-      const res = await fetch('/api/my-messages', { credentials: 'include' })
+      const res = await fetch('/api/my-messages', { credentials: 'include', cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setMessages(data.messages || [])
+        // Mark inbox as seen so the UserMenu badge clears
+        try {
+          localStorage.setItem(`tvs:inbox-seen:${user.email.toLowerCase()}`, new Date().toISOString())
+          window.dispatchEvent(new Event('inbox:refresh'))
+        } catch { /* ignore */ }
       } else {
         const data = await res.json().catch(() => ({}))
         setError(data.error || 'Không thể tải tin nhắn')

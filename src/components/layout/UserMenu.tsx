@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { User, LogIn, LogOut, Download, Settings, ShieldCheck, Wallet, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,10 +16,49 @@ import { useAuth } from '@/hooks/use-auth'
 import { useBalance } from '@/hooks/use-balance'
 import { formatVND } from '@/lib/format'
 
+function getInboxSeenKey(email: string) {
+  return `tvs:inbox-seen:${email.toLowerCase()}`
+}
+
 export function UserMenu() {
   const { user, logout } = useAuth()
   const { balance } = useBalance()
   const router = useRouter()
+  const [hasUnreadReply, setHasUnreadReply] = useState(false)
+
+  // Poll /api/my-messages every 30s and compare latestReplyAt against localStorage.
+  // If admin added a reply after the last time the customer opened /tin-nhan,
+  // show a dot next to the "Tin nhắn" menu item.
+  useEffect(() => {
+    if (!user?.email) { setHasUnreadReply(false); return }
+    let cancelled = false
+
+    async function check() {
+      try {
+        const res = await fetch('/api/my-messages', { credentials: 'include', cache: 'no-store' })
+        if (!res.ok || cancelled) return
+        const data = await res.json()
+        const latest: string | null = data?.latestReplyAt || null
+        if (!latest) { setHasUnreadReply(false); return }
+        const seenRaw = localStorage.getItem(getInboxSeenKey(user!.email))
+        const seenAt = seenRaw ? new Date(seenRaw).getTime() : 0
+        setHasUnreadReply(new Date(latest).getTime() > seenAt)
+      } catch { /* ignore */ }
+    }
+
+    check()
+    const interval = setInterval(check, 30000)
+    const onFocus = () => check()
+    const onCustom = () => check()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('inbox:refresh', onCustom)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('inbox:refresh', onCustom)
+    }
+  }, [user?.email])
 
   if (!user) {
     return (
@@ -39,6 +79,9 @@ export function UserMenu() {
         <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary" aria-label="Menu tài khoản">
           <User className="h-5 w-5" />
           <span className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ${isAdmin ? 'bg-warning' : 'bg-accent'}`} />
+          {hasUnreadReply && (
+            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-destructive animate-pulse" aria-label="Phản hồi mới" />
+          )}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56 bg-card border-border">
@@ -86,7 +129,12 @@ export function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/tin-nhan" className="cursor-pointer">
             <Mail className="mr-2 h-4 w-4" />
-            Tin nhắn
+            <span className="flex-1">Tin nhắn</span>
+            {hasUnreadReply && (
+              <span className="ml-2 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-destructive/15 text-destructive border border-destructive/30">
+                Mới
+              </span>
+            )}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

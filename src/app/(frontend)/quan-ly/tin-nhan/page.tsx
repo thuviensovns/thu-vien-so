@@ -78,8 +78,13 @@ export default function MessengerPage() {
         setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)))
         if (selected?.id === id) setSelected((prev) => prev ? { ...prev, status: status as Message['status'] } : null)
         toast.success(`Đã cập nhật trạng thái: ${statusConfig[status as keyof typeof statusConfig]?.label}`)
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err?.error || `Lỗi cập nhật (HTTP ${res.status})`)
       }
-    } catch { toast.error('Lỗi cập nhật') }
+    } catch (e) {
+      toast.error('Lỗi kết nối: ' + ((e as Error)?.message || 'unknown'))
+    }
     setSaving(false)
   }
 
@@ -96,10 +101,19 @@ export default function MessengerPage() {
       if (res.ok) {
         const updated = await res.json()
         setMessages((prev) => prev.map((m) => (m.id === selected.id ? { ...m, ...updated } : m)))
-        setSelected((prev) => prev ? { ...prev, adminNote, status: 'replied' } : null)
-        toast.success('Đã lưu phản hồi')
+        setSelected((prev) => prev ? { ...prev, adminNote: updated.adminNote ?? adminNote, status: 'replied' } : null)
+        toast.success('Đã lưu phản hồi', {
+          description: `Khách hàng ${selected.email} sẽ thấy phản hồi trong trang Hộp thư.`,
+        })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        console.error('[saveNote] PATCH failed:', res.status, err)
+        toast.error(err?.error || `Lỗi lưu phản hồi (HTTP ${res.status})`)
       }
-    } catch { toast.error('Lỗi lưu phản hồi') }
+    } catch (e) {
+      console.error('[saveNote] exception:', e)
+      toast.error('Lỗi kết nối: ' + ((e as Error)?.message || 'unknown'))
+    }
     setSaving(false)
   }
 
