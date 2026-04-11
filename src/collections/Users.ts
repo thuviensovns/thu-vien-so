@@ -65,19 +65,14 @@ export const Users: CollectionConfig = {
       min: 0,
       label: 'Số dư (VND)',
       admin: { description: 'Số dư tài khoản người dùng' },
-      hooks: {
-        beforeChange: [
-          ({ value, originalDoc, operation, req, overrideAccess }) => {
-            // Allow on create (default value)
-            if (operation === 'create') return value ?? 0
-            // Allow server-side operations (admin topup, webhook, etc.)
-            if (overrideAccess) return value
-            // Allow admin users
-            if (req?.user?.role === 'admin') return value
-            // Prevent non-admin users from changing their own balance
-            return originalDoc?.balance ?? 0
-          },
-        ],
+      // Field-level access: only admin can edit from admin UI.
+      // Server-side payload.update({ overrideAccess: true }) bypasses this entirely
+      // (used by webhook bank-transfer + admin manual topup endpoint).
+      // NOTE: Do not use field beforeChange hook for this — Payload 3.80 does not
+      // forward `overrideAccess` into field hook args, so server-side updates would
+      // be silently reverted (regression from commit 50fb146).
+      access: {
+        update: ({ req: { user } }) => user?.role === 'admin',
       },
     },
   ],

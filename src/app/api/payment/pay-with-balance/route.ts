@@ -85,11 +85,13 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
-    // Step 4: Deduct balance
+    // Step 4: Deduct balance (overrideAccess required — balance field access.update
+    // allows only admin role, and this route authenticates the customer themselves)
     await payload.update({
       collection: 'users',
       id: user.id,
       data: { balance: recheckBalance - total },
+      overrideAccess: true,
     })
 
     // Step 5: Fulfill order — generates downloadToken, marks as paid, increments download counts

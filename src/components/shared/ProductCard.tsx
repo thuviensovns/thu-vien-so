@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/hooks/use-cart'
 import { useAuth } from '@/hooks/use-auth'
+import { useBalance } from '@/hooks/use-balance'
 import { typeLabels } from '@/lib/config'
 import { formatVND } from '@/lib/format'
 import { deleteAdminProduct, getAdminProducts } from '@/lib/admin-helpers'
+import { instantBuyWithBalance, buildDownloadResultUrl } from '@/lib/instant-buy'
 import { useState, memo, useMemo } from 'react'
 import { toast } from 'sonner'
 import { confirmDialog } from '@/components/ui/confirm-dialog'
@@ -46,8 +48,9 @@ export const ProductCard = memo(function ProductCard({
   featured,
   onDeleted,
 }: ProductCardProps) {
-  const { addItem, items } = useCart()
+  const { addItem, removeItem, items } = useCart()
   const { user } = useAuth()
+  const { balance, refreshBalance } = useBalance()
   const router = useRouter()
   const [justAdded, setJustAdded] = useState(false)
   const isAdmin = user?.role === 'admin'
@@ -138,6 +141,31 @@ export const ProductCard = memo(function ProductCard({
       await handleFreeDownload()
       return
     }
+
+    // If logged in and balance covers the price, skip checkout and
+    // create+pay the order in one shot, then jump straight to downloads.
+    if (user && balance >= price) {
+      const toastId = 'instant-buy'
+      toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
+      const result = await instantBuyWithBalance(productId)
+      if (result.ok) {
+        toast.success('Thanh toán thành công!', { id: toastId, description: `Đang chuyển đến trang tải xuống...` })
+        if (isInCart) removeItem(productId)
+        refreshBalance()
+        router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))
+        return
+      }
+      toast.dismiss(toastId)
+      // insufficient / unauthorized → silently fall through to checkout
+      // (balance in context can be stale after another tab spent it; let
+      // checkout show the real state)
+      if (result.reason === 'error') {
+        toast.error(result.message || 'Thanh toán thất bại')
+        return
+      }
+    }
+
+    // Fallback: normal checkout flow
     if (!isInCart) {
       addItem({ id: productId, name, slug, price, thumbnail, type })
     }

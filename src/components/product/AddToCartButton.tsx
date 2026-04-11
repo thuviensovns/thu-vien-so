@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { Download, ShoppingCart, Check, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/hooks/use-cart'
+import { useAuth } from '@/hooks/use-auth'
+import { useBalance } from '@/hooks/use-balance'
+import { instantBuyWithBalance, buildDownloadResultUrl } from '@/lib/instant-buy'
 import { toast } from 'sonner'
 
 interface AddToCartButtonProps {
@@ -18,7 +21,9 @@ interface AddToCartButtonProps {
 }
 
 export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree }: AddToCartButtonProps) {
-  const { addItem, items } = useCart()
+  const { addItem, removeItem, items } = useCart()
+  const { user } = useAuth()
+  const { balance, refreshBalance } = useBalance()
   const router = useRouter()
   const [justAdded, setJustAdded] = useState(false)
   const isInCart = items.some((i) => i.id === id)
@@ -82,6 +87,28 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       await handleFreeDownload()
       return
     }
+
+    // If logged in and balance covers the price, skip checkout and
+    // jump straight to the download result page after paying with balance.
+    if (user && balance >= price) {
+      const toastId = 'instant-buy'
+      toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
+      const result = await instantBuyWithBalance(id)
+      if (result.ok) {
+        toast.success('Thanh toán thành công!', { id: toastId, description: 'Đang chuyển đến trang tải xuống...' })
+        if (isInCart) removeItem(id)
+        refreshBalance()
+        router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))
+        return
+      }
+      toast.dismiss(toastId)
+      if (result.reason === 'error') {
+        toast.error(result.message || 'Thanh toán thất bại')
+        return
+      }
+      // insufficient / unauthorized → fall through to checkout
+    }
+
     if (!isInCart) {
       addItem({ id, name, slug, price, thumbnail, type })
     }
