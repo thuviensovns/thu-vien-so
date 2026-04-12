@@ -135,12 +135,63 @@ export async function POST(req: NextRequest) {
       depth: 1,
     })
 
-    if (result.totalDocs === 0) {
+    let topup: TopUp | null = null
+
+    if (result.totalDocs > 0) {
+      topup = result.docs[0] as TopUp
+    } else {
+      // No pending topup found — try fixed code pattern NAPKH{userId}
+      const fixedMatch = transferCode.match(/^NAPKH(\d+)$/)
+      if (fixedMatch) {
+        const extractedUserId = parseInt(fixedMatch[1], 10)
+        console.log('[Sepay Webhook] Fixed code detected, userId:', extractedUserId)
+
+        // Verify user exists
+        try {
+          const targetUser = await payload.findByID({ collection: 'users', id: extractedUserId }) as User
+          if (targetUser) {
+            // Auto-create a topup record and credit the user
+            const newTopup = await payload.create({
+              collection: 'topups',
+              data: {
+                user: extractedUserId,
+                amount,
+                transferCode: `${transferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`,
+                status: 'completed',
+                bankTransactionId: bankTxId,
+                bankDescription: content,
+                confirmedAt: new Date().toISOString(),
+              },
+              overrideAccess: true,
+            })
+
+            const currentBalance = targetUser.balance || 0
+            await payload.update({
+              collection: 'users',
+              id: extractedUserId,
+              data: { balance: currentBalance + amount },
+              overrideAccess: true,
+            })
+
+            console.log(`[Sepay Webhook] Auto-credited ${amount} VND to user ${extractedUserId} via fixed code. New balance: ${currentBalance + amount}`)
+
+            try { revalidatePath('/', 'layout') } catch {}
+
+            return NextResponse.json({
+              success: true,
+              message: 'Top-up auto-created and credited via fixed code',
+              topupId: newTopup.id,
+              creditedAmount: amount,
+            })
+          }
+        } catch {
+          console.log('[Sepay Webhook] User not found for fixed code userId:', extractedUserId)
+        }
+      }
+
       console.log('[Sepay Webhook] No pending topup for code:', transferCode)
       return NextResponse.json({ success: true, message: 'No matching pending topup' })
     }
-
-    const topup = result.docs[0] as TopUp
 
     // Verify amount (allow flat fee tolerance of max 5,000 VND for bank fees)
     const tolerance = Math.min(5000, topup.amount * 0.1)
@@ -150,7 +201,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ATOMIC: Conditionally update only if still pending (prevents double-credit)
-    // Payload doesn't support WHERE in update, so we re-check status right before update
     const freshTopup = await payload.findByID({ collection: 'topups', id: topup.id }) as TopUp
     if (freshTopup.status !== 'pending') {
       console.log('[Sepay Webhook] Topup already processed:', topup.id)

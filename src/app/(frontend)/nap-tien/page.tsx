@@ -23,15 +23,9 @@ const presetAmounts = [10000, 20000, 50000, 100000, 200000, 500000]
 const POLL_INTERVAL = 5000
 const POLL_TIMEOUT = 30 * 60 * 1000
 
-/** Generate a random transfer code (client-side, for QR display) */
-function generateTransferCode(): string {
-  const arr = new Uint8Array(4)
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(arr)
-  } else {
-    for (let i = 0; i < 4; i++) arr[i] = Math.floor(Math.random() * 256)
-  }
-  return 'NAP' + Array.from(arr).map(b => b.toString(16).toUpperCase().padStart(2, '0')).join('')
+/** Fixed transfer code per user for easy admin tracking */
+function getUserTransferCode(userId: string): string {
+  return `NAPKH${String(userId).padStart(4, '0')}`
 }
 
 export default function TopUpPage() {
@@ -49,8 +43,8 @@ export default function TopUpPage() {
   const [authError, setAuthError] = useState(false)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Generate transfer code once on mount
-  const [transferCode] = useState(() => generateTransferCode())
+  // Fixed transfer code per user — same code every time for admin tracking
+  const transferCode = user ? getUserTransferCode(user.id) : ''
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -154,8 +148,6 @@ export default function TopUpPage() {
     setPolling(false)
     setTopupCreated(false)
     setAuthError(false)
-    // Reload page to get new transfer code
-    window.location.reload()
   }
 
   return (

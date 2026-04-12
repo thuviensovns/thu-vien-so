@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
-import crypto from 'crypto'
 
 /** Create a pending top-up request */
 export async function POST(req: NextRequest) {
@@ -22,38 +21,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid amount (min 10,000 VND)' }, { status: 400 })
     }
 
-    // Prefer the client-generated transferCode when it matches the expected
-    // NAP + 8 hex-uppercase format (same entropy as server-side crypto.randomBytes(4)).
-    // This is required because the client already rendered the QR with that code and
-    // the user transfers with that exact memo — if we swap it server-side, the Sepay
-    // webhook cannot match the transaction to this topup and the balance never lands.
-    // Collisions are rejected by the `unique: true` DB constraint on `topupCode` → we
-    // retry once with a server-generated code.
+    // Fixed transfer code per user: NAPKH + zero-padded userId
     const clientCode = typeof body?.transferCode === 'string' ? body.transferCode.trim().toUpperCase() : ''
-    const NAP_RE = /^NAP[0-9A-F]{8}$/
-    let transferCode = NAP_RE.test(clientCode)
+    const FIXED_RE = /^NAPKH\d{4,}$/
+    const transferCode = FIXED_RE.test(clientCode)
       ? clientCode
-      : `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+      : `NAPKH${String(user.id).padStart(4, '0')}`
 
-    // Create pending top-up with 30-minute expiry. Retry once with a fresh server-side
-    // code if the client code happens to collide with the unique index.
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
 
+    // Upsert: if a pending topup with this fixed code exists, update its amount
+    const existing = await payload.find({
+      collection: 'topups',
+      where: {
+        transferCode: { equals: transferCode },
+        status: { equals: 'pending' },
+      },
+      limit: 1,
+    })
+
     let topup
-    try {
-      topup = await payload.create({
+    if (existing.totalDocs > 0) {
+      // Update existing pending topup with new amount and extend expiry
+      topup = await payload.update({
         collection: 'topups',
-        data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
+        id: existing.docs[0].id,
+        data: { amount, expiresAt },
       })
-    } catch (createErr) {
-      const m = (createErr as Error).message || ''
-      if (/unique|duplicate/i.test(m)) {
-        transferCode = `NAP${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+    } else {
+      // Create new pending topup
+      try {
         topup = await payload.create({
           collection: 'topups',
           data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
         })
-      } else {
+      } catch (createErr) {
+        const m = (createErr as Error).message || ''
+        if (/unique|duplicate/i.test(m)) {
+          // A completed topup with this code exists — find and update the existing pending one
+          // or the code was already used. Expire old completed ones won't help (unique constraint).
+          // Generate a one-time fallback code for this specific transaction.
+          const fallbackCode = `${transferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`
+          topup = await payload.create({
+            collection: 'topups',
+            data: { user: user.id, amount, transferCode: fallbackCode, status: 'pending', expiresAt },
+          })
+          return NextResponse.json({
+            id: topup.id,
+            transferCode: fallbackCode,
+            amount,
+            status: 'pending',
+            expiresAt,
+          })
+        }
         throw createErr
       }
     }
