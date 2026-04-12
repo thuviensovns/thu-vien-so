@@ -16,6 +16,7 @@ import { formatVND } from '@/lib/format'
 import { useAuth } from '@/hooks/use-auth'
 import { useBalance } from '@/hooks/use-balance'
 import { useBankConfig } from '@/hooks/use-bank-config'
+import { TopUpLeaderboard } from '@/components/shared/TopUpLeaderboard'
 import { toast } from 'sonner'
 
 const presetAmounts = [10000, 20000, 50000, 100000, 200000, 500000]
@@ -438,6 +439,11 @@ export default function TopUpPage() {
             </div>
           </div>
         )}
+
+        {/* Top-up Leaderboard */}
+        <div className="mt-8">
+          <TopUpLeaderboard />
+        </div>
       </div>
     </div>
   )
