@@ -18,7 +18,6 @@ export async function GET() {
         AND u.email NOT LIKE 'test-%'
         AND u.email NOT LIKE '%test@%'
         AND u.email NOT LIKE '%@example.com'
-        AND t.transfer_code NOT LIKE 'ADMIN%'
         AND t.created_at >= date_trunc('month', CURRENT_DATE)
         AND t.created_at < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
       GROUP BY u.id, u.display_name, u.email
