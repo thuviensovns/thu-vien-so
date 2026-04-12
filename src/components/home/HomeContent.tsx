@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ProductCard } from '@/components/shared/ProductCard'
+import { TopUpLeaderboard } from '@/components/shared/TopUpLeaderboard'
 import { getCategoryDescriptions, type DemoProduct } from '@/lib/demo-data'
 import { getSiteSettings, defaultSiteSettings, categoryMeta } from '@/lib/config'
 import { mapPayloadDoc } from '@/lib/product-mapper'
@@ -269,6 +270,13 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
               <ProductCard key={product.slug} {...toCardProps(product)} />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ===== TOP NẠP LEADERBOARD ===== */}
+      <section className="container mx-auto px-4 py-10 sm:py-14 md:py-16">
+        <div className="max-w-md mx-auto">
+          <TopUpLeaderboard />
         </div>
       </section>
 
