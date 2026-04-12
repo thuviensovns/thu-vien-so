@@ -7,7 +7,7 @@ export const TopUps: CollectionConfig = {
     group: 'Thương mại',
     defaultColumns: ['transferCode', 'user', 'amount', 'status', 'createdAt'],
     description: 'Lịch sử nạp tiền qua chuyển khoản ngân hàng',
-    listSearchableFields: ['transferCode', 'bankTransactionId'],
+    listSearchableFields: ['transferCode', 'bankTransactionId', 'bankDescription'],
   },
   labels: { singular: 'Nạp tiền', plural: 'Nạp tiền' },
   access: {

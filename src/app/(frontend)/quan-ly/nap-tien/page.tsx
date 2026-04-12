@@ -21,6 +21,7 @@ interface TopUpEntry {
   transferCode: string
   status: 'completed' | 'pending' | 'failed' | 'expired'
   bankTransactionId?: string | null
+  bankDescription?: string | null
   confirmedAt?: string | null
   createdAt: string
 }
@@ -36,6 +37,7 @@ export default function TopUpManagementPage() {
   const [history, setHistory] = useState<TopUpEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [showAddForm, setShowAddForm] = useState(false)
   const [formEmail, setFormEmail] = useState('')
   const [formAmount, setFormAmount] = useState('')
@@ -45,6 +47,7 @@ export default function TopUpManagementPage() {
     try {
       const params = new URLSearchParams()
       if (search) params.set('search', search)
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
       const res = await fetch(`/api/admin/topups?${params}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
@@ -52,7 +55,7 @@ export default function TopUpManagementPage() {
       }
     } catch { /* ignore */ }
     setLoading(false)
-  }, [search])
+  }, [search, statusFilter])
 
   useEffect(() => {
     fetchTopUps()
@@ -200,13 +203,34 @@ export default function TopUpManagementPage() {
         </Card>
       )}
 
+      {/* Status filter tabs */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {[
+          { value: 'all', label: 'Tất cả' },
+          { value: 'pending', label: 'Chờ xử lý' },
+          { value: 'completed', label: 'Hoàn thành' },
+          { value: 'failed', label: 'Thất bại' },
+          { value: 'expired', label: 'Hết hạn' },
+        ].map((tab) => (
+          <Button
+            key={tab.value}
+            size="sm"
+            variant={statusFilter === tab.value ? 'default' : 'outline'}
+            className="text-xs h-7 px-2.5"
+            onClick={() => setStatusFilter(tab.value)}
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </div>
+
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo mã giao dịch..."
+          placeholder="Tìm theo mã giao dịch, nội dung CK, mã ngân hàng..."
           className="pl-9 bg-muted/50"
         />
       </div>
@@ -250,6 +274,11 @@ export default function TopUpManagementPage() {
                       <span>•</span>
                       <span>{formatDate(entry.createdAt)}</span>
                     </div>
+                    {entry.bankDescription && (
+                      <p className="text-[11px] text-muted-foreground mt-1 bg-muted/50 px-2 py-0.5 rounded font-mono truncate">
+                        ND: {entry.bankDescription}
+                      </p>
+                    )}
                   </div>
                   <span className="text-sm font-bold text-success shrink-0">
                     +{formatVND(entry.amount)}

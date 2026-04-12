@@ -19,7 +19,14 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.or = [
         { transferCode: { contains: search } },
+        { bankDescription: { contains: search } },
+        { bankTransactionId: { contains: search } },
       ]
+    }
+
+    const statusFilter = req.nextUrl.searchParams.get('status') || ''
+    if (statusFilter && statusFilter !== 'all') {
+      where.status = { equals: statusFilter }
     }
 
     const topups = await payload.find({
@@ -44,6 +51,7 @@ export async function GET(req: NextRequest) {
           transferCode: t.transferCode,
           status: t.status,
           bankTransactionId: t.bankTransactionId,
+          bankDescription: t.bankDescription || null,
           confirmedAt: t.confirmedAt,
           createdAt: t.createdAt,
         }
