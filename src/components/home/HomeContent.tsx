@@ -126,51 +126,59 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-background to-secondary/8" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--glow),transparent_60%)]" />
 
-        <div className="container relative mx-auto px-4 py-12 sm:py-16 md:py-24 lg:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="secondary" className="mb-4 bg-secondary/10 text-secondary border-secondary/20 text-xs sm:text-sm">
-              {settings.heroBadge || `Hơn ${totalProducts}+ tài nguyên cho Producer`}
-            </Badge>
+        <div className="container relative mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:gap-8">
+            {/* Left: Hero content */}
+            <div className="flex-1 text-center lg:text-left">
+              <Badge variant="secondary" className="mb-4 bg-secondary/10 text-secondary border-secondary/20 text-xs sm:text-sm">
+                {settings.heroBadge || `Hơn ${totalProducts}+ tài nguyên cho Producer`}
+              </Badge>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-              {settings.heroTitle || (
-                <>
-                  Thư Viện{' '}
-                  <span className="text-primary">Số</span>{' '}
-                  <span className="text-secondary">Việt Nam</span>
-                </>
-              )}
-            </h1>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl font-bold tracking-tight leading-tight">
+                {settings.heroTitle || (
+                  <>
+                    Thư Viện{' '}
+                    <span className="text-primary">Số</span>{' '}
+                    <span className="text-secondary">Việt Nam</span>
+                  </>
+                )}
+              </h1>
 
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg text-muted-foreground md:text-xl max-w-2xl mx-auto">
-              {settings.heroSubtitle || 'Download Sample Pack, FLP Project, VST Plugin & Preset chất lượng cao. Tài nguyên EDM, Vinahouse dành riêng cho Producer Việt.'}
-            </p>
+              <p className="mt-3 sm:mt-4 text-base sm:text-lg text-muted-foreground md:text-xl max-w-2xl lg:max-w-none">
+                {settings.heroSubtitle || 'Download Sample Pack, FLP Project, VST Plugin & Preset chất lượng cao. Tài nguyên EDM, Vinahouse dành riêng cho Producer Việt.'}
+              </p>
 
-            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button size="lg" asChild className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow">
-                <Link href="/san-pham">
-                  Khám phá ngay
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild className="w-full sm:w-auto border-border hover:border-primary/50">
-                <Link href="/san-pham?free=true">
-                  Tải miễn phí
-                  <Download className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="mt-10 sm:mt-14 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-2xl mx-auto">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center p-3 rounded-xl bg-card/50 border border-border/50 backdrop-blur-sm">
-                <stat.icon className="h-4 w-4 text-primary mx-auto mb-1" />
-                <div className="text-xl sm:text-2xl font-bold text-primary font-mono">{stat.value}</div>
-                <div className="text-xs sm:text-sm text-muted-foreground">{stat.label}</div>
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center lg:justify-start justify-center gap-3">
+                <Button size="lg" asChild className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow">
+                  <Link href="/san-pham">
+                    Khám phá ngay
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" asChild className="w-full sm:w-auto border-border hover:border-primary/50">
+                  <Link href="/san-pham?free=true">
+                    Tải miễn phí
+                    <Download className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
               </div>
-            ))}
+
+              {/* Stats */}
+              <div className="mt-10 sm:mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                {stats.map((stat) => (
+                  <div key={stat.label} className="text-center p-3 rounded-xl bg-card/50 border border-border/50 backdrop-blur-sm">
+                    <stat.icon className="h-4 w-4 text-primary mx-auto mb-1" />
+                    <div className="text-xl sm:text-2xl font-bold text-primary font-mono">{stat.value}</div>
+                    <div className="text-xs sm:text-sm text-muted-foreground">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Top Nạp Leaderboard */}
+            <div className="mt-8 lg:mt-0 lg:w-80 lg:shrink-0">
+              <TopUpLeaderboard />
+            </div>
           </div>
         </div>
       </section>
@@ -270,13 +278,6 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
               <ProductCard key={product.slug} {...toCardProps(product)} />
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ===== TOP NẠP LEADERBOARD ===== */}
-      <section className="container mx-auto px-4 py-10 sm:py-14 md:py-16">
-        <div className="max-w-md mx-auto">
-          <TopUpLeaderboard />
         </div>
       </section>
 

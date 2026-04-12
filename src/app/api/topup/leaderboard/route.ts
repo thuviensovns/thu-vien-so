@@ -22,7 +22,7 @@ export async function GET() {
       LIMIT 10
     `)
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       month: new Date().getMonth() + 1,
       year: new Date().getFullYear(),
       leaderboard: rows.map((r: Record<string, unknown>, i: number) => ({
@@ -31,6 +31,9 @@ export async function GET() {
         totalAmount: Number(r.total_amount),
       })),
     })
+    // Cache for 5 minutes — leaderboard doesn't need real-time updates
+    res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60')
+    return res
   } catch (error) {
     console.error('[Topup leaderboard] Error:', error)
     return NextResponse.json({ leaderboard: [], month: new Date().getMonth() + 1, year: new Date().getFullYear() })
