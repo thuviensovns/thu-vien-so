@@ -14,6 +14,7 @@ export async function GET() {
       FROM topups t
       JOIN users u ON u.id = t.user_id
       WHERE t.status = 'completed'
+        AND u.role = 'customer'
         AND t.created_at >= date_trunc('month', CURRENT_DATE)
         AND t.created_at < date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
       GROUP BY u.id, u.display_name, u.email
@@ -31,8 +32,8 @@ export async function GET() {
         totalAmount: Number(r.total_amount),
       })),
     })
-    // Cache for 5 minutes — leaderboard doesn't need real-time updates
-    res.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60')
+    // No cache — always sync with DB when new deposits come in
+    res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
     return res
   } catch (error) {
     console.error('[Topup leaderboard] Error:', error)
