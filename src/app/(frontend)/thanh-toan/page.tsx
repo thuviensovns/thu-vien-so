@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   CreditCard, AlertCircle, ChevronRight, Lock, ShoppingCart, QrCode,
-  Wallet, CheckCircle, ArrowLeft,
+  Wallet, CheckCircle, ArrowLeft, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -251,7 +251,18 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <form onSubmit={handleCheckout}>
+        <form onSubmit={handleCheckout} className="relative">
+          {isSubmitting && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+              <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-card border border-border shadow-xl">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                <div className="text-center">
+                  <p className="font-bold text-lg">Đang xử lý thanh toán...</p>
+                  <p className="text-sm text-muted-foreground mt-1">Vui lòng không tắt trang</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
             {/* Checkout form */}
             <div className="lg:col-span-3 space-y-4 sm:space-y-5">
