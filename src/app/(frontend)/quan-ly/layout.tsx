@@ -41,8 +41,8 @@ interface NotificationState {
     amount: number; transferCode: string; confirmedAt: string | null; createdAt: string | null;
   }[]
   recentOrders: {
-    id: number; type: 'order'; orderNumber: string; status: string; userName: string | null; userEmail: string | null;
-    total: number; transferCode: string | null; paymentMethod: string | null; itemCount: number; paidAt: string | null; createdAt: string;
+    id: number; type: 'order'; orderNumber: string; status: string; userName: string | null; userEmail: string | null; userPhone: string | null;
+    total: number; transferCode: string | null; paymentMethod: string | null; itemCount: number; itemNames: string; paidAt: string | null; createdAt: string;
   }[]
 }
 
@@ -145,9 +145,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           // Browser notification
           if ('Notification' in window && Notification.permission === 'granted') {
             if (orderDelta) {
+              const recentOrders = data.recentOrders || []
+              const newest = recentOrders[0]
+              const customerInfo = newest
+                ? `${newest.userName || newest.userEmail || 'Khách'} — ${newest.itemNames || newest.itemCount + ' sp'}`
+                : ''
               const count = newOrders - prevOrderCount.current
               new Notification('Đơn hàng mới', {
-                body: `Có ${count} đơn hàng chuyển khoản mới`,
+                body: customerInfo
+                  ? `${customerInfo}\nTổng: ${new Intl.NumberFormat('vi-VN').format(newest.total)}đ`
+                  : `Có ${count} đơn hàng mới`,
                 icon: '/favicon.ico',
               })
             }

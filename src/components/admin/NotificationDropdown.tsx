@@ -25,10 +25,12 @@ interface OrderNotification {
   status: string
   userName: string | null
   userEmail: string | null
+  userPhone: string | null
   total: number
   transferCode: string | null
   paymentMethod: string | null
   itemCount: number
+  itemNames: string
   paidAt: string | null
   createdAt: string
 }
@@ -190,6 +192,21 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
                               {isPending ? ' đặt hàng ' : ' thanh toán '}
                               <span className={`font-bold ${isPending ? 'text-warning' : 'text-primary'}`}>{formatVND(o.total)}</span>
                             </p>
+                            {/* Customer info */}
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0 mt-0.5">
+                              {o.userEmail && (
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{o.userEmail}</span>
+                              )}
+                              {o.userPhone && (
+                                <span className="text-[10px] text-muted-foreground">{o.userPhone}</span>
+                              )}
+                            </div>
+                            {/* Product names */}
+                            {o.itemNames && (
+                              <p className="text-[10px] text-muted-foreground/80 truncate mt-0.5" title={o.itemNames}>
+                                🎵 {o.itemNames}
+                              </p>
+                            )}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span className={`inline-block text-[9px] px-1.5 py-0 rounded-full font-medium ${
                                 isPending ? 'bg-warning/10 text-warning' : isPaid ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'

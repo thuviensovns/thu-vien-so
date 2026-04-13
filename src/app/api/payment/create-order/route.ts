@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    let body: { paymentMethod?: string; items?: Array<{ productId: string }> }
+    let body: { paymentMethod?: string; items?: Array<{ productId: string }>; customerEmail?: string; customerPhone?: string; customerName?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
@@ -90,6 +90,13 @@ export async function POST(req: NextRequest) {
     // Create order with user's fixed transfer code
     const orderNumber = generateOrderNumber()
     const transferCode = getUserTransferCode(user.id)
+    // Sanitize customer info from form
+    const customerName = typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, 100) : ''
+    const customerPhone = typeof body?.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 20) : ''
+    const customerEmail = typeof body?.customerEmail === 'string' && body.customerEmail.includes('@')
+      ? body.customerEmail.trim().slice(0, 100)
+      : user.email
+
     const order = await payload.create({
       collection: 'orders',
       data: {
@@ -102,7 +109,9 @@ export async function POST(req: NextRequest) {
         payment: {
           method: paymentMethod,
         },
-        customerEmail: user.email,
+        customerName: customerName || (user as Record<string, unknown>).displayName as string || '',
+        customerEmail,
+        customerPhone,
       },
     })
 
