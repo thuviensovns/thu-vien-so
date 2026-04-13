@@ -48,6 +48,34 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       q: `CREATE UNIQUE INDEX IF NOT EXISTS orders_download_token_idx ON orders(download_token)`,
     },
     {
+      label: 'Add orders.transfer_code',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS transfer_code VARCHAR`,
+    },
+    {
+      label: 'Create index orders.transfer_code',
+      q: `CREATE INDEX IF NOT EXISTS orders_transfer_code_idx ON orders(transfer_code)`,
+    },
+    {
+      label: 'Add orders.customer_name',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name VARCHAR`,
+    },
+    {
+      label: 'Add orders.customer_email',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_email VARCHAR`,
+    },
+    {
+      label: 'Add orders.customer_phone',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_phone VARCHAR`,
+    },
+    {
+      label: 'Add orders.read_by_admin',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS read_by_admin BOOLEAN DEFAULT false`,
+    },
+    {
+      label: 'Add orders.note',
+      q: `ALTER TABLE orders ADD COLUMN IF NOT EXISTS note VARCHAR`,
+    },
+    {
       label: 'Add balance to enum_orders_payment_method',
       q: `ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'balance'`,
     },
