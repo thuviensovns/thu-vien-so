@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Download, Loader2 } from 'lucide-react'
@@ -24,7 +25,10 @@ interface DownloadsTabProps {
 }
 
 export default function DownloadsTab({ downloads, loading, onRefresh, onDownloadsChange }: DownloadsTabProps) {
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set())
+
   async function handleDownload(downloadId: string) {
+    setLoadingIds((prev) => new Set(prev).add(downloadId))
     try {
       const res = await fetch('/api/download', {
         method: 'POST',
@@ -64,6 +68,8 @@ export default function DownloadsTab({ downloads, loading, onRefresh, onDownload
       toast.error('Tải xuống thất bại. Vui lòng thử lại.')
     } catch {
       toast.error('Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.')
+    } finally {
+      setLoadingIds((prev) => { const next = new Set(prev); next.delete(downloadId); return next })
     }
   }
 
@@ -128,12 +134,16 @@ export default function DownloadsTab({ downloads, loading, onRefresh, onDownload
                 </div>
                 <Button
                   size="sm"
-                  disabled={!canDownload}
+                  disabled={!canDownload || loadingIds.has(dl.id)}
                   onClick={() => handleDownload(dl.id)}
                   className={`shrink-0 text-xs ${canDownload ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'opacity-50'}`}
                 >
-                  <Download className="h-3.5 w-3.5 mr-1" />
-                  {canDownload ? `Tải (${remaining})` : 'Hết lượt'}
+                  {loadingIds.has(dl.id) ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  {loadingIds.has(dl.id) ? 'Đang tải...' : canDownload ? `Tải (${remaining})` : 'Hết lượt'}
                 </Button>
               </div>
             )
