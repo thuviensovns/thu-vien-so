@@ -44,23 +44,32 @@ export async function fulfillOrder(
   // Update order: status=paid + downloadToken
   // overrideAccess: this runs from trusted payment webhooks and the balance-pay flow;
   // customers cannot otherwise update orders (admin-only per Orders.access.update).
-  await payload.update({
-    collection: 'orders',
-    id: orderId,
-    data: {
-      status: 'paid',
-      downloadToken,
-      downloadExpiresAt,
-      ...(paymentInfo ? {
-        payment: {
-          ...order.payment,
-          ...paymentInfo,
-          paidAt: paymentInfo.paidAt || new Date().toISOString(),
-        },
-      } : {}),
-    },
-    overrideAccess: true,
-  })
+  const updateData: Record<string, unknown> = {
+    status: 'paid',
+    downloadToken,
+    downloadExpiresAt,
+    ...(paymentInfo ? {
+      payment: {
+        ...order.payment,
+        ...paymentInfo,
+        paidAt: paymentInfo.paidAt || new Date().toISOString(),
+      },
+    } : {}),
+  }
+  try {
+    await payload.update({ collection: 'orders', id: orderId, data: updateData, overrideAccess: true })
+  } catch (updateErr) {
+    // downloadToken/downloadExpiresAt columns may not exist in DB yet
+    const msg = (updateErr as Error).message || ''
+    if (/column|field|download_token|download_expires/i.test(msg)) {
+      console.warn('[fulfillOrder] Retrying without download fields:', msg)
+      delete updateData.downloadToken
+      delete updateData.downloadExpiresAt
+      await payload.update({ collection: 'orders', id: orderId, data: updateData, overrideAccess: true })
+    } else {
+      throw updateErr
+    }
+  }
 
   // Create per-product download records + bump product.downloadCount.
   // Download records power the /tai-khoan?tab=downloads re-download UI.

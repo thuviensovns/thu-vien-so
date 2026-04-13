@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
     const orderNumber = generateOrderNumber()
     const transferCode = getUserTransferCode(user.id)
 
+    // Core fields that always exist in DB
     const orderData: Record<string, unknown> = {
       orderNumber,
       user: user.id,
@@ -98,17 +99,14 @@ export async function POST(req: NextRequest) {
       total,
       status: 'pending',
       payment: { method: paymentMethod },
-      customerEmail: user.email,
     }
 
-    // These fields may not exist in DB yet (Payload auto-syncs on first access)
-    // Include them so they get saved once columns are created
-    try {
-      orderData.transferCode = transferCode
-      orderData.customerName = (typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, 100) : '')
-        || (user as Record<string, unknown>).displayName || ''
-      orderData.customerPhone = typeof body?.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 20) : ''
-    } catch { /* ignore */ }
+    // Extra fields that may not exist in DB yet (Payload auto-syncs on first access)
+    orderData.customerEmail = user.email
+    orderData.transferCode = transferCode
+    orderData.customerName = (typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, 100) : '')
+      || (user as Record<string, unknown>).displayName || ''
+    orderData.customerPhone = typeof body?.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 20) : ''
 
     let order
     try {
@@ -116,11 +114,12 @@ export async function POST(req: NextRequest) {
     } catch (createErr) {
       // If new columns cause error, retry without them
       const msg = (createErr as Error).message || ''
-      if (/column|field|transfer_code|customer_name|read_by_admin/i.test(msg)) {
+      if (/column|field|transfer|customer|read_by_admin/i.test(msg)) {
         console.warn('[create-order] Retrying without new fields:', msg)
         delete orderData.transferCode
         delete orderData.customerName
         delete orderData.customerPhone
+        delete orderData.customerEmail
         order = await payload.create({ collection: 'orders', data: orderData })
       } else {
         throw createErr
