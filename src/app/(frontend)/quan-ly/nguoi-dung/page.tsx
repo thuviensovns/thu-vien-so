@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Users, ShieldCheck, User, Mail, Trash2, AlertCircle,
-  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2,
+  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2, KeyRound,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +32,8 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [balanceUserId, setBalanceUserId] = useState<string | null>(null)
   const [balanceAmount, setBalanceAmount] = useState('')
+  const [resetPwUserId, setResetPwUserId] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
   const [page, setPage] = useState(1)
 
   // Fetch real users from Payload API
@@ -212,6 +214,35 @@ export default function UsersPage() {
     setBalanceAmount('')
   }
 
+  async function handleResetPassword(userId: string) {
+    const pw = newPassword.trim()
+    if (pw.length < 6) {
+      toast.error('Mật khẩu phải có ít nhất 6 ký tự')
+      return
+    }
+    const user = allUsers.find((u) => u.id === userId)
+    if (!user) return
+
+    try {
+      const res = await fetch('/api/admin/users/reset-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, newPassword: pw }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Lỗi đặt lại mật khẩu')
+        return
+      }
+      toast.success(`Đã đặt lại mật khẩu cho ${user.displayName || user.email}`)
+    } catch {
+      toast.error('Lỗi kết nối')
+    }
+    setResetPwUserId(null)
+    setNewPassword('')
+  }
+
   function handleExport() {
     const csv = [
       'ID,Email,Tên,Quyền,Trạng thái,Mã CK',
@@ -366,6 +397,16 @@ export default function UsersPage() {
                       >
                         <ArrowUpCircle className="h-4 w-4" />
                       </Button>
+                      {/* Reset password */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-primary hover:text-primary"
+                        onClick={() => { setResetPwUserId(resetPwUserId === user.id ? null : user.id); setBalanceUserId(null) }}
+                        title="Đặt lại mật khẩu"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
                       {/* Role toggle */}
                       <Button
                         variant="ghost"
@@ -422,6 +463,28 @@ export default function UsersPage() {
                       Trừ
                     </Button>
                     <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setBalanceUserId(null)}>
+                      Hủy
+                    </Button>
+                  </div>
+                )}
+
+                {/* Password reset form */}
+                {resetPwUserId === user.id && (
+                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
+                    <KeyRound className="h-4 w-4 text-primary shrink-0" />
+                    <Input
+                      type="text"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mật khẩu mới (tối thiểu 6 ký tự)"
+                      className="bg-muted/50 h-8 text-sm flex-1 min-w-[180px]"
+                      autoComplete="off"
+                    />
+                    <Button size="sm" className="h-8 text-xs" onClick={() => handleResetPassword(user.id)}>
+                      <KeyRound className="mr-1 h-3 w-3" />
+                      Đặt lại
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setResetPwUserId(null); setNewPassword('') }}>
                       Hủy
                     </Button>
                   </div>
