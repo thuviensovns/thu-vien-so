@@ -109,6 +109,13 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       // insufficient / unauthorized → fall through to checkout
     }
 
+    // Require login before checkout
+    if (!user) {
+      toast.info('Vui lòng đăng nhập để mua hàng')
+      router.push('/dang-nhap?redirect=/thanh-toan')
+      return
+    }
+
     if (!isInCart) {
       addItem({ id, name, slug, price, thumbnail, type })
     }

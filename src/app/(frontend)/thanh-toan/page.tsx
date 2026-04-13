@@ -40,7 +40,7 @@ export default function CheckoutPage() {
   const router = useRouter()
   const { items, total, itemCount, clearCart } = useCart()
   const { balance, refreshBalance } = useBalance()
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const bank = useBankConfig()
   const [paymentMethod, setPaymentMethod] = useState('bank-transfer')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -211,6 +211,24 @@ export default function CheckoutPage() {
       setError('Lỗi kết nối. Vui lòng thử lại.')
       setIsSubmitting(false)
     }
+  }
+
+  // Redirect to login if not authenticated (wait for auth to finish loading first)
+  if (!authLoading && !user && !isSubmitting) {
+    router.replace('/dang-nhap?redirect=/thanh-toan')
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-[60vh] px-4 py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (authLoading) {
+    return (
+      <div className="container mx-auto flex items-center justify-center min-h-[60vh] px-4 py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (items.length === 0) {

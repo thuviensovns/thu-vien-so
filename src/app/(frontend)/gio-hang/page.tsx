@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { Trash2, ShoppingCart, ArrowRight, ArrowLeft, Shield, Zap, Clock, Package } from 'lucide-react'
 import { useCart } from '@/hooks/use-cart'
+import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
@@ -14,6 +16,8 @@ import { toast } from 'sonner'
 
 export default function CartPage() {
   const { items, removeItem, clearCart, total, itemCount } = useCart()
+  const { user } = useAuth()
+  const router = useRouter()
 
   if (items.length === 0) {
     return (
@@ -162,13 +166,18 @@ export default function CartPage() {
               <Button
                 size="lg"
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow-sm"
-                asChild
+                onClick={() => {
+                  if (!user) {
+                    toast.info('Vui lòng đăng nhập để mua hàng')
+                    router.push('/dang-nhap?redirect=/thanh-toan')
+                    return
+                  }
+                  router.push('/thanh-toan')
+                }}
               >
-                <Link href="/thanh-toan">
-                  <Zap className="mr-2 h-4 w-4" />
-                  Thanh toán {formatVND(total)}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
+                <Zap className="mr-2 h-4 w-4" />
+                Thanh toán {formatVND(total)}
+                <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
               {/* Trust signals */}

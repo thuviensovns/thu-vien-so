@@ -22,12 +22,15 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const justRegistered = searchParams.get('registered') === 'true'
 
+  const rawRedirect = searchParams.get('redirect')
+  const redirectTo = rawRedirect?.startsWith('/') ? rawRedirect : null
+
   // Redirect if already logged in (admins → admin panel, users → account)
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace(user.role === 'admin' ? '/quan-ly' : '/tai-khoan')
+      router.replace(redirectTo || (user.role === 'admin' ? '/quan-ly' : '/tai-khoan'))
     }
-  }, [authLoading, user, router])
+  }, [authLoading, user, router, redirectTo])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -42,9 +45,9 @@ export default function LoginPage() {
         const meRes = await fetch('/api/users/me', { credentials: 'include' })
         const meData = await meRes.json()
         const role = meData?.user?.role
-        router.push(role === 'admin' ? '/quan-ly' : '/tai-khoan')
+        router.push(redirectTo || (role === 'admin' ? '/quan-ly' : '/tai-khoan'))
       } catch {
-        router.push('/tai-khoan')
+        router.push(redirectTo || '/tai-khoan')
       }
     } else {
       setError(result.error || 'Đăng nhập thất bại')

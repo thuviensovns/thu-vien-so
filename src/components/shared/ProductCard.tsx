@@ -165,6 +165,13 @@ export const ProductCard = memo(function ProductCard({
       }
     }
 
+    // Require login before checkout
+    if (!user) {
+      toast.info('Vui lòng đăng nhập để mua hàng')
+      router.push('/dang-nhap?redirect=/thanh-toan')
+      return
+    }
+
     // Fallback: normal checkout flow
     if (!isInCart) {
       addItem({ id: productId, name, slug, price, thumbnail, type })
