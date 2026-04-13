@@ -15,7 +15,7 @@ import { useCart } from '@/hooks/use-cart'
 import { useBalance } from '@/hooks/use-balance'
 import { useAuth } from '@/hooks/use-auth'
 import { formatVND } from '@/lib/format'
-import { paymentMethods, buildVietQRUrl, getUserTransferCode } from '@/lib/config'
+import { paymentMethods, buildVietQRUrl, buildMomoQRUrl, getUserTransferCode } from '@/lib/config'
 import { useBankConfig } from '@/hooks/use-bank-config'
 import { toast } from 'sonner'
 import OrderSummary from './OrderSummary'
@@ -58,6 +58,7 @@ export default function CheckoutPage() {
   const transferContent = user ? getUserTransferCode(user.id) : ''
 
   const qrUrl = useMemo(() => buildVietQRUrl(finalTotal, transferContent, bank), [finalTotal, transferContent, bank])
+  const momoQrUrl = useMemo(() => buildMomoQRUrl(finalTotal, transferContent), [finalTotal, transferContent])
 
   const allPaymentMethods = useMemo(() => {
     const methods = [
@@ -307,7 +308,7 @@ export default function CheckoutPage() {
                       <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
                         <div className="shrink-0 bg-white rounded-lg p-2 shadow-sm">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src="/images/momo-qr.png" alt="QR MoMo" width={200} height={200} className="rounded" />
+                          <img src={momoQrUrl} alt="QR MoMo" width={200} height={200} className="rounded" />
                         </div>
                         <div className="flex-1 space-y-2.5 text-sm w-full">
                           <h3 className="font-bold text-base flex items-center gap-2">
@@ -325,7 +326,7 @@ export default function CheckoutPage() {
                             </div>
                           </div>
                           <p className="text-[10px] text-muted-foreground leading-relaxed mt-2">
-                            Quét mã QR bằng app MoMo, nhập đúng số tiền và nội dung chuyển khoản.
+                            Quét mã QR bằng app MoMo hoặc app ngân hàng. Số tiền và nội dung đã được điền sẵn.
                             Đơn hàng sẽ được xử lý sau khi admin xác nhận thanh toán.
                           </p>
                         </div>

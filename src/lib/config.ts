@@ -128,6 +128,40 @@ export function buildVietQRUrl(amount: number, content: string, bankOverride?: B
   return `https://img.vietqr.io/image/${bank.bankBin}-${bank.accountNumber}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=${encodedName}`
 }
 
+/** Default MoMo account for QR payments */
+export const defaultMomoAccount = {
+  phone: '0344382804',
+  accountName: 'HOANG ANH DUNG',
+}
+
+/** Get MoMo account (admin-configured or default) */
+export function getMomoAccount() {
+  if (typeof window === 'undefined') return defaultMomoAccount
+  try {
+    const stored = localStorage.getItem('admin_momo_account')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      if (parsed.phone && parsed.accountName) return parsed
+    }
+  } catch {}
+  return defaultMomoAccount
+}
+
+/** Save MoMo account settings (admin only) */
+export function saveMomoAccount(account: typeof defaultMomoAccount) {
+  try {
+    localStorage.setItem('admin_momo_account', JSON.stringify(account))
+  } catch {}
+}
+
+/** Build MoMo VietQR URL (BIN 971025) */
+export function buildMomoQRUrl(amount: number, content: string) {
+  const momo = getMomoAccount()
+  const encoded = encodeURIComponent(content)
+  const encodedName = encodeURIComponent(momo.accountName)
+  return `https://img.vietqr.io/image/971025-${momo.phone}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=${encodedName}`
+}
+
 /** Minimum top-up amount (VND) */
 export const MIN_TOPUP = 10000
 
