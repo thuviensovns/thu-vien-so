@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatVND } from '@/lib/format'
+import { getUserTransferCode } from '@/lib/config'
 import { getDemoUsers, saveDemoUsers, logActivity, type DemoUser } from '@/lib/admin-helpers'
 import { toast } from 'sonner'
 import AdminPagination, { paginate } from '@/components/admin/AdminPagination'
@@ -173,9 +174,9 @@ export default function UsersPage() {
 
   function handleExport() {
     const csv = [
-      'ID,Email,Tên,Quyền,Trạng thái',
+      'ID,Email,Tên,Quyền,Trạng thái,Mã CK',
       ...allUsers.map((u) =>
-        `${u.id},${u.email},${u.displayName || ''},${u.role || 'customer'},${u.banned ? 'banned' : 'active'}`
+        `${u.id},${u.email},${u.displayName || ''},${u.role || 'customer'},${u.banned ? 'banned' : 'active'},${getUserTransferCode(u.id)}`
       ),
     ].join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -302,6 +303,11 @@ export default function UsersPage() {
                         <span className="flex items-center gap-1 text-success font-medium shrink-0">
                           <Wallet className="h-3 w-3" />
                           {formatVND(user.balance)}
+                        </span>
+                      )}
+                      {user.role !== 'admin' && (
+                        <span className="font-mono text-[10px] text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded shrink-0">
+                          {getUserTransferCode(user.id)}
                         </span>
                       )}
                     </div>
