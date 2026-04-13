@@ -62,12 +62,12 @@ export async function POST(req: NextRequest) {
         collection: 'topups',
         data: {
           user: targetUser.id,
-          amount: -amount,
+          amount,
           transferCode,
           status: 'completed',
           confirmedAt: new Date().toISOString(),
           readByAdmin: true,
-          bankDescription: `Admin trừ thủ công bởi ${user.email}`,
+          bankDescription: `[TRỪ TIỀN] Admin trừ ${amount}₫ bởi ${user.email}`,
         },
         overrideAccess: true,
       })
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         collection: 'topups',
         data: {
           user: targetUser.id,
-          amount: -amount,
+          amount,
           transferCode,
           status: 'completed',
           confirmedAt: new Date().toISOString(),
