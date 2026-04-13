@@ -23,12 +23,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // Cache: undefined = not tried, null = tried and failed, object = success
 let _cachedPayload: Awaited<ReturnType<typeof import('payload')['getPayload']>> | null | undefined = undefined
 let _cacheExpiry = 0
+let _migrationRan = false
 
 async function safeGetPayload() {
   const now = Date.now()
   if (_cachedPayload !== undefined) {
     if (_cachedPayload === null && now < _cacheExpiry) return null
     if (_cachedPayload !== null) return _cachedPayload
+  }
+
+  // Auto-run DB migration on first cold start
+  if (!_migrationRan) {
+    _migrationRan = true
+    try {
+      const { ensureTablesExist } = await import('./db-migrate')
+      await ensureTablesExist()
+    } catch { /* non-fatal */ }
   }
 
   try {
@@ -62,6 +72,25 @@ export async function getPayloadClient() {
 export async function getPayloadForApi(timeoutMs = 15000) {
   // Reuse cached instance if available (avoids re-init on every request)
   if (_cachedPayload) return _cachedPayload
+
+  // Auto-run DB migration on first cold start (push:false means Payload
+  // never creates new columns; this ensures they exist before Payload
+  // tries to use them)
+  if (!_migrationRan) {
+    _migrationRan = true
+    try {
+      const { ensureTablesExist } = await import('./db-migrate')
+      const result = await ensureTablesExist()
+      if (result.executed.length > 0) {
+        console.log('[DB Migration] Executed:', result.executed.join(', '))
+      }
+      if (result.errors.length > 0) {
+        console.warn('[DB Migration] Errors:', result.errors.join(', '))
+      }
+    } catch (e) {
+      console.warn('[DB Migration] Failed (non-fatal):', (e as Error).message)
+    }
+  }
 
   const { getPayload } = await import('payload')
   const config = (await import('@payload-config')).default
