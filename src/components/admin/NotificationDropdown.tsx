@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Wallet, Mail, CheckCheck, X } from 'lucide-react'
+import { Bell, Wallet, Mail, CheckCheck, X, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { formatVND } from '@/lib/format'
 
@@ -18,11 +18,28 @@ interface TopUpNotification {
   createdAt: string | null
 }
 
+interface OrderNotification {
+  id: number
+  type: 'order'
+  orderNumber: string
+  status: string
+  userName: string | null
+  userEmail: string | null
+  total: number
+  transferCode: string | null
+  paymentMethod: string | null
+  itemCount: number
+  paidAt: string | null
+  createdAt: string
+}
+
 interface NotificationData {
   unreadCount: number
   unreadMessages: number
   unreadTopUps: number
+  unreadOrders: number
   recentTopUps: TopUpNotification[]
+  recentOrders: OrderNotification[]
 }
 
 interface Props {
@@ -63,22 +80,27 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
   async function markAllRead() {
     setMarking(true)
     try {
-      await fetch('/api/notifications/topups/read', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true }),
-      })
+      await Promise.all([
+        fetch('/api/notifications/topups/read', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ all: true }),
+        }),
+        fetch('/api/notifications/orders/read', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ all: true }),
+        }),
+      ])
       onMarkedRead?.()
     } catch { /* ignore */ }
     setMarking(false)
   }
 
-  async function markOneRead(id: number) {
+  async function markOneTopUpRead(id: number) {
     try {
       await fetch('/api/notifications/topups/read', {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: [id] }),
       })
@@ -86,8 +108,19 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
     } catch { /* ignore */ }
   }
 
-  const { unreadCount, unreadMessages, unreadTopUps, recentTopUps } = data
-  const hasNotifications = unreadTopUps > 0 || unreadMessages > 0
+  async function markOneOrderRead(id: number) {
+    try {
+      await fetch('/api/notifications/orders/read', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      })
+      onMarkedRead?.()
+    } catch { /* ignore */ }
+  }
+
+  const { unreadCount, unreadMessages, unreadTopUps, unreadOrders, recentTopUps, recentOrders } = data
+  const hasNotifications = unreadTopUps > 0 || unreadMessages > 0 || unreadOrders > 0
 
   return (
     <div ref={ref} className="relative">
@@ -110,7 +143,7 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
             <h3 className="text-sm font-bold">Thông báo</h3>
-            {unreadTopUps > 0 && (
+            {(unreadTopUps > 0 || unreadOrders > 0) && (
               <button
                 onClick={markAllRead}
                 disabled={marking}
@@ -130,6 +163,62 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
               </div>
             ) : (
               <>
+                {/* Order notifications */}
+                {recentOrders.length > 0 && (
+                  <div>
+                    <div className="px-4 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/20">
+                      Đơn hàng ({unreadOrders})
+                    </div>
+                    {recentOrders.map((o) => {
+                      const isPending = o.status === 'pending'
+                      const isPaid = o.status === 'paid'
+                      return (
+                        <div
+                          key={o.id}
+                          className="flex items-start gap-3 px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer border-b border-border/50 last:border-0"
+                          onClick={() => {
+                            router.push('/quan-ly/don-hang')
+                            setOpen(false)
+                          }}
+                        >
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isPending ? 'bg-warning/10' : 'bg-primary/10'}`}>
+                            <ShoppingCart className={`h-4 w-4 ${isPending ? 'text-warning' : 'text-primary'}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium leading-snug">
+                              <span className="text-foreground">{o.userName || o.userEmail || 'Khách'}</span>
+                              {isPending ? ' đặt hàng ' : ' thanh toán '}
+                              <span className={`font-bold ${isPending ? 'text-warning' : 'text-primary'}`}>{formatVND(o.total)}</span>
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`inline-block text-[9px] px-1.5 py-0 rounded-full font-medium ${
+                                isPending ? 'bg-warning/10 text-warning' : isPaid ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {isPending ? 'Chờ CK' : isPaid ? 'Đã TT' : o.status}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {o.orderNumber} · {o.itemCount} sp · {timeAgo(isPaid ? o.paidAt : o.createdAt)}
+                              </span>
+                            </div>
+                          </div>
+                          {isPaid && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                markOneOrderRead(o.id)
+                              }}
+                              className="text-muted-foreground hover:text-foreground shrink-0 mt-1"
+                              title="Đánh dấu đã đọc"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Topup notifications */}
                 {recentTopUps.length > 0 && (
                   <div>
@@ -169,7 +258,7 @@ export default function NotificationDropdown({ data, onMarkedRead }: Props) {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                markOneRead(t.id)
+                                markOneTopUpRead(t.id)
                               }}
                               className="text-muted-foreground hover:text-foreground shrink-0 mt-1"
                               title="Đánh dấu đã đọc"

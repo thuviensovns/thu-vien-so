@@ -75,6 +75,9 @@ export const Orders: CollectionConfig = {
     { name: 'customerPhone', type: 'text', label: 'SĐT khách hàng' },
     { name: 'note', type: 'textarea', label: 'Ghi chú' },
 
+    // Admin notification tracking
+    { name: 'readByAdmin', type: 'checkbox', defaultValue: false, label: 'Admin đã đọc', admin: { position: 'sidebar' } },
+
     // Token-based download system
     { name: 'downloadToken', type: 'text', unique: true, index: true, label: 'Download Token', admin: { readOnly: true, position: 'sidebar' } },
     { name: 'downloadExpiresAt', type: 'date', label: 'Download hết hạn', admin: { readOnly: true, position: 'sidebar' } },

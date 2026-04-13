@@ -82,10 +82,61 @@ export async function GET(req: NextRequest) {
       } catch { /* ignore */ }
     }
 
+    // Order notifications: pending bank-transfer + recently paid but unread by admin
+    let unreadOrderCount = 0
+    let orderDocs: Record<string, unknown>[] = []
+    try {
+      const unreadOrders = await payload.find({
+        collection: 'orders',
+        where: {
+          or: [
+            {
+              and: [
+                { status: { equals: 'pending' } },
+                { 'payment.method': { equals: 'bank-transfer' } },
+              ],
+            },
+            {
+              and: [
+                { status: { equals: 'paid' } },
+                { readByAdmin: { not_equals: true } },
+              ],
+            },
+          ],
+        },
+        sort: '-createdAt',
+        limit: 20,
+        depth: 1,
+        overrideAccess: true,
+      })
+      unreadOrderCount = unreadOrders.totalDocs
+      orderDocs = unreadOrders.docs as unknown as Record<string, unknown>[]
+    } catch (e) {
+      console.warn('[Notifications] order query failed, trying fallback:', (e as Error).message)
+      try {
+        const fallback = await payload.find({
+          collection: 'orders',
+          where: {
+            or: [
+              { status: { equals: 'pending' } },
+              { status: { equals: 'paid' } },
+            ],
+          },
+          sort: '-createdAt',
+          limit: 20,
+          depth: 1,
+          overrideAccess: true,
+        })
+        unreadOrderCount = fallback.totalDocs
+        orderDocs = fallback.docs as unknown as Record<string, unknown>[]
+      } catch { /* ignore */ }
+    }
+
     return NextResponse.json({
-      unreadCount: newMessages.totalDocs + unreadTopUpCount,
+      unreadCount: newMessages.totalDocs + unreadTopUpCount + unreadOrderCount,
       unreadMessages: newMessages.totalDocs,
       unreadTopUps: unreadTopUpCount,
+      unreadOrders: unreadOrderCount,
       recent: recentMessages.docs.map((msg) => ({
         id: msg.id,
         name: msg.name,
@@ -110,6 +161,25 @@ export async function GET(req: NextRequest) {
           transferCode: t.transferCode,
           confirmedAt: t.confirmedAt,
           createdAt: t.createdAt,
+        }
+      }),
+      recentOrders: orderDocs.map((o) => {
+        const user = typeof o.user === 'object' && o.user ? (o.user as Record<string, unknown>) : null
+        const payment = o.payment as Record<string, unknown> | null
+        const items = Array.isArray(o.items) ? o.items as Record<string, unknown>[] : []
+        return {
+          id: o.id,
+          type: 'order' as const,
+          orderNumber: o.orderNumber as string,
+          status: o.status as string,
+          userName: (user?.displayName as string) || null,
+          userEmail: (user?.email as string) || null,
+          total: o.total as number,
+          transferCode: o.transferCode as string | null,
+          paymentMethod: (payment?.method as string) || null,
+          itemCount: items.length,
+          paidAt: (payment?.paidAt as string) || null,
+          createdAt: o.createdAt as string,
         }
       }),
     })

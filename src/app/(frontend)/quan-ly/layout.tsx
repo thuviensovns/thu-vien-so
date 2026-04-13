@@ -19,7 +19,7 @@ import NotificationDropdown from '@/components/admin/NotificationDropdown'
 const adminNav = [
   { label: 'Tổng quan', href: '/quan-ly', icon: LayoutDashboard },
   { label: 'Tin nhắn hỗ trợ', href: '/quan-ly/tin-nhan', icon: Mail, badgeKey: 'messages' as const },
-  { label: 'Đơn hàng', href: '/quan-ly/don-hang', icon: ShoppingCart },
+  { label: 'Đơn hàng', href: '/quan-ly/don-hang', icon: ShoppingCart, badgeKey: 'orders' as const },
   { label: 'Sản phẩm', href: '/quan-ly/san-pham', icon: Package },
   { label: 'Người dùng', href: '/quan-ly/nguoi-dung', icon: Users },
   { label: 'Nạp tiền', href: '/quan-ly/nap-tien', icon: Wallet, badgeKey: 'topups' as const },
@@ -35,14 +35,19 @@ interface NotificationState {
   unreadCount: number
   unreadMessages: number
   unreadTopUps: number
+  unreadOrders: number
   recentTopUps: {
     id: number; type: 'topup'; status: string; userName: string | null; userEmail: string | null;
     amount: number; transferCode: string; confirmedAt: string | null; createdAt: string | null;
   }[]
+  recentOrders: {
+    id: number; type: 'order'; orderNumber: string; status: string; userName: string | null; userEmail: string | null;
+    total: number; transferCode: string | null; paymentMethod: string | null; itemCount: number; paidAt: string | null; createdAt: string;
+  }[]
 }
 
 const emptyNotifications: NotificationState = {
-  unreadCount: 0, unreadMessages: 0, unreadTopUps: 0, recentTopUps: [],
+  unreadCount: 0, unreadMessages: 0, unreadTopUps: 0, unreadOrders: 0, recentTopUps: [], recentOrders: [],
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -52,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [notifications, setNotifications] = useState<NotificationState>(emptyNotifications)
   const [apiStatus, setApiStatus] = useState<'online' | 'degraded' | 'offline'>('online')
   const prevTopUpCount = useRef(0)
+  const prevOrderCount = useRef(0)
 
   // System health indicator
   const healthCheck = useCallback(async () => {
@@ -122,9 +128,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       if (res.ok) {
         const data = await res.json()
         const newTopUps = data.unreadTopUps || 0
+        const newOrders = data.unreadOrders || 0
 
-        // Play sound + browser notification when new topups arrive
-        if (newTopUps > prevTopUpCount.current && prevTopUpCount.current !== 0) {
+        // Play sound + browser notification when new topups or orders arrive
+        const topUpDelta = newTopUps > prevTopUpCount.current && prevTopUpCount.current !== 0
+        const orderDelta = newOrders > prevOrderCount.current && prevOrderCount.current !== 0
+
+        if (topUpDelta || orderDelta) {
           // Sound
           try {
             const audio = new Audio('/sounds/notification.wav')
@@ -134,20 +144,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           // Browser notification
           if ('Notification' in window && Notification.permission === 'granted') {
-            const count = newTopUps - prevTopUpCount.current
-            new Notification('Nạp tiền mới', {
-              body: `Có ${count} giao dịch nạp tiền mới`,
-              icon: '/favicon.ico',
-            })
+            if (orderDelta) {
+              const count = newOrders - prevOrderCount.current
+              new Notification('Đơn hàng mới', {
+                body: `Có ${count} đơn hàng chuyển khoản mới`,
+                icon: '/favicon.ico',
+              })
+            }
+            if (topUpDelta) {
+              const count = newTopUps - prevTopUpCount.current
+              new Notification('Nạp tiền mới', {
+                body: `Có ${count} giao dịch nạp tiền mới`,
+                icon: '/favicon.ico',
+              })
+            }
           }
         }
         prevTopUpCount.current = newTopUps
+        prevOrderCount.current = newOrders
 
         setNotifications({
           unreadCount: data.unreadCount || 0,
           unreadMessages: data.unreadMessages || 0,
           unreadTopUps: newTopUps,
+          unreadOrders: newOrders,
           recentTopUps: data.recentTopUps || [],
+          recentOrders: data.recentOrders || [],
         })
       }
     } catch { /* ignore */ }
@@ -233,6 +255,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const isActive = pathname === item.href
               const badgeCount = item.badgeKey === 'messages' ? notifications.unreadMessages
                 : item.badgeKey === 'topups' ? notifications.unreadTopUps
+                : item.badgeKey === 'orders' ? notifications.unreadOrders
                 : 0
               return (
                 <Link
