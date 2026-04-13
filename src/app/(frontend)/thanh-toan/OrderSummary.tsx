@@ -22,12 +22,11 @@ interface OrderSummaryProps {
   couponCode?: string
   paymentMethod: string
   isSubmitting: boolean
-  agreedTerms: boolean
 }
 
 export default function OrderSummary({
   items, itemCount, total, discount, finalTotal,
-  transferContent, couponCode, paymentMethod, isSubmitting, agreedTerms,
+  transferContent, couponCode, paymentMethod, isSubmitting,
 }: OrderSummaryProps) {
   return (
     <div className="lg:col-span-2">
@@ -91,7 +90,7 @@ export default function OrderSummary({
         <Button
           type="submit"
           size="lg"
-          disabled={isSubmitting || !agreedTerms}
+          disabled={isSubmitting}
           className="w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-glow-sm disabled:opacity-50"
         >
           {isSubmitting ? (

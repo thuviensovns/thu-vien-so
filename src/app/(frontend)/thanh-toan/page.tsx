@@ -42,13 +42,9 @@ export default function CheckoutPage() {
   const { balance, refreshBalance } = useBalance()
   const { user } = useAuth()
   const bank = useBankConfig()
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [fullName, setFullName] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('bank-transfer')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [agreedTerms, setAgreedTerms] = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<ApiCoupon | null>(null)
   const [couponError, setCouponError] = useState('')
@@ -107,7 +103,6 @@ export default function CheckoutPage() {
   async function handleCheckout(e: React.FormEvent) {
     e.preventDefault()
     if (items.length === 0) return
-    if (!agreedTerms) { setError('Vui lòng đồng ý với điều khoản sử dụng'); return }
     setError('')
     setIsSubmitting(true)
 
@@ -144,7 +139,7 @@ export default function CheckoutPage() {
           credentials: 'include',
           body: JSON.stringify({
             items: items.map((i) => ({ productId: i.id, price: i.price })),
-            paymentMethod: 'balance', customerEmail: email, customerPhone: phone, customerName: fullName,
+            paymentMethod: 'balance',
           }),
         })
         if (!createRes.ok) {
@@ -191,7 +186,7 @@ export default function CheckoutPage() {
         credentials: 'include',
         body: JSON.stringify({
           items: items.map((i) => ({ productId: i.id, price: i.price })),
-          paymentMethod, customerEmail: email, customerPhone: phone, customerName: fullName,
+          paymentMethod,
         }),
       })
       if (res.ok) {
@@ -265,36 +260,11 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Step 1: Contact info */}
+              {/* Step 1: Payment method */}
               <Card className="border-border bg-card">
                 <CardContent className="p-4 sm:p-6 space-y-4">
                   <div className="flex items-center gap-2">
                     <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">1</div>
-                    <h2 className="font-bold">Thông tin liên hệ</h2>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="sm:col-span-2">
-                      <label htmlFor="checkout-name" className="text-sm font-medium mb-1.5 block">Họ tên</label>
-                      <Input id="checkout-name" type="text" placeholder="Nguyễn Văn A" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={isSubmitting} className="bg-muted/50" />
-                    </div>
-                    <div>
-                      <label htmlFor="checkout-email" className="text-sm font-medium mb-1.5 block">Email <span className="text-destructive">*</span></label>
-                      <Input id="checkout-email" type="email" placeholder="email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={isSubmitting} className="bg-muted/50" />
-                      <p className="text-[10px] text-muted-foreground mt-1">Link download sẽ được gửi đến email này</p>
-                    </div>
-                    <div>
-                      <label htmlFor="checkout-phone" className="text-sm font-medium mb-1.5 block">Số điện thoại</label>
-                      <Input id="checkout-phone" type="tel" placeholder="0912 345 678" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={isSubmitting} className="bg-muted/50" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Step 2: Payment method */}
-              <Card className="border-border bg-card">
-                <CardContent className="p-4 sm:p-6 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">2</div>
                     <h2 className="font-bold">Phương thức thanh toán</h2>
                   </div>
                   <div className="space-y-2">
@@ -373,23 +343,6 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
-              {/* Step 3: Confirm */}
-              <Card className="border-border bg-card">
-                <CardContent className="p-4 sm:p-6 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">3</div>
-                    <h2 className="font-bold">Xác nhận đơn hàng</h2>
-                  </div>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)} disabled={isSubmitting} className="accent-cyan-500 mt-0.5" />
-                    <span className="text-xs text-muted-foreground leading-relaxed">
-                      Tôi đồng ý với{' '}
-                      <Link href="/dieu-khoan" className="text-primary hover:underline" target="_blank">điều khoản sử dụng</Link>{' '}
-                      và <Link href="/chinh-sach-bao-mat" className="text-primary hover:underline" target="_blank">chính sách bảo mật</Link> của Thư Viện Số
-                    </span>
-                  </label>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Order summary */}
@@ -397,7 +350,7 @@ export default function CheckoutPage() {
               items={items} itemCount={itemCount} total={total}
               discount={discount} finalTotal={finalTotal} transferContent={transferContent}
               couponCode={appliedCoupon?.code} paymentMethod={paymentMethod}
-              isSubmitting={isSubmitting} agreedTerms={agreedTerms}
+              isSubmitting={isSubmitting}
             />
           </div>
         </form>

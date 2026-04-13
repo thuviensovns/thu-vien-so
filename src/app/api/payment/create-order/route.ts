@@ -90,30 +90,42 @@ export async function POST(req: NextRequest) {
     // Create order with user's fixed transfer code
     const orderNumber = generateOrderNumber()
     const transferCode = getUserTransferCode(user.id)
-    // Sanitize customer info from form
-    const customerName = typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, 100) : ''
-    const customerPhone = typeof body?.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 20) : ''
-    const customerEmail = typeof body?.customerEmail === 'string' && body.customerEmail.includes('@')
-      ? body.customerEmail.trim().slice(0, 100)
-      : user.email
 
-    const order = await payload.create({
-      collection: 'orders',
-      data: {
-        orderNumber,
-        transferCode,
-        user: user.id,
-        items: orderItems,
-        total,
-        status: 'pending',
-        payment: {
-          method: paymentMethod,
-        },
-        customerName: customerName || (user as Record<string, unknown>).displayName as string || '',
-        customerEmail,
-        customerPhone,
-      },
-    })
+    const orderData: Record<string, unknown> = {
+      orderNumber,
+      user: user.id,
+      items: orderItems,
+      total,
+      status: 'pending',
+      payment: { method: paymentMethod },
+      customerEmail: user.email,
+    }
+
+    // These fields may not exist in DB yet (Payload auto-syncs on first access)
+    // Include them so they get saved once columns are created
+    try {
+      orderData.transferCode = transferCode
+      orderData.customerName = (typeof body?.customerName === 'string' ? body.customerName.trim().slice(0, 100) : '')
+        || (user as Record<string, unknown>).displayName || ''
+      orderData.customerPhone = typeof body?.customerPhone === 'string' ? body.customerPhone.trim().slice(0, 20) : ''
+    } catch { /* ignore */ }
+
+    let order
+    try {
+      order = await payload.create({ collection: 'orders', data: orderData })
+    } catch (createErr) {
+      // If new columns cause error, retry without them
+      const msg = (createErr as Error).message || ''
+      if (/column|field|transfer_code|customer_name|read_by_admin/i.test(msg)) {
+        console.warn('[create-order] Retrying without new fields:', msg)
+        delete orderData.transferCode
+        delete orderData.customerName
+        delete orderData.customerPhone
+        order = await payload.create({ collection: 'orders', data: orderData })
+      } else {
+        throw createErr
+      }
+    }
 
     // For bank-transfer, return order info (user scans QR, Sepay webhook confirms later)
     if (paymentMethod === 'bank-transfer') {
