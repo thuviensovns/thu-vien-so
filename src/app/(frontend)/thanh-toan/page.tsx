@@ -197,7 +197,7 @@ export default function CheckoutPage() {
         setIsSubmitting(false)
         if (data.paymentUrl) { window.location.href = data.paymentUrl }
         else {
-          const resultStatus = paymentMethod === 'bank-transfer' ? 'pending' : 'success'
+          const resultStatus = (paymentMethod === 'bank-transfer' || paymentMethod === 'momo') ? 'pending' : 'success'
           router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}&orderId=${data.orderId || ''}`)
         }
         return
@@ -300,6 +300,37 @@ export default function CheckoutPage() {
 
                   {paymentMethod === 'bank-transfer' && (
                     <BankTransferQR qrUrl={qrUrl} bank={bank} finalTotal={finalTotal} transferContent={transferContent} />
+                  )}
+
+                  {paymentMethod === 'momo' && (
+                    <div className="mt-4 p-4 rounded-xl border border-pink-500/20 bg-pink-500/5">
+                      <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                        <div className="shrink-0 bg-white rounded-lg p-2 shadow-sm">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/images/momo-qr.png" alt="QR MoMo" width={200} height={200} className="rounded" />
+                        </div>
+                        <div className="flex-1 space-y-2.5 text-sm w-full">
+                          <h3 className="font-bold text-base flex items-center gap-2">
+                            <QrCode className="h-4 w-4 text-pink-500" />
+                            Thanh toán qua MoMo
+                          </h3>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                              <span className="text-muted-foreground text-xs">Số tiền</span>
+                              <span className="font-bold text-pink-500">{formatVND(finalTotal)}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                              <span className="text-muted-foreground text-xs">Nội dung CK</span>
+                              <span className="font-mono font-bold text-secondary">{transferContent}</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed mt-2">
+                            Quét mã QR bằng app MoMo, nhập đúng số tiền và nội dung chuyển khoản.
+                            Đơn hàng sẽ được xử lý sau khi admin xác nhận thanh toán.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {paymentMethod === 'balance' && canPayWithBalance && (
