@@ -1,4 +1,5 @@
 import { getDbPool } from './db-pool'
+import { categoryMeta } from './config'
 
 /** Ensure additional tables/columns exist. Idempotent via IF NOT EXISTS. */
 export async function ensureTablesExist(): Promise<{ executed: string[]; errors: string[] }> {
@@ -91,6 +92,10 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       label: 'Add momo to enum_orders_payment_method',
       q: `ALTER TYPE enum_orders_payment_method ADD VALUE IF NOT EXISTS 'momo'`,
     },
+    {
+      label: 'Add cai-dat-phan-mem to enum_categories_type',
+      q: `ALTER TYPE enum_categories_type ADD VALUE IF NOT EXISTS 'cai-dat-phan-mem'`,
+    },
   ]
 
   for (const { label, q } of queries) {
@@ -99,6 +104,23 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       results.executed.push(label)
     } catch (err) {
       results.errors.push(`${label}: ${(err as Error).message}`)
+    }
+  }
+
+  // Auto-create missing categories from categoryMeta
+  for (const cat of categoryMeta) {
+    try {
+      const exists = await pool.query('SELECT id FROM categories WHERE slug = $1', [cat.slug])
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO categories (name, slug, type, description, "order", updated_at, created_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+          [cat.name, cat.slug, cat.slug, cat.description, 0],
+        )
+        results.executed.push(`Created category: ${cat.name}`)
+      }
+    } catch (err) {
+      results.errors.push(`Category ${cat.slug}: ${(err as Error).message}`)
     }
   }
 

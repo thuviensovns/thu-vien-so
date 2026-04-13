@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDbPool } from '@/lib/db-pool'
 import { ensureTablesExist } from '@/lib/db-migrate'
+import { categoryMeta } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -42,6 +43,23 @@ async function runMigration(req: NextRequest) {
         results.executed.push(label)
       } catch (err) {
         results.errors.push(`${label}: ${(err as Error).message}`)
+      }
+    }
+
+    // Auto-create missing categories from categoryMeta
+    for (const cat of categoryMeta) {
+      try {
+        const exists = await pool.query('SELECT id FROM categories WHERE slug = $1', [cat.slug])
+        if (exists.rows.length === 0) {
+          await pool.query(
+            `INSERT INTO categories (name, slug, type, description, "order", updated_at, created_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+            [cat.name, cat.slug, cat.slug, cat.description, 0],
+          )
+          results.executed.push(`Created category: ${cat.name}`)
+        }
+      } catch (catErr) {
+        results.errors.push(`Category ${cat.slug}: ${(catErr as Error).message}`)
       }
     }
 

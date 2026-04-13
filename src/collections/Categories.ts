@@ -51,6 +51,7 @@ export const Categories: CollectionConfig = {
         { label: 'Preset', value: 'preset' },
         { label: 'Instrument', value: 'instrument' },
         { label: 'Sóng nhạc Lyrics', value: 'song-nhac-lyrics' },
+        { label: 'Cài đặt phần mềm', value: 'cai-dat-phan-mem' },
       ],
     },
     { name: 'parent', type: 'relationship', relationTo: 'categories', label: 'Danh mục cha' },
