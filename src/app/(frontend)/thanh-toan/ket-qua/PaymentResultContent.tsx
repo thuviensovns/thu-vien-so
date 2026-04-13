@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   CheckCircle, XCircle, Loader2, Download, ShoppingCart,
-  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw, Info,
+  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw, Info, QrCode,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,6 +33,7 @@ export default function PaymentResultContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading')
   const [orderNumber, setOrderNumber] = useState('')
   const [downloadToken, setDownloadToken] = useState('')
+  const [transferCode, setTransferCode] = useState('')
   const [downloads, setDownloads] = useState<DownloadStatus[]>([])
   const [allDone, setAllDone] = useState(false)
   const [polling, setPolling] = useState(false)
@@ -46,10 +47,12 @@ export default function PaymentResultContent() {
     const directStatus = searchParams.get('status')
     const directOrderNumber = searchParams.get('orderNumber')
     const token = searchParams.get('token')
+    const tCode = searchParams.get('transferCode')
 
     if (txnRef) setOrderNumber(txnRef)
     if (directOrderNumber) setOrderNumber(directOrderNumber)
     if (token) setDownloadToken(token)
+    if (tCode) setTransferCode(tCode)
 
     if (responseCode === '00' || directStatus === 'success') {
       setStatus('success')
@@ -244,10 +247,18 @@ export default function PaymentResultContent() {
               </div>
             )}
 
+            {transferCode && (
+              <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20">
+                <QrCode className="h-4 w-4 text-primary" />
+                <span className="text-sm text-muted-foreground">Nội dung CK:</span>
+                <span className="font-mono font-bold text-secondary">{transferCode}</span>
+              </div>
+            )}
+
             <Separator className="my-5" />
 
             <div className="text-left max-w-sm mx-auto space-y-2 text-xs text-muted-foreground">
-              <p>Nội dung chuyển khoản phải chứa mã đơn hàng <span className="font-mono text-primary font-bold">{orderNumber}</span> để hệ thống tự động xác nhận.</p>
+              <p>Nội dung chuyển khoản phải chứa mã <span className="font-mono text-secondary font-bold">{transferCode || orderNumber}</span> để hệ thống tự động xác nhận.</p>
               <p>Sau khi xác nhận, bạn sẽ nhận được link tải sản phẩm tại trang <strong>Tài khoản</strong>.</p>
             </div>
 

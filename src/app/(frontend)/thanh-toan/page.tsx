@@ -199,7 +199,7 @@ export default function CheckoutPage() {
         if (data.paymentUrl) { window.location.href = data.paymentUrl }
         else {
           const resultStatus = (paymentMethod === 'bank-transfer' || paymentMethod === 'momo') ? 'pending' : 'success'
-          router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}&orderId=${data.orderId || ''}`)
+          router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}&orderId=${data.orderId || ''}&transferCode=${data.transferCode || transferContent}`)
         }
         return
       }

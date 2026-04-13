@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ paymentUrl, orderId: order.id, orderNumber })
     }
 
-    return NextResponse.json({ orderId: order.id, orderNumber })
+    return NextResponse.json({ orderId: order.id, orderNumber, transferCode })
   } catch (error) {
     console.error('Create order error:', error)
     const msg = (error as Error).message
