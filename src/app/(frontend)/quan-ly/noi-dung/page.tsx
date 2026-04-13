@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   RefreshCw, Type, FileText, Search, Globe, MessageSquare, Tag,
-  Music, Headphones, Zap, Sliders, Guitar, Mic, Package, Check, RotateCcw,
+  Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor, Package, Check, RotateCcw,
   Megaphone, Save, Upload, Loader2, CheckCircle2, XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -23,7 +23,7 @@ import SpinField from './SpinField'
 
 const catIcons: Record<string, React.ElementType> = {
   'sample-pack': Music, 'flp': Headphones, 'vst': Zap,
-  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic,
+  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic, 'cai-dat-phan-mem': Monitor,
 }
 
 type SpinnableField = 'heroTitle' | 'heroSubtitle' | 'heroBadge' | 'footerText' | 'metaTitle' | 'metaDescription' | 'announcementText'

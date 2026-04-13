@@ -105,6 +105,12 @@ export const contentVariations: ContentVariations = {
       'Bộ sưu tập sóng nhạc và lyrics video: template After Effects, Premiere Pro. Tạo video nhạc chuyên nghiệp.',
       'Template sóng nhạc, lyrics video, visualizer cho sản xuất content âm nhạc trên YouTube và TikTok.',
     ],
+    'cai-dat-phan-mem': [
+      'Dịch vụ cài đặt phần mềm âm nhạc: FL Studio, Ableton, Logic Pro, và các DAW chuyên nghiệp khác.',
+      'Hướng dẫn và hỗ trợ cài đặt VST Plugin, DAW, phần mềm mix master cho Producer Việt Nam.',
+      'Cài đặt phần mềm sản xuất âm nhạc: DAW, Plugin, Driver âm thanh. Hỗ trợ từ xa nhanh chóng.',
+      'Dịch vụ setup phần mềm âm nhạc chuyên nghiệp: cài đặt, cấu hình, tối ưu hiệu suất cho PC/Laptop.',
+    ],
   },
 }
 

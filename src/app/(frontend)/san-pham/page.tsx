@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import {
-  Music, Headphones, Zap, Sliders, Guitar, Mic,
+  Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor,
   Package, Sparkles, ChevronRight, Download, Gift, Flame, ArrowRight,
 } from 'lucide-react'
 import { getProducts, getCategoryStats } from '@/lib/payload'
@@ -34,6 +34,7 @@ const categoryIcons: Record<string, typeof Music> = {
   'preset': Sliders,
   'instrument': Guitar,
   'song-nhac-lyrics': Mic,
+  'cai-dat-phan-mem': Monitor,
 }
 
 interface PageProps {

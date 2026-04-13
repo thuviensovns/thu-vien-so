@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Menu, FileAudio, Guitar, Plug, Sliders, Mic, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet, Music } from 'lucide-react'
+import { Menu, FileAudio, Guitar, Plug, Sliders, Mic, Monitor, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet, Music } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
@@ -20,6 +20,7 @@ const mobileNavItems = [
   { label: 'Preset', href: '/danh-muc/preset', icon: Sliders },
   { label: 'Instrument', href: '/danh-muc/instrument', icon: Guitar },
   { label: 'Sóng nhạc Lyrics', href: '/danh-muc/song-nhac-lyrics', icon: Mic },
+  { label: 'Cài đặt phần mềm', href: '/danh-muc/cai-dat-phan-mem', icon: Monitor },
   { label: 'Blog', href: '/blog', icon: BookOpen },
 ]
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Music, Headphones, Zap, Sliders, Guitar, Mic, Package, ArrowRight } from 'lucide-react'
+import { Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor, Package, ArrowRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { getCategoryDescriptions } from '@/lib/demo-data'
@@ -10,7 +10,7 @@ import { categoryMeta } from '@/lib/config'
 
 const categoryIcons: Record<string, typeof Music> = {
   'sample-pack': Music, 'flp': Headphones, 'vst': Zap,
-  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic,
+  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic, 'cai-dat-phan-mem': Monitor,
 }
 
 const categoryColors: Record<string, string> = {
@@ -20,11 +20,13 @@ const categoryColors: Record<string, string> = {
   'preset': 'from-success/20 to-teal-500/10 border-success/20 hover:border-success/40',
   'instrument': 'from-rose-500/20 to-destructive/10 border-rose-500/20 hover:border-rose-500/40',
   'song-nhac-lyrics': 'from-info/20 to-violet-500/10 border-info/20 hover:border-info/40',
+  'cai-dat-phan-mem': 'from-orange-500/20 to-amber-500/10 border-orange-500/20 hover:border-orange-500/40',
 }
 
 const iconColors: Record<string, string> = {
   'sample-pack': 'text-cyan-400', 'flp': 'text-purple-400', 'vst': 'text-warning',
   'preset': 'text-success', 'instrument': 'text-rose-400', 'song-nhac-lyrics': 'text-info',
+  'cai-dat-phan-mem': 'text-orange-400',
 }
 
 interface CatStatsEntry { totalProducts: number; freeProducts: number; totalDownloads: number }

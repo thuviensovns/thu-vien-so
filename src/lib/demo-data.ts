@@ -26,6 +26,7 @@ export const demoCategoryDescriptions: Record<string, string> = {
   'preset': 'Preset chất lượng cao cho Serum, Sylenth1, Massive, Spire và các synth phổ biến khác.',
   'instrument': 'Nhạc cụ ảo chuyên nghiệp: Guitar, Piano, Violin, Drum và nhiều nhạc cụ khác cho sản xuất âm nhạc.',
   'song-nhac-lyrics': 'Sóng nhạc, hiệu ứng lyrics video, template karaoke và các tài nguyên cho sản xuất video âm nhạc.',
+  'cai-dat-phan-mem': 'Dịch vụ cài đặt phần mềm âm nhạc: FL Studio, Ableton, Logic Pro, và các DAW chuyên nghiệp khác.',
 }
 
 /** Get admin-overridden category descriptions (client-only, reads localStorage) */

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
-  ArrowRight, Download, Guitar, Headphones, Mic, Music, Zap, Sliders,
+  ArrowRight, Download, Guitar, Headphones, Mic, Music, Zap, Sliders, Monitor,
   Star, TrendingUp, Users, Flame, Gift, Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,7 @@ import { getCategoryDescriptions, type DemoProduct } from '@/lib/demo-data'
 import { getSiteSettings, defaultSiteSettings, categoryMeta } from '@/lib/config'
 import { mapPayloadDoc } from '@/lib/product-mapper'
 
-const categoryIcons: Record<string, typeof Music> = { Music, Headphones, Zap, Sliders, Guitar, Mic }
+const categoryIcons: Record<string, typeof Music> = { Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor }
 
 
 function computeStats(products: DemoProduct[]) {

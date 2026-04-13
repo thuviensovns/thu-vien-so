@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft, Download, FileArchive, HardDrive, ChevronRight,
-  Music, Headphones, Zap, Sliders, Guitar, Mic, Package, Eye, Shield, Clock,
+  Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor, Package, Eye, Shield, Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,7 +24,7 @@ import { typeLabels } from '@/lib/config'
 import { formatFileSize } from '@/lib/format'
 const categoryIcons: Record<string, typeof Music> = {
   'sample-pack': Music, 'flp': Headphones, 'vst': Zap,
-  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic,
+  'preset': Sliders, 'instrument': Guitar, 'song-nhac-lyrics': Mic, 'cai-dat-phan-mem': Monitor,
 }
 
 interface ProductDetailClientProps {

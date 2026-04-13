@@ -23,6 +23,7 @@ export const navItems = [
   { label: 'Preset', href: '/danh-muc/preset' },
   { label: 'Instrument', href: '/danh-muc/instrument' },
   { label: 'Sóng nhạc Lyrics', href: '/danh-muc/song-nhac-lyrics' },
+  { label: 'Cài đặt phần mềm', href: '/danh-muc/cai-dat-phan-mem' },
   { label: 'Blog', href: '/blog' },
 ] as const
 
@@ -34,6 +35,7 @@ export const typeLabels: Record<string, string> = {
   preset: 'Preset',
   instrument: 'Instrument',
   'song-nhac-lyrics': 'Sóng nhạc Lyrics',
+  'cai-dat-phan-mem': 'Cài đặt phần mềm',
 }
 
 /** Category metadata for homepage and navigation */
@@ -73,6 +75,12 @@ export const categoryMeta = [
     slug: 'song-nhac-lyrics',
     description: 'Sóng nhạc và lyrics video cho sản xuất âm nhạc',
     iconName: 'Mic' as const,
+  },
+  {
+    name: 'Cài đặt phần mềm',
+    slug: 'cai-dat-phan-mem',
+    description: 'Hướng dẫn và dịch vụ cài đặt phần mềm âm nhạc',
+    iconName: 'Monitor' as const,
   },
 ] as const
 
