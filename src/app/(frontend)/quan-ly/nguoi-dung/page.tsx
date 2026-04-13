@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Users, ShieldCheck, User, Mail, Trash2, AlertCircle,
-  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, FileDown, Loader2,
+  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -172,6 +172,46 @@ export default function UsersPage() {
     setBalanceAmount('')
   }
 
+  async function handleDeductBalance(userId: string) {
+    const amount = parseInt(balanceAmount)
+    if (isNaN(amount) || amount < 1000) {
+      toast.error('Số tiền tối thiểu 1.000₫')
+      return
+    }
+    const user = allUsers.find((u) => u.id === userId)
+    if (!user) return
+
+    if (amount > (user.balance || 0)) {
+      toast.error(`Số dư không đủ để trừ. Hiện có: ${formatVND(user.balance || 0)}`)
+      return
+    }
+
+    try {
+      const res = await fetch('/api/admin/topups/deduct', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, amount }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Lỗi trừ tiền')
+        return
+      }
+      toast.success(`Đã trừ ${formatVND(amount)} của ${user.displayName || user.email}`, {
+        description: `Số dư mới: ${formatVND(data.newBalance)}`,
+      })
+      setDbUsers((prev) => prev.map((u) =>
+        u.id === userId ? { ...u, balance: data.newBalance } : u
+      ))
+      fetchUsers()
+    } catch {
+      toast.error('Lỗi kết nối')
+    }
+    setBalanceUserId(null)
+    setBalanceAmount('')
+  }
+
   function handleExport() {
     const csv = [
       'ID,Email,Tên,Quyền,Trạng thái,Mã CK',
@@ -316,13 +356,13 @@ export default function UsersPage() {
                   {/* Actions */}
                   {!isBuiltInAdmin && (
                     <div className="flex items-center gap-1 shrink-0">
-                      {/* Balance button */}
+                      {/* Balance adjust button */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-success hover:text-success"
                         onClick={() => setBalanceUserId(balanceUserId === user.id ? null : user.id)}
-                        title="Cộng tiền"
+                        title="Cộng/Trừ tiền"
                       >
                         <ArrowUpCircle className="h-4 w-4" />
                       </Button>
@@ -362,19 +402,24 @@ export default function UsersPage() {
 
                 {/* Balance adjustment form */}
                 {balanceUserId === user.id && (
-                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
+                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
                     <Wallet className="h-4 w-4 text-success shrink-0" />
                     <Input
                       type="number"
                       value={balanceAmount}
                       onChange={(e) => setBalanceAmount(e.target.value)}
                       placeholder="Số tiền (VND)"
-                      className="bg-muted/50 font-mono h-8 text-sm flex-1"
+                      className="bg-muted/50 font-mono h-8 text-sm flex-1 min-w-[120px]"
                       min={1000}
                       step={1000}
                     />
                     <Button size="sm" className="h-8 text-xs" onClick={() => handleAddBalance(user.id)}>
-                      Cộng tiền
+                      <ArrowUpCircle className="mr-1 h-3 w-3" />
+                      Cộng
+                    </Button>
+                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeductBalance(user.id)}>
+                      <ArrowDownCircle className="mr-1 h-3 w-3" />
+                      Trừ
                     </Button>
                     <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setBalanceUserId(null)}>
                       Hủy
