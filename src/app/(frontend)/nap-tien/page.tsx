@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { buildVietQRUrl, MIN_TOPUP } from '@/lib/config'
+import { buildVietQRUrl, MIN_TOPUP, getUserTransferCode } from '@/lib/config'
 import { formatVND } from '@/lib/format'
 import { useAuth } from '@/hooks/use-auth'
 import { useBalance } from '@/hooks/use-balance'
@@ -23,10 +23,7 @@ const presetAmounts = [10000, 20000, 50000, 100000, 200000, 500000]
 const POLL_INTERVAL = 5000
 const POLL_TIMEOUT = 30 * 60 * 1000
 
-/** Fixed transfer code per user for easy admin tracking */
-function getUserTransferCode(userId: string): string {
-  return `NAPKH${String(userId).padStart(4, '0')}`
-}
+// getUserTransferCode imported from @/lib/config
 
 export default function TopUpPage() {
   const { user } = useAuth()

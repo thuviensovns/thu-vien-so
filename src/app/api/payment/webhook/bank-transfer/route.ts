@@ -69,13 +69,12 @@ export async function POST(req: NextRequest) {
     // Extract transfer code from content
     const content = String(body.content || body.description || '').toUpperCase()
 
-    // Try to match an ORDER number first (DH... or MUS-...)
-    const orderMatch = content.match(/\b(DH[A-Z0-9]{10,20}|MUS-[A-Z0-9]+-[A-Z0-9]+)\b/)
+    // Try to match an ORDER number (MUS-...)
+    const orderMatch = content.match(/\b(MUS-[A-Z0-9]+-[A-Z0-9]+)\b/)
     if (orderMatch) {
       const orderNumber = orderMatch[0]
       console.log('[Sepay Webhook] Detected order number:', orderNumber)
 
-      // Find pending order with this order number
       const orderResult = await payload.find({
         collection: 'orders',
         where: {
@@ -88,15 +87,12 @@ export async function POST(req: NextRequest) {
 
       if (orderResult.totalDocs > 0) {
         const order = orderResult.docs[0] as Order
-
-        // Verify amount (allow 5,000 VND tolerance for bank fees)
         const tolerance = Math.min(5000, order.total * 0.1)
         if (amount < order.total - tolerance) {
           console.warn(`[Sepay Webhook] Order amount mismatch: received ${amount}, expected ${order.total}`)
           return NextResponse.json({ success: false, error: 'Amount too low for order' }, { status: 400 })
         }
 
-        // Fulfill the order — generates downloadToken, marks as paid
         const result = await fulfillOrder(payload, order.id, {
           transactionId: bankTxId,
           paidAt: new Date().toISOString(),
@@ -104,7 +100,6 @@ export async function POST(req: NextRequest) {
         })
 
         console.log(`[Sepay Webhook] Order ${orderNumber} fulfilled. Token: ${result.downloadToken}`)
-
         try { revalidatePath('/', 'layout') } catch {}
 
         return NextResponse.json({
@@ -116,19 +111,65 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // No order match — try top-up code (NAP...)
-    const codeMatch = content.match(/\bNAP[A-Z0-9]{4,12}\b/)
-    if (!codeMatch) {
+    // Match NAPKH{userId} code — used for BOTH orders and topups
+    const codeMatch = content.match(/\bNAPKH\d{4,}\b/)
+    if (codeMatch) {
+      const transferCode = codeMatch[0]
+      console.log('[Sepay Webhook] Detected user transfer code:', transferCode)
+
+      // Priority 1: Check for pending ORDER with this transferCode
+      const orderResult = await payload.find({
+        collection: 'orders',
+        where: {
+          transferCode: { equals: transferCode },
+          status: { equals: 'pending' },
+          'payment.method': { equals: 'bank-transfer' },
+        },
+        limit: 1,
+        sort: '-createdAt',
+        depth: 0,
+      })
+
+      if (orderResult.totalDocs > 0) {
+        const order = orderResult.docs[0] as Order
+        const tolerance = Math.min(5000, order.total * 0.1)
+        if (amount >= order.total - tolerance) {
+          const result = await fulfillOrder(payload, order.id, {
+            transactionId: bankTxId,
+            paidAt: new Date().toISOString(),
+            rawResponse: { gateway: body.gateway, bankTxId, amount, content },
+          })
+
+          console.log(`[Sepay Webhook] Order ${order.orderNumber} fulfilled via ${transferCode}. Token: ${result.downloadToken}`)
+          try { revalidatePath('/', 'layout') } catch {}
+
+          return NextResponse.json({
+            success: true,
+            message: 'Order fulfilled via transfer code',
+            orderNumber: order.orderNumber,
+            downloadToken: result.downloadToken,
+          })
+        }
+        // Amount too low for order — fall through to credit as topup instead
+        console.log(`[Sepay Webhook] Amount ${amount} too low for order ${order.orderNumber} (${order.total}), falling through to topup`)
+      }
+
+      // Priority 2: Fall through to topup logic below
+    }
+
+    // Try top-up code (NAP...)
+    const topupCodeMatch = content.match(/\bNAP[A-Z0-9]{4,12}\b/)
+    if (!topupCodeMatch) {
       console.log('[Sepay Webhook] No transfer code found in:', content)
       return NextResponse.json({ success: true, message: 'No matching transfer code' })
     }
-    const transferCode = codeMatch[0]
+    const topupTransferCode = topupCodeMatch[0]
 
     // Find pending top-up with this transfer code
-    const result = await payload.find({
+    const topupResult = await payload.find({
       collection: 'topups',
       where: {
-        transferCode: { equals: transferCode },
+        transferCode: { equals: topupTransferCode },
         status: { equals: 'pending' },
       },
       limit: 1,
@@ -137,26 +178,24 @@ export async function POST(req: NextRequest) {
 
     let topup: TopUp | null = null
 
-    if (result.totalDocs > 0) {
-      topup = result.docs[0] as TopUp
+    if (topupResult.totalDocs > 0) {
+      topup = topupResult.docs[0] as TopUp
     } else {
       // No pending topup found — try fixed code pattern NAPKH{userId}
-      const fixedMatch = transferCode.match(/^NAPKH(\d+)$/)
+      const fixedMatch = topupTransferCode.match(/^NAPKH(\d+)$/)
       if (fixedMatch) {
         const extractedUserId = parseInt(fixedMatch[1], 10)
         console.log('[Sepay Webhook] Fixed code detected, userId:', extractedUserId)
 
-        // Verify user exists
         try {
           const targetUser = await payload.findByID({ collection: 'users', id: extractedUserId }) as User
           if (targetUser) {
-            // Auto-create a topup record and credit the user
             const newTopup = await payload.create({
               collection: 'topups',
               data: {
                 user: extractedUserId,
                 amount,
-                transferCode: `${transferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`,
+                transferCode: `${topupTransferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`,
                 status: 'completed',
                 bankTransactionId: bankTxId,
                 bankDescription: content,
@@ -174,7 +213,6 @@ export async function POST(req: NextRequest) {
             })
 
             console.log(`[Sepay Webhook] Auto-credited ${amount} VND to user ${extractedUserId} via fixed code. New balance: ${currentBalance + amount}`)
-
             try { revalidatePath('/', 'layout') } catch {}
 
             return NextResponse.json({
@@ -189,7 +227,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      console.log('[Sepay Webhook] No pending topup for code:', transferCode)
+      console.log('[Sepay Webhook] No pending topup for code:', topupTransferCode)
       return NextResponse.json({ success: true, message: 'No matching pending topup' })
     }
 

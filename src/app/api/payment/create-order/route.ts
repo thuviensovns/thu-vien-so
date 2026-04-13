@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { createVNPayUrl, generateOrderNumber } from '@/lib/payment'
+import { getUserTransferCode } from '@/lib/config'
 
 export async function POST(req: NextRequest) {
   try {
@@ -64,12 +65,36 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Create order
+    // Cancel any existing pending bank-transfer orders for this user
+    // (user's fixed transfer code means only one pending order at a time)
+    if (paymentMethod === 'bank-transfer') {
+      const oldOrders = await payload.find({
+        collection: 'orders',
+        where: {
+          user: { equals: user.id },
+          status: { equals: 'pending' },
+          'payment.method': { equals: 'bank-transfer' },
+        },
+        limit: 10,
+        depth: 0,
+      })
+      for (const old of oldOrders.docs) {
+        await payload.update({
+          collection: 'orders',
+          id: old.id,
+          data: { status: 'failed' },
+        })
+      }
+    }
+
+    // Create order with user's fixed transfer code
     const orderNumber = generateOrderNumber()
+    const transferCode = getUserTransferCode(user.id)
     const order = await payload.create({
       collection: 'orders',
       data: {
         orderNumber,
+        transferCode,
         user: user.id,
         items: orderItems,
         total,
@@ -83,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     // For bank-transfer, return order info (user scans QR, Sepay webhook confirms later)
     if (paymentMethod === 'bank-transfer') {
-      return NextResponse.json({ orderId: order.id, orderNumber, status: 'pending' })
+      return NextResponse.json({ orderId: order.id, orderNumber, transferCode, status: 'pending' })
     }
 
     // Generate payment URL

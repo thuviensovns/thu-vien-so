@@ -1,11 +1,12 @@
 /**
  * E2E: register customer -> admin credit -> buy -> verify /api/downloads returns the purchase.
  */
-const BASE = 'http://localhost:3000'
+const BASE = process.env.BASE || 'http://localhost:3001'
 const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
 const ADMIN_PASSWORD = 'Anhdungpro1@'
-const CUST_EMAIL = `test-dl-${Date.now()}@example.com`
+const CUST_EMAIL = process.env.CUST_EMAIL || `test-dl-${Date.now()}@example.com`
 const CUST_PASSWORD = 'Test1234!'
+console.log('RUN with customer:', CUST_EMAIL)
 
 async function j(res) {
   const text = await res.text()

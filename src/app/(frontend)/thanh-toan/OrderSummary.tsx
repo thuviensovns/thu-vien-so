@@ -18,7 +18,7 @@ interface OrderSummaryProps {
   total: number
   discount: number
   finalTotal: number
-  orderNumber: string
+  transferContent: string
   couponCode?: string
   paymentMethod: string
   isSubmitting: boolean
@@ -27,7 +27,7 @@ interface OrderSummaryProps {
 
 export default function OrderSummary({
   items, itemCount, total, discount, finalTotal,
-  orderNumber, couponCode, paymentMethod, isSubmitting, agreedTerms,
+  transferContent, couponCode, paymentMethod, isSubmitting, agreedTerms,
 }: OrderSummaryProps) {
   return (
     <div className="lg:col-span-2">
@@ -37,10 +37,10 @@ export default function OrderSummary({
           Đơn hàng ({itemCount})
         </h2>
 
-        {/* Order number */}
+        {/* Transfer content */}
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/50">
-          <span className="text-xs text-muted-foreground">Mã đơn:</span>
-          <span className="font-mono text-xs font-bold text-primary">{orderNumber}</span>
+          <span className="text-xs text-muted-foreground">Nội dung CK:</span>
+          <span className="font-mono text-xs font-bold text-primary">{transferContent}</span>
         </div>
 
         {/* Item list */}

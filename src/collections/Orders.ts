@@ -70,6 +70,7 @@ export const Orders: CollectionConfig = {
         { name: 'rawResponse', type: 'json', admin: { readOnly: true }, label: 'Dữ liệu gốc' },
       ],
     },
+    { name: 'transferCode', type: 'text', index: true, label: 'Nội dung CK', admin: { description: 'NAPKH{userId} — mã chuyển khoản cố định theo khách hàng' } },
     { name: 'customerEmail', type: 'email', label: 'Email khách hàng' },
     { name: 'customerPhone', type: 'text', label: 'SĐT khách hàng' },
     { name: 'note', type: 'textarea', label: 'Ghi chú' },

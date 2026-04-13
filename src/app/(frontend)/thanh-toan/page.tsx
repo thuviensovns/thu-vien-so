@@ -13,8 +13,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useCart } from '@/hooks/use-cart'
 import { useBalance } from '@/hooks/use-balance'
+import { useAuth } from '@/hooks/use-auth'
 import { formatVND } from '@/lib/format'
-import { paymentMethods, buildVietQRUrl } from '@/lib/config'
+import { paymentMethods, buildVietQRUrl, getUserTransferCode } from '@/lib/config'
 import { useBankConfig } from '@/hooks/use-bank-config'
 import { toast } from 'sonner'
 import OrderSummary from './OrderSummary'
@@ -35,16 +36,11 @@ const paymentIcons: Record<string, typeof CreditCard> = {
   vnpay: CreditCard, momo: CreditCard, 'bank-transfer': QrCode, 'balance': Wallet,
 }
 
-function generateDemoOrderNumber() {
-  const d = new Date()
-  const ts = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
-  return `DH${ts}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-}
-
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, total, itemCount, clearCart } = useCart()
   const { balance, refreshBalance } = useBalance()
+  const { user } = useAuth()
   const bank = useBankConfig()
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -62,19 +58,24 @@ export default function CheckoutPage() {
   const finalTotal = total - discount
   const canPayWithBalance = balance >= finalTotal && finalTotal > 0
 
-  const orderNumber = useMemo(() => generateDemoOrderNumber(), [])
-  const transferContent = `${orderNumber}`
+  // Same transfer code per user everywhere (topup + checkout)
+  const transferContent = user ? getUserTransferCode(user.id) : ''
 
   const qrUrl = useMemo(() => buildVietQRUrl(finalTotal, transferContent, bank), [finalTotal, transferContent, bank])
 
-  const allPaymentMethods = useMemo(() => [
-    {
-      id: 'balance',
-      name: 'Số dư tài khoản',
-      description: `Số dư: ${formatVND(balance)}${!canPayWithBalance ? ' (không đủ)' : ''}`,
-    },
-    ...paymentMethods,
-  ], [balance, canPayWithBalance])
+  const allPaymentMethods = useMemo(() => {
+    const methods = [
+      {
+        id: 'balance',
+        name: 'Số dư tài khoản',
+        description: `Số dư: ${formatVND(balance)}${!canPayWithBalance ? ' (không đủ)' : ''}`,
+      },
+      ...paymentMethods,
+    ]
+    // Bank transfer requires login for transfer code generation
+    if (!user) return methods.filter((m) => m.id !== 'bank-transfer')
+    return methods
+  }, [balance, canPayWithBalance, user])
 
   async function handleApplyCoupon() {
     setCouponError('')
@@ -394,7 +395,7 @@ export default function CheckoutPage() {
             {/* Order summary */}
             <OrderSummary
               items={items} itemCount={itemCount} total={total}
-              discount={discount} finalTotal={finalTotal} orderNumber={orderNumber}
+              discount={discount} finalTotal={finalTotal} transferContent={transferContent}
               couponCode={appliedCoupon?.code} paymentMethod={paymentMethod}
               isSubmitting={isSubmitting} agreedTerms={agreedTerms}
             />

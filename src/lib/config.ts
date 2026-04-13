@@ -131,6 +131,11 @@ export function buildVietQRUrl(amount: number, content: string, bankOverride?: B
 /** Minimum top-up amount (VND) */
 export const MIN_TOPUP = 10000
 
+/** Fixed transfer code per user — same code for both topup & checkout */
+export function getUserTransferCode(userId: string | number): string {
+  return `NAPKH${String(userId).padStart(4, '0')}`
+}
+
 // --- Dynamic Site Settings (admin-configurable via /quan-ly/cai-dat) ---
 
 export interface SiteSettings {
