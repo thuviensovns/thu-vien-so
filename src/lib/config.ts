@@ -130,7 +130,7 @@ export function buildVietQRUrl(amount: number, content: string, bankOverride?: B
 
 /** Default MoMo account for QR payments */
 export const defaultMomoAccount = {
-  phone: '0344382804',
+  accountNumber: 'PSP2604318700001122',
   accountName: 'HOANG ANH DUNG',
 }
 
@@ -141,7 +141,7 @@ export function getMomoAccount() {
     const stored = localStorage.getItem('admin_momo_account')
     if (stored) {
       const parsed = JSON.parse(stored)
-      if (parsed.phone && parsed.accountName) return parsed
+      if (parsed.accountNumber && parsed.accountName) return parsed
     }
   } catch {}
   return defaultMomoAccount
@@ -159,7 +159,7 @@ export function buildMomoQRUrl(amount: number, content: string) {
   const momo = getMomoAccount()
   const encoded = encodeURIComponent(content)
   const encodedName = encodeURIComponent(momo.accountName)
-  return `https://img.vietqr.io/image/971025-${momo.phone}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=${encodedName}`
+  return `https://img.vietqr.io/image/971025-${momo.accountNumber}-compact2.png?amount=${amount}&addInfo=${encoded}&accountName=${encodedName}`
 }
 
 /** Minimum top-up amount (VND) */
