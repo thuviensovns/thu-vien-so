@@ -12,11 +12,8 @@ function nativeFetch(url: string): Promise<{ stream: ReadableStream; status: num
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'User-Agent': 'com.google.android.youtube/19.09.36 (Linux; U; Android 14) gzip',
         'Accept': '*/*',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.youtube.com/',
-        'Origin': 'https://www.youtube.com',
       },
     }, (res) => {
       // Follow redirects

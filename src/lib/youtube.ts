@@ -1,12 +1,4 @@
-import { Innertube, Platform } from 'youtubei.js'
-import vm from 'vm'
-
-// Override Platform evaluator with Node.js vm for URL deciphering
-Platform.shim.eval = async (data: { output: string }, env: Record<string, unknown>) => {
-  const context = vm.createContext({ ...env })
-  const wrapped = '(function() {' + data.output + '})()'
-  return vm.runInContext(wrapped, context, { timeout: 5000 })
-}
+import { Innertube } from 'youtubei.js'
 
 let innertubeInstance: Awaited<ReturnType<typeof Innertube.create>> | null = null
 let instanceCreatedAt = 0
@@ -38,27 +30,24 @@ function extractVideoId(videoUrl: string): string | null {
 }
 
 /**
- * Get video metadata + direct CDN download URL for combined format.
+ * Get video metadata + direct CDN download URL.
+ * Uses ANDROID client which provides direct URLs without decipher,
+ * and is not bot-detected on datacenter IPs (like Vercel).
  */
 export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
   const yt = await getInnertube()
   const videoId = extractVideoId(videoUrl)
   if (!videoId) throw new Error('Invalid YouTube URL')
 
-  const info = await yt.getBasicInfo(videoId)
+  const info = await yt.getBasicInfo(videoId, { client: 'ANDROID' })
   const d = info.basic_info
 
-  // Extract CDN URL from combined formats (video+audio, typically 360p)
+  // ANDROID client provides direct URLs (no signature cipher)
   let cdnUrl: string | null = null
   for (const fmt of info.streaming_data?.formats || []) {
-    try {
-      const url = await fmt.decipher(yt.session.player)
-      if (url) {
-        cdnUrl = url
-        break
-      }
-    } catch {
-      // Skip formats that can't be deciphered
+    if (fmt.url) {
+      cdnUrl = fmt.url
+      break
     }
   }
 
