@@ -75,12 +75,24 @@ function getOrtBase(): string {
 }
 
 // ── Model config ───────────────────────────────────────────────
+//
+// Default: MDX-Net kuielab_a_vocals (STFT-based, CAC format).
+// To switch to a RoFormer model (BS-RoFormer / Mel-Band RoFormer), set the
+// following public env vars at build time — the separator adapts by reading
+// the probed ONNX input shape at runtime, so any CAC-compatible 4-channel
+// spectrogram model works. Raw-waveform RoFormer exports need a different
+// preprocessing path (not yet implemented; these envs remain the extension point).
+//   NEXT_PUBLIC_AI_MODEL_URL         — HTTPS URL to the .onnx file
+//   NEXT_PUBLIC_AI_MODEL_KEY         — IndexedDB cache key (bump to invalidate)
+//   NEXT_PUBLIC_AI_MODEL_COMPENSATE  — gain compensation after separation
 
 const MODEL_URL =
+  process.env.NEXT_PUBLIC_AI_MODEL_URL ||
   'https://huggingface.co/seanghay/uvr_models/resolve/main/kuielab_a_vocals.onnx'
 const MODEL_CACHE_DB = 'vocal-separator-cache'
 const MODEL_CACHE_STORE = 'models'
-const MODEL_CACHE_KEY = 'kuielab_a_vocals_v1'
+const MODEL_CACHE_KEY =
+  process.env.NEXT_PUBLIC_AI_MODEL_KEY || 'kuielab_a_vocals_v1'
 
 // MDX-Net parameters for kuielab_a_vocals
 const N_FFT = 6144
@@ -88,7 +100,7 @@ const HOP = 1024
 const DIM_F = 2048 // frequency bins model expects (cropped from N_FFT/2+1)
 const DIM_T = 512 // time frames per segment (kuielab_a_vocals model expects 512)
 const DIM_C = 4 // channels: L_real, L_imag, R_real, R_imag (CAC format)
-const COMPENSATE = 1.035
+const COMPENSATE = Number(process.env.NEXT_PUBLIC_AI_MODEL_COMPENSATE) || 1.035
 const CHUNK_SIZE = (DIM_T - 1) * HOP // 261120 samples per chunk (~5.9s @44.1kHz)
 const N_BINS = N_FFT / 2 + 1 // 3073
 
@@ -664,6 +676,17 @@ export async function separateWithAI(
     finalVocR[i] = Math.max(-1, Math.min(1, finalVocR[i]))
   }
 
+  // Equalize loudness: vocals vs instrumental can differ by 10+ dB
+  // (quiet vocal in dense mix → vocal stem near silence, inst stem loud).
+  // Normalize both to the original mix's RMS so playback volume is consistent.
+  equalizeStems(
+    {
+      vocals: { left: finalVocL, right: finalVocR },
+      inst: { left: instL, right: instR },
+    },
+    { left, right },
+  )
+
   onProgress?.({ phase: 'reconstruct', percent: 100, detail: 'Hoàn tất!' })
   session.release()
 
@@ -673,6 +696,7 @@ export async function separateWithAI(
 // ── Multi-stem AI separation (7 tracks) ────────────────────────
 
 import { separateInstruments, type MultiStemResult, type StemPair } from './multi-stem-separator'
+import { equalizeStems } from './loudness'
 
 export interface MultiStemAIResult {
   vocals: StemPair
@@ -722,10 +746,27 @@ export async function separateMultiStemWithAI(
     },
   )
 
-  return {
+  const out: MultiStemAIResult = {
     vocals: { left: aiResult.vocalsL, right: aiResult.vocalsR },
     ...stemResult,
   }
+
+  // Equalize all 7 stems against the original mix so no track sits much
+  // louder or quieter than the others during playback.
+  equalizeStems(
+    {
+      vocals: out.vocals,
+      drums: out.drums,
+      bass: out.bass,
+      guitar: out.guitar,
+      piano: out.piano,
+      strings: out.strings,
+      others: out.others,
+    },
+    { left, right },
+  )
+
+  return out
 }
 
 // ── 4-stem AI separation (Vocals, Drums, Bass, Others) ────────
@@ -772,10 +813,22 @@ export async function separate4StemWithAI(
                  stemResult.strings.right[i] + stemResult.others.right[i]
   }
 
-  return {
+  const out: FourStemAIResult = {
     vocals: { left: aiResult.vocalsL, right: aiResult.vocalsR },
     drums: stemResult.drums,
     bass: stemResult.bass,
     others: { left: othersL, right: othersR },
   }
+
+  equalizeStems(
+    {
+      vocals: out.vocals,
+      drums: out.drums,
+      bass: out.bass,
+      others: out.others,
+    },
+    { left, right },
+  )
+
+  return out
 }
