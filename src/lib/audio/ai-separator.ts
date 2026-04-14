@@ -22,27 +22,56 @@ export interface AISeparationResult {
   instR: Float32Array
 }
 
-// ── ONNX Runtime CDN (bypasses webpack bundling issues) ───────
+// ── ONNX Runtime loader (same-origin first, CDN fallback) ─────
+// Files served from /public/ort/ via scripts/sync-ort.mjs (runs on install + build).
 
+const ORT_LOCAL_BASE = '/ort/'
 const ORT_CDN_BASE = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/'
-const ORT_CDN_SCRIPT = `${ORT_CDN_BASE}ort.wasm.min.js`
+
+let ortBaseUsed = ORT_LOCAL_BASE
+
+function injectScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = src
+    s.async = true
+    s.onload = () => resolve()
+    s.onerror = () => reject(new Error(`script load failed: ${src}`))
+    document.head.appendChild(s)
+  })
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadOrtFromCDN(): Promise<any> {
+async function loadOrtFromCDN(): Promise<any> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const g = globalThis as any
-  if (g.ort) return Promise.resolve(g.ort)
+  if (g.ort) return g.ort
 
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = ORT_CDN_SCRIPT
-    script.onload = () => {
-      if (g.ort) resolve(g.ort)
-      else reject(new Error('ONNX Runtime loaded but ort global not found'))
+  const sources: Array<[string, string]> = [
+    [`${ORT_LOCAL_BASE}ort.wasm.min.js`, ORT_LOCAL_BASE],
+    [`${ORT_CDN_BASE}ort.wasm.min.js`, ORT_CDN_BASE],
+  ]
+  let lastErr: unknown = null
+  for (const [url, base] of sources) {
+    try {
+      await injectScript(url)
+      if (g.ort) {
+        ortBaseUsed = base
+        return g.ort
+      }
+      lastErr = new Error('ort global not set after script load')
+    } catch (e) {
+      lastErr = e
+      console.warn('[AI-Sep] ORT load failed from', url, e)
     }
-    script.onerror = () => reject(new Error('Failed to load ONNX Runtime from CDN'))
-    document.head.appendChild(script)
-  })
+  }
+  throw new Error(
+    `Failed to load ONNX Runtime (local + CDN): ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
+  )
+}
+
+function getOrtBase(): string {
+  return ortBaseUsed
 }
 
 // ── Model config ───────────────────────────────────────────────
@@ -423,7 +452,7 @@ export async function separateWithAI(
   onProgress?.({ phase: 'load', percent: 0, detail: 'Khởi tạo ONNX Runtime...' })
   const ort = await loadOrtFromCDN()
 
-  ort.env.wasm.wasmPaths = ORT_CDN_BASE
+  ort.env.wasm.wasmPaths = getOrtBase()
 
   // Try multi-threaded first, fall back to single-threaded if it fails
   let session: InstanceType<typeof ort.InferenceSession>

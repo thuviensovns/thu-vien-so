@@ -246,7 +246,7 @@ export const defaultSiteSettings: SiteSettings = {
   minTopup: MIN_TOPUP,
   maxDownloads: 5,
   downloadExpiryHours: 72,
-  sevenTrackFee: 5000, // 5,000 VND per 7-track use
+  sevenTrackFee: 15, // 15 VND per 7-track use
   footerText: 'Tài nguyên FLP, VST, Sample Pack cho Producer Việt Nam. Download miễn phí và premium cho Producer Việt.',
   copyrightText: '',
 }

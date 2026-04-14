@@ -143,10 +143,10 @@ export function VocalRemover() {
         if (data?.settings?.sevenTrackFee !== undefined) {
           setSevenTrackFee(data.settings.sevenTrackFee)
         } else {
-          setSevenTrackFee(5000) // default
+          setSevenTrackFee(15) // default
         }
       })
-      .catch(() => setSevenTrackFee(5000))
+      .catch(() => setSevenTrackFee(15))
   }, [])
 
   // Cleanup AudioContext on unmount
