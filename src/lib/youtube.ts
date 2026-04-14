@@ -10,7 +10,7 @@ Platform.shim.eval = async (data: { output: string }, env: Record<string, unknow
 
 let innertubeInstance: Awaited<ReturnType<typeof Innertube.create>> | null = null
 let instanceCreatedAt = 0
-const INSTANCE_TTL = 30 * 60_000 // Refresh every 30 minutes
+const INSTANCE_TTL = 30 * 60_000
 
 async function getInnertube() {
   const now = Date.now()
@@ -28,6 +28,8 @@ export interface YtVideoInfo {
   channel: string
   view_count: number
   thumbnail: string
+  /** Direct CDN URL for the best combined (video+audio) format */
+  cdnUrl: string | null
 }
 
 function extractVideoId(videoUrl: string): string | null {
@@ -36,8 +38,7 @@ function extractVideoId(videoUrl: string): string | null {
 }
 
 /**
- * Get video metadata (title, duration, channel, thumbnail).
- * Does NOT extract download URLs — downloads use server-side streaming.
+ * Get video metadata + direct CDN download URL for combined format.
  */
 export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
   const yt = await getInnertube()
@@ -47,6 +48,20 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
   const info = await yt.getBasicInfo(videoId)
   const d = info.basic_info
 
+  // Extract CDN URL from combined formats (video+audio, typically 360p)
+  let cdnUrl: string | null = null
+  for (const fmt of info.streaming_data?.formats || []) {
+    try {
+      const url = await fmt.decipher(yt.session.player)
+      if (url) {
+        cdnUrl = url
+        break
+      }
+    } catch {
+      // Skip formats that can't be deciphered
+    }
+  }
+
   return {
     id: d.id || videoId,
     title: d.title || 'Không rõ tiêu đề',
@@ -54,42 +69,6 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
     channel: d.channel?.name || d.author || '',
     view_count: d.view_count || 0,
     thumbnail: `https://i.ytimg.com/vi/${d.id || videoId}/hqdefault.jpg`,
+    cdnUrl,
   }
-}
-
-/**
- * Stream a YouTube video via youtubei.js download API (handles SABR internally).
- * Wraps the AsyncGenerator from yt.download() into a Web ReadableStream.
- */
-export async function streamVideo(videoUrl: string): Promise<ReadableStream<Uint8Array>> {
-  const yt = await getInnertube()
-  const videoId = extractVideoId(videoUrl)
-  if (!videoId) throw new Error('Invalid YouTube URL')
-
-  const generator = await yt.download(videoId, {
-    type: 'video+audio',
-    quality: 'best',
-  })
-
-  // yt.download() may return ReadableStream or AsyncGenerator depending on version
-  if (generator instanceof ReadableStream) {
-    return generator
-  }
-
-  // Wrap AsyncGenerator/AsyncIterable into a Web ReadableStream
-  const iter = (generator as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        const { value, done } = await iter.next()
-        if (done) {
-          controller.close()
-        } else {
-          controller.enqueue(value)
-        }
-      } catch (err) {
-        controller.error(err)
-      }
-    },
-  })
 }

@@ -91,8 +91,7 @@ export function YoutubeDownloader() {
       if (!video) return
       setDownloading(type)
 
-      const ext = 'mp4'
-      const filename = `${video.title}.${ext}`
+      const filename = `${video.title}.mp4`
       const streamUrl = `/api/youtube-download/stream?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(filename)}`
 
       const a = document.createElement('a')
