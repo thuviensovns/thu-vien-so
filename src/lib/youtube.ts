@@ -1,4 +1,12 @@
-import { Innertube } from 'youtubei.js'
+import { Innertube, Platform } from 'youtubei.js'
+import vm from 'vm'
+
+// Override Platform evaluator with Node.js vm for URL deciphering (needed for WEB/MWEB clients)
+Platform.shim.eval = async (data: { output: string }, env: Record<string, unknown>) => {
+  const context = vm.createContext({ ...env })
+  const wrapped = '(function() {' + data.output + '})()'
+  return vm.runInContext(wrapped, context, { timeout: 5000 })
+}
 
 let innertubeInstance: Awaited<ReturnType<typeof Innertube.create>> | null = null
 let instanceCreatedAt = 0
@@ -49,7 +57,8 @@ async function fetchOembedInfo(videoId: string): Promise<{ title: string; channe
 }
 
 /**
- * Try multiple Innertube clients to work around YouTube bot-detection on datacenter IPs.
+ * Try multiple Innertube clients. Accept first one that returns any streaming format.
+ * Supports both direct URLs (ANDROID/IOS) and deciphered URLs (WEB/MWEB).
  */
 async function tryClients(videoId: string) {
   const yt = await getInnertube()
@@ -64,18 +73,31 @@ async function tryClients(videoId: string) {
   for (const client of clients) {
     try {
       const info = await yt.getBasicInfo(videoId, { client })
-      const hasTitle = !!info.basic_info.title
-      const hasFormats = (info.streaming_data?.formats?.length || 0) > 0
-      const hasDirectUrl = !!info.streaming_data?.formats?.[0]?.url
+      const formats = info.streaming_data?.formats || []
 
-      console.log(
-        `[YouTube] Client=${client} title=${hasTitle} fmts=${hasFormats} directUrl=${hasDirectUrl}`,
-      )
+      // Try to get a usable URL from any format (direct or via decipher)
+      for (const fmt of formats) {
+        let url: string | null = null
 
-      // Only accept if we have metadata AND a direct URL (no decipher needed)
-      if (hasTitle && hasDirectUrl) {
-        return { info, client }
+        // Direct URL (ANDROID/IOS)
+        if (fmt.url) {
+          url = fmt.url
+        } else {
+          // Needs decipher (WEB/MWEB)
+          try {
+            url = await fmt.decipher(yt.session.player)
+          } catch {
+            continue
+          }
+        }
+
+        if (url) {
+          console.log(`[YouTube] Client=${client} SUCCESS (${fmt.url ? 'direct' : 'decipher'})`)
+          return { info, client, cdnUrl: url }
+        }
       }
+
+      console.log(`[YouTube] Client=${client} no usable URL (${formats.length} formats)`)
     } catch (e) {
       console.log(`[YouTube] Client=${client} error:`, (e as Error).message.slice(0, 80))
     }
@@ -108,7 +130,7 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
     channel = d.channel?.name || d.author || ''
     duration = d.duration || 0
     view_count = d.view_count || 0
-    cdnUrl = result.info.streaming_data?.formats?.[0]?.url || null
+    cdnUrl = result.cdnUrl
     client = result.client
   }
 
