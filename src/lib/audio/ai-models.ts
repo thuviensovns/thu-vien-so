@@ -10,7 +10,7 @@
  *   - HTDemucs  (raw waveform, 4-stem direct output)   — env-gated
  */
 
-export type ModelArchitecture = 'mdx' | 'htdemucs'
+export type ModelArchitecture = 'mdx' | 'htdemucs' | 'roformer'
 
 export interface MdxSpec {
   architecture: 'mdx'
@@ -38,6 +38,34 @@ export interface HtDemucsSpec {
   outputStems: [string, string, string, string]
 }
 
+/**
+ * RoFormer (Rotary Position Embedding Transformer) — SOTA architecture from
+ * ZFTurbo's BS-RoFormer / Mel-RoFormer models (12.9+ SDR on MUSDB18-HQ).
+ *
+ * Input is band-split STFT: the spectrogram is sliced into frequency bands
+ * (typically 62 bands) which are processed by a transformer with rotary
+ * positional embeddings — captures long-range temporal dependencies far
+ * better than MDX's U-Net.
+ *
+ * Browser integration requires: an exported ONNX model (input signature
+ * varies per export) + a model-specific adapter (band boundaries, mel bin
+ * mapping, etc.). The registry entry is wired; the runtime adapter throws
+ * a clear error until a concrete export is provided via env.
+ */
+export interface RoFormerSpec {
+  architecture: 'roformer'
+  /** STFT size */
+  nFft: number
+  /** Hop length */
+  hop: number
+  /** Number of frequency bands for band-split input */
+  numBands: number
+  /** Time frames per segment */
+  dimT: number
+  /** Sample rate the model was trained at */
+  sampleRate: number
+}
+
 export interface ModelEntry {
   id: string
   label: string
@@ -55,7 +83,7 @@ export interface ModelEntry {
   cacheKey: string
   /** Approximate download size for UI */
   sizeMB: number
-  spec: MdxSpec | HtDemucsSpec
+  spec: MdxSpec | HtDemucsSpec | RoFormerSpec
   /** Feature-flag: hide from UI unless the URL is configured */
   requiresEnvUrl?: boolean
 }
@@ -72,6 +100,7 @@ const MDX_B_URL =
   'https://huggingface.co/seanghay/uvr_models/resolve/main/kuielab_b_vocals.onnx'
 
 const HTDEMUCS_URL = process.env.NEXT_PUBLIC_AI_HTDEMUCS_URL || ''
+const ROFORMER_URL = process.env.NEXT_PUBLIC_AI_ROFORMER_URL || ''
 
 // ── Registry ───────────────────────────────────────────────────
 
@@ -128,9 +157,27 @@ export const MODELS: Record<string, ModelEntry> = {
       outputStems: ['drums', 'bass', 'other', 'vocals'],
     },
   },
+  roformer: {
+    id: 'roformer',
+    label: 'BS-RoFormer (SOTA)',
+    description: 'Band-split Rotary Transformer — điểm SDR cao nhất hiện có',
+    url: '/api/ai-models/roformer',
+    upstreamUrl: ROFORMER_URL,
+    cacheKey: process.env.NEXT_PUBLIC_AI_ROFORMER_KEY || 'bs_roformer_v1',
+    sizeMB: 170,
+    requiresEnvUrl: !ROFORMER_URL,
+    spec: {
+      architecture: 'roformer',
+      nFft: 2048,
+      hop: 512,
+      numBands: 62,
+      dimT: 801,
+      sampleRate: 44100,
+    },
+  },
 }
 
-export type PresetId = 'fast' | 'quality' | 'best'
+export type PresetId = 'fast' | 'quality' | 'best' | 'ultra'
 
 export interface Preset {
   id: PresetId
@@ -140,6 +187,13 @@ export interface Preset {
   models: string[]
   /** Rough slowdown multiplier vs fast */
   slowdown: number
+  /** Run each model with Test-Time Augmentation (2x inference, +0.3-0.5 dB SDR) */
+  tta?: boolean
+  /**
+   * Overlap fraction override for waveform models (HTDemucs).
+   * Higher = fewer seam artifacts, quadratic cost. Default per model spec.
+   */
+  overlap?: number
 }
 
 /**
@@ -168,6 +222,15 @@ export const PRESETS: Record<PresetId, Preset> = {
     description: 'Kết hợp MDX-A + MDX-B — sạch nhất, chậm ~2x',
     models: ['mdx_a', 'mdx_b'],
     slowdown: 2,
+  },
+  ultra: {
+    id: 'ultra',
+    label: 'Tối đa (Ensemble + TTA)',
+    description: 'Ensemble + Test-Time Augmentation — tiệm cận giới hạn SOTA, chậm ~4x',
+    models: ['mdx_a', 'mdx_b'],
+    slowdown: 4,
+    tta: true,
+    overlap: 0.5,
   },
 }
 

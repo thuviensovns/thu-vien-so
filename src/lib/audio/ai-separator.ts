@@ -836,3 +836,61 @@ export async function separate4StemWithAI(
 
   return out
 }
+
+// ── Test-Time Augmentation (TTA) ───────────────────────────────
+//
+// UVR-proven trick: run the model twice — once on the original signal,
+// once on L↔R swapped + polarity-inverted — then un-flip the second pass
+// and average. The two passes share the same phase structure but have
+// orthogonal per-channel biases, so model artifacts that are sensitive to
+// channel ordering or sign cancel on average (~0.3-0.5 dB SDR gain).
+//
+// Cost: 2x inference time. Recommended only for "ultra" preset tier.
+
+export async function separateWithTTA(
+  left: Float32Array,
+  right: Float32Array,
+  sampleRate: number,
+  onProgress?: (p: AIProgress) => void,
+  modelId: string = DEFAULT_MODEL_ID,
+): Promise<AISeparationResult> {
+  const length = left.length
+  // Pass 1: original signal, 0-50% of progress
+  const p1 = await separateWithAI(
+    left, right, sampleRate,
+    (p) => onProgress?.({ phase: p.phase, percent: Math.round(p.percent * 0.5), detail: `[TTA 1/2] ${p.detail || ''}`.trim() }),
+    modelId,
+  )
+  // Pass 2: channel-swapped + polarity-inverted, 50-100%
+  const negL = new Float32Array(length)
+  const negR = new Float32Array(length)
+  for (let i = 0; i < length; i++) {
+    negL[i] = -right[i]
+    negR[i] = -left[i]
+  }
+  const p2 = await separateWithAI(
+    negL, negR, sampleRate,
+    (p) => onProgress?.({ phase: p.phase, percent: 50 + Math.round(p.percent * 0.5), detail: `[TTA 2/2] ${p.detail || ''}`.trim() }),
+    modelId,
+  )
+
+  // Un-flip p2 and average with p1.  p2's output:
+  //   vocalsL was computed from -right → real vocal-right = -p2.vocalsL
+  //   vocalsR was computed from -left  → real vocal-left  = -p2.vocalsR
+  const vocalsL = new Float32Array(length)
+  const vocalsR = new Float32Array(length)
+  const instL = new Float32Array(length)
+  const instR = new Float32Array(length)
+  for (let i = 0; i < length; i++) {
+    vocalsL[i] = (p1.vocalsL[i] + -p2.vocalsR[i]) * 0.5
+    vocalsR[i] = (p1.vocalsR[i] + -p2.vocalsL[i]) * 0.5
+    instL[i] = (p1.instL[i] + -p2.instR[i]) * 0.5
+    instR[i] = (p1.instR[i] + -p2.instL[i]) * 0.5
+  }
+
+  equalizeStems(
+    { vocals: { left: vocalsL, right: vocalsR }, inst: { left: instL, right: instR } },
+    { left, right },
+  )
+  return { vocalsL, vocalsR, instL, instR }
+}

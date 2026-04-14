@@ -823,7 +823,7 @@ export function VocalRemover() {
                 <p className="text-[11px] font-medium text-muted-foreground mb-1.5">
                   Chất lượng AI
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   {availablePresets.map((p) => {
                     const active = preset === p.id
                     return (

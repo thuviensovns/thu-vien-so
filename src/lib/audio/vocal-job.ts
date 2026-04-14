@@ -11,6 +11,7 @@
 
 import {
   separateWithAI,
+  separateWithTTA,
   separateMultiStemWithAI,
   type AIProgress,
 } from './ai-separator'
@@ -216,14 +217,14 @@ class VocalJobManager {
       const presetId = params.presetId || 'fast'
       const original: StemPairRaw = { left, right }
 
-      // Resolve model ids for the chosen preset (ignored by 'htdemucs' & 'dsp')
-      const modelIds =
-        presetId === 'htdemucs'
-          ? []
-          : (PRESETS[presetId as PresetId]?.models ?? ['mdx_a'])
+      // Resolve preset: model ids + TTA flag + overlap override
+      const presetObj = presetId === 'htdemucs' ? undefined : PRESETS[presetId as PresetId]
+      const modelIds = presetId === 'htdemucs' ? [] : (presetObj?.models ?? ['mdx_a'])
       const primaryModel = modelIds[0] || 'mdx_a'
       const useEnsemble = modelIds.length > 1
       const useHtDemucs = presetId === 'htdemucs'
+      const useTTA = !!presetObj?.tta
+      const overlapOverride = presetObj?.overlap
 
       // Helper: run the vocals separator chosen by preset. Returns {vocalsL/R, instL/R}.
       const runVocalsSep = async () => {
@@ -234,7 +235,7 @@ class VocalJobManager {
               percent: p.percent,
               detail: p.detail,
             })
-          })
+          }, overlapOverride)
           // Use HTDemucs vocals; derive instrumental from residual for coherence.
           const len = left.length
           const instL = new Float32Array(len)
@@ -254,7 +255,11 @@ class VocalJobManager {
           }
         }
         if (useEnsemble) {
-          const r = await separateEnsemble(left, right, sampleRate, modelIds, onProgress)
+          const r = await separateEnsemble(left, right, sampleRate, modelIds, onProgress, useTTA)
+          return { vocalsL: r.vocalsL, vocalsR: r.vocalsR, instL: r.instL, instR: r.instR }
+        }
+        if (useTTA) {
+          const r = await separateWithTTA(left, right, sampleRate, onProgress, primaryModel)
           return { vocalsL: r.vocalsL, vocalsR: r.vocalsR, instL: r.instL, instR: r.instR }
         }
         const r = await separateWithAI(left, right, sampleRate, onProgress, primaryModel)
@@ -278,7 +283,7 @@ class VocalJobManager {
           // HTDemucs natively produces 4 stems — use them directly.
           const r = await separateWithHTDemucs(left, right, sampleRate, (p) => {
             onProgress({ phase: p.phase as AIProgress['phase'], percent: p.percent, detail: p.detail })
-          })
+          }, overlapOverride)
           this.setState({
             status: 'done', progress: 100, phase: 'Hoàn tất!',
             result: {
@@ -317,7 +322,7 @@ class VocalJobManager {
           // HTDemucs gives 4 stems; split 'other' via DSP into guitar/piano/strings/others
           const r = await separateWithHTDemucs(left, right, sampleRate, (p) => {
             onProgress({ phase: p.phase as AIProgress['phase'], percent: Math.round(p.percent * 0.8), detail: p.detail })
-          })
+          }, overlapOverride)
           const stem = await separateInstruments(r.other.left, r.other.right, sampleRate, (p) => {
             this.setState({ progress: 80 + Math.round(p.percent * 0.18), phase: 'Tách nhạc cụ từ "Khác"...' })
           })

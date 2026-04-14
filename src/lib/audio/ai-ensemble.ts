@@ -12,7 +12,7 @@
  * which tends to be cleaner than any single model's instrumental output.
  */
 
-import { separateWithAI, type AISeparationResult, type AIProgress } from './ai-separator'
+import { separateWithAI, separateWithTTA, type AISeparationResult, type AIProgress } from './ai-separator'
 import { equalizeStems } from './loudness'
 
 export interface EnsembleResult extends AISeparationResult {
@@ -32,6 +32,8 @@ export async function separateEnsemble(
   sampleRate: number,
   modelIds: string[],
   onProgress?: (p: AIProgress) => void,
+  /** If true, each model is run with TTA (2 passes, channel-swap+polarity). */
+  tta: boolean = false,
 ): Promise<EnsembleResult> {
   if (modelIds.length === 0) throw new Error('Ensemble needs ≥1 model')
   const length = left.length
@@ -47,7 +49,8 @@ export async function separateEnsemble(
     const slotStart = (i / modelIds.length) * 100
     const slotEnd = ((i + 1) / modelIds.length) * 100
 
-    const result = await separateWithAI(
+    const runner = tta ? separateWithTTA : separateWithAI
+    const result = await runner(
       left,
       right,
       sampleRate,
@@ -56,7 +59,7 @@ export async function separateEnsemble(
         onProgress?.({
           phase: p.phase,
           percent: Math.round(pct),
-          detail: `[${i + 1}/${modelIds.length}] ${p.detail || ''}`.trim(),
+          detail: `[${i + 1}/${modelIds.length}${tta ? ' +TTA' : ''}] ${p.detail || ''}`.trim(),
         })
       },
       modelId,

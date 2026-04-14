@@ -92,6 +92,8 @@ export async function separateWithHTDemucs(
   right: Float32Array,
   _sampleRate: number,
   onProgress?: (p: HtDemucsProgress) => void,
+  /** Optional overlap override (0..1). Higher = better, quadratic cost. */
+  overlapOverride?: number,
 ): Promise<HtDemucsResult> {
   const model = getModel('htdemucs')
   if (model.spec.architecture !== 'htdemucs') {
@@ -106,7 +108,10 @@ export async function separateWithHTDemucs(
   const spec = model.spec
   const length = left.length
   const seg = spec.segmentSamples
-  const hop = Math.floor(seg * (1 - spec.overlap))
+  const overlap = overlapOverride != null
+    ? Math.min(0.9, Math.max(0, overlapOverride))
+    : spec.overlap
+  const hop = Math.max(1, Math.floor(seg * (1 - overlap)))
   const fadeLen = seg - hop
 
   // ── Download model ───────────────────────────────────────────
