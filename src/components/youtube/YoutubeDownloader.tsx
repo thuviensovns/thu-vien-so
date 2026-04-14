@@ -106,6 +106,7 @@ export function YoutubeDownloader() {
       setDownloading(formatId)
 
       try {
+        // Get the CDN URL for this format
         const res = await fetch('/api/youtube-download/download', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -138,6 +139,25 @@ export function YoutubeDownloader() {
     [video, url]
   )
 
+  const handleStreamDownload = useCallback(
+    (label: string, ext: string) => {
+      if (!video) return
+      setDownloading('stream')
+      const filename = `${video.title}.${ext}`
+      const streamUrl = `/api/youtube-download/stream?youtubeUrl=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(filename)}`
+      const a = document.createElement('a')
+      a.href = streamUrl
+      a.download = filename
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      toast.success(`Đang tải ${label}`)
+      setTimeout(() => setDownloading(null), 2000)
+    },
+    [video, url]
+  )
+
   const handleReset = useCallback(() => {
     setVideo(null)
     setUrl('')
@@ -155,7 +175,7 @@ export function YoutubeDownloader() {
           <h1 className="text-xl sm:text-2xl font-bold">Tải Video YouTube</h1>
         </div>
         <p className="text-muted-foreground text-xs sm:text-sm">
-          Tải nhạc MP3 và video MP4 từ YouTube — miễn phí, không giới hạn
+          Tải video MP4 và âm thanh từ YouTube — miễn phí, không giới hạn
         </p>
       </div>
 
@@ -273,11 +293,11 @@ export function YoutubeDownloader() {
             </div>
 
             {/* Format Tabs */}
-            <Tabs defaultValue="mp3">
+            <Tabs defaultValue="mp4">
               <TabsList className="w-full grid grid-cols-3">
                 <TabsTrigger value="mp3" className="gap-1.5">
                   <Music className="size-3.5" />
-                  MP3
+                  Âm thanh
                 </TabsTrigger>
                 <TabsTrigger value="mp4" className="gap-1.5">
                   <Video className="size-3.5" />
@@ -292,32 +312,30 @@ export function YoutubeDownloader() {
               {/* MP3 Tab */}
               <TabsContent value="mp3">
                 {video.mp3Format ? (
-                  <button
-                    onClick={() => handleDownload(video.mp3Format!.formatId, 'MP3', 'mp3')}
-                    disabled={downloading !== null}
-                    className="flex w-full items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent hover:border-accent-foreground/20 disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex items-center justify-center size-8 rounded-md bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
-                        <Music className="size-4 text-green-500" />
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handleDownload(video.mp3Format!.formatId, 'MP4 Audio', 'mp4')}
+                      disabled={downloading !== null}
+                      className="flex w-full items-center justify-between rounded-lg border p-3 transition-all hover:bg-accent hover:border-accent-foreground/20 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex items-center justify-center size-8 rounded-md bg-green-500/10 group-hover:bg-green-500/20 transition-colors">
+                          <Music className="size-4 text-green-500" />
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="font-medium text-sm">Tải âm thanh</span>
+                          <span className="text-[10px] text-muted-foreground">MP4 có âm thanh</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-left">
-                        <span className="font-medium text-sm">Tải MP3</span>
-                        {video.mp3Format.size && (
-                          <span className="text-xs text-muted-foreground">
-                            {video.mp3Format.size}
-                          </span>
+                      <div className="flex items-center gap-1.5">
+                        {downloading === video.mp3Format.formatId ? (
+                          <Loader2 className="size-4 animate-spin text-green-500" />
+                        ) : (
+                          <Download className="size-4 text-muted-foreground group-hover:text-green-500 transition-colors" />
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {downloading === video.mp3Format.formatId ? (
-                        <Loader2 className="size-4 animate-spin text-green-500" />
-                      ) : (
-                        <Download className="size-4 text-muted-foreground group-hover:text-green-500 transition-colors" />
-                      )}
-                    </div>
-                  </button>
+                    </button>
+                  </div>
                 ) : (
                   <div className="text-sm text-muted-foreground text-center py-6">
                     Không có định dạng âm thanh cho video này
@@ -466,7 +484,7 @@ export function YoutubeDownloader() {
               </div>
               <div>
                 <p className="text-xs sm:text-sm font-medium">MP4</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Đến 1080p</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Video + Âm thanh</p>
               </div>
             </div>
             <div className="flex flex-col items-center gap-2 rounded-xl border p-3 sm:p-4 text-center">

@@ -31,6 +31,7 @@ export function middleware(req: NextRequest) {
     && !pathname.startsWith('/api/health')
     && !pathname.startsWith('/api/ping')
     && !pathname.startsWith('/api/vocal-remover')
+    && !pathname.startsWith('/api/youtube-download')
   if (isPayloadApi) return NextResponse.next()
 
   // Rate limit custom API routes
