@@ -11,12 +11,6 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json()
@@ -27,22 +21,6 @@ export async function POST(req: NextRequest) {
 
     const info = await getVideoInfo(url)
 
-    // Build MP4 format list from downloadable combined formats
-    const mp4Formats = info.downloadFormats
-      .filter(f => f.hasVideo && f.ext === 'mp4')
-      .map(f => ({
-        quality: f.quality,
-        formatId: f.formatId,
-        size: f.filesize ? formatFileSize(f.filesize) : '',
-        hasAudio: f.hasAudio,
-      }))
-
-    // MP3/audio: if any combined format has audio, offer audio extraction
-    const audioFormat = info.downloadFormats.find(f => f.hasAudio)
-    const mp3Format = audioFormat
-      ? { formatId: audioFormat.formatId, size: '' }
-      : null
-
     return NextResponse.json({
       videoId: info.id,
       title: info.title,
@@ -50,8 +28,6 @@ export async function POST(req: NextRequest) {
       channel: info.channel,
       viewCount: info.view_count,
       thumbnail: info.thumbnail,
-      mp4Formats,
-      mp3Format,
     })
   } catch (err) {
     console.error('[YouTube Info]', err)
