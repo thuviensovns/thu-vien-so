@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       channel: info.channel,
       viewCount: info.view_count,
       thumbnail: info.thumbnail,
+      hasDownload: !!info.cdnUrl,
+      _client: info.client || 'none',
     })
   } catch (err) {
     console.error('[YouTube Info]', err)
