@@ -95,25 +95,25 @@ export function YoutubeDownloader() {
       const streamUrl = `/api/youtube-download/stream?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(filename)}`
 
       try {
-        toast.info('Đang chuẩn bị tải xuống...')
-        const res = await fetch(streamUrl)
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Lỗi không xác định' }))
-          throw new Error(err.error || `Lỗi ${res.status}`)
+        toast.info('Đang bắt đầu tải xuống...')
+        // Probe server first (HEAD-like via small range) so we can show proper
+        // error if proxy is offline. Server redirects 302 to ngrok if healthy.
+        const probe = await fetch(streamUrl, { method: 'GET', redirect: 'manual' })
+        if (probe.type === 'opaqueredirect' || probe.status === 0 || probe.status === 302) {
+          // Healthy — let browser handle actual download natively (no buffering, no Vercel 60s cap).
+        } else if (!probe.ok) {
+          const err = await probe.json().catch(() => ({ error: `Lỗi ${probe.status}` }))
+          throw new Error(err.error || `Lỗi ${probe.status}`)
         }
 
-        const blob = await res.blob()
-        const blobUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = blobUrl
+        a.href = streamUrl
         a.download = filename
         a.style.display = 'none'
         document.body.appendChild(a)
         a.click()
         a.remove()
-        URL.revokeObjectURL(blobUrl)
-        toast.success(type === 'mp3' ? 'Đã tải âm thanh!' : 'Đã tải video!')
+        toast.success(type === 'mp3' ? 'Đã bắt đầu tải âm thanh!' : 'Đã bắt đầu tải video!')
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Không thể tải video. Vui lòng thử lại.')
       } finally {

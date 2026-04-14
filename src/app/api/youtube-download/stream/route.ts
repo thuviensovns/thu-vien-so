@@ -76,29 +76,41 @@ export async function GET(req: NextRequest) {
       .trim() || 'download.mp4'
 
   try {
-    let streamSrc: { stream: ReadableStream; headers: Record<string, string> }
-
     if (proxy) {
-      // PROXY PATH — stream directly through the home tunnel.
+      // PROXY PATH — redirect client directly to ngrok tunnel so Vercel's 60s
+      // function limit doesn't apply (large videos were timing out).
       const videoId = extractVideoId(youtubeUrl)
       if (!videoId) return NextResponse.json({ error: 'URL không hợp lệ' }, { status: 400 })
-      const proxyUrl = `${proxy.base}/stream?url=${encodeURIComponent(youtubeUrl)}`
-      console.log('[YouTube Stream] routing via proxy tunnel')
-      const proxyRes = await nativeFetch(proxyUrl, {
-        'ngrok-skip-browser-warning': '1',
-        ...(proxy.secret ? { 'x-proxy-secret': proxy.secret } : {}),
-      })
-      const ct = (proxyRes.headers['content-type'] || '').toLowerCase()
-      if (proxyRes.status !== 200 || ct.includes('text/html')) {
-        console.error(`[YouTube Stream] proxy returned status=${proxyRes.status} ct=${ct} — tunnel likely down`)
-        proxyRes.stream.cancel?.()
+
+      // Health check tunnel first so we can surface a clear error if offline.
+      try {
+        const hc = await fetch(`${proxy.base}/health`, {
+          headers: { 'ngrok-skip-browser-warning': '1' },
+          signal: AbortSignal.timeout(5000),
+        })
+        const ct = (hc.headers.get('content-type') || '').toLowerCase()
+        if (!hc.ok || ct.includes('text/html')) throw new Error(`bad health ${hc.status} ${ct}`)
+      } catch (e) {
+        console.error('[YouTube Stream] tunnel health check failed:', (e as Error).message)
         return NextResponse.json(
           { error: 'Máy chủ proxy đang offline. Vui lòng liên hệ admin.' },
           { status: 503 },
         )
       }
-      streamSrc = proxyRes
-    } else {
+
+      const params = new URLSearchParams({
+        url: youtubeUrl,
+        filename,
+        ...(proxy.secret ? { secret: proxy.secret } : {}),
+      })
+      const redirectUrl = `${proxy.base}/stream?${params.toString()}`
+      console.log('[YouTube Stream] redirecting to tunnel (bypass Vercel 60s)')
+      return NextResponse.redirect(redirectUrl, 302)
+    }
+
+    let streamSrc: { stream: ReadableStream; headers: Record<string, string> }
+
+    {
       // DIRECT PATH — resolve CDN URL via Innertube, fetch from Vercel.
       const info = await getVideoInfo(youtubeUrl)
       if (!info.cdnUrl) {

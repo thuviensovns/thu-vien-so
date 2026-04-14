@@ -99,9 +99,9 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj))
 }
 
-function requireAuth(req, res) {
+function requireAuth(req, res, urlObj) {
   if (!SECRET) return true
-  const got = req.headers['x-proxy-secret']
+  const got = req.headers['x-proxy-secret'] || urlObj?.searchParams.get('secret')
   if (got !== SECRET) {
     sendJson(res, 401, { error: 'unauthorized' })
     return false
@@ -109,7 +109,7 @@ function requireAuth(req, res) {
   return true
 }
 
-function streamFromCdn(url, res) {
+function streamFromCdn(url, res, filename) {
   const req = https.get(
     url,
     {
@@ -127,11 +127,18 @@ function streamFromCdn(url, res) {
         sendJson(res, 502, { error: `CDN returned ${upstream.statusCode}` })
         return
       }
-      res.writeHead(200, {
+      const headers = {
         'Content-Type': upstream.headers['content-type'] || 'video/mp4',
         'Content-Length': upstream.headers['content-length'] || '',
         'Cache-Control': 'no-store',
-      })
+        'Access-Control-Allow-Origin': '*',
+      }
+      if (filename) {
+        const safe = filename.replace(/"/g, '')
+        headers['Content-Disposition'] =
+          `attachment; filename="${safe.replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`
+      }
+      res.writeHead(200, headers)
       upstream.pipe(res)
     },
   )
@@ -166,7 +173,7 @@ const server = http.createServer(async (req, res) => {
       return
     }
 
-    if (!requireAuth(req, res)) return
+    if (!requireAuth(req, res, url)) return
 
     // GET /info?url=...
     if (req.method === 'GET' && url.pathname === '/info') {
@@ -186,7 +193,8 @@ const server = http.createServer(async (req, res) => {
       if (!videoId) return sendJson(res, 400, { error: 'invalid youtube url' })
       const info = await fetchInfo(videoId)
       if (!info?.cdnUrl) return sendJson(res, 404, { error: 'no stream' })
-      streamFromCdn(info.cdnUrl, res)
+      const filename = url.searchParams.get('filename') || `${info.title || videoId}.mp4`
+      streamFromCdn(info.cdnUrl, res, filename)
       return
     }
 
