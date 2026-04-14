@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 3600,
   },
+  serverExternalPackages: ['youtubei.js'],
   experimental: {
     optimizePackageImports: [
       'lucide-react',

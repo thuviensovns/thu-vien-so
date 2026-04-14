@@ -59,16 +59,37 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
 
 /**
  * Stream a YouTube video via youtubei.js download API (handles SABR internally).
- * Returns a ReadableStream suitable for piping to an HTTP response.
+ * Wraps the AsyncGenerator from yt.download() into a Web ReadableStream.
  */
 export async function streamVideo(videoUrl: string): Promise<ReadableStream<Uint8Array>> {
   const yt = await getInnertube()
   const videoId = extractVideoId(videoUrl)
   if (!videoId) throw new Error('Invalid YouTube URL')
 
-  const stream = await yt.download(videoId, {
+  const generator = await yt.download(videoId, {
     type: 'video+audio',
     quality: 'best',
   })
-  return stream as ReadableStream<Uint8Array>
+
+  // yt.download() may return ReadableStream or AsyncGenerator depending on version
+  if (generator instanceof ReadableStream) {
+    return generator
+  }
+
+  // Wrap AsyncGenerator/AsyncIterable into a Web ReadableStream
+  const iter = (generator as AsyncIterable<Uint8Array>)[Symbol.asyncIterator]()
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { value, done } = await iter.next()
+        if (done) {
+          controller.close()
+        } else {
+          controller.enqueue(value)
+        }
+      } catch (err) {
+        controller.error(err)
+      }
+    },
+  })
 }
