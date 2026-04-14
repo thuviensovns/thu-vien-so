@@ -2,7 +2,11 @@
 node_modules/
 
 # binaries
-bin/
+bin/*
+!bin/yt-proxy/
+bin/yt-proxy/node_modules/
+bin/yt-proxy/.env
+bin/yt-proxy/cloudflared.exe
 .pnp
 .pnp.js
 .pnp.cjs

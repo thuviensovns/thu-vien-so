@@ -1,0 +1,16 @@
+{
+  "name": "yt-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local YouTube proxy server — runs on your PC's residential IP to bypass Vercel datacenter block",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "tunnel": "cloudflared tunnel --url http://localhost:3001",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "youtubei.js": "^17.0.1"
+  }
+}
