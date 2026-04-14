@@ -91,29 +91,41 @@ export function YoutubeDownloader() {
       if (!video) return
       setDownloading(type)
 
-      const filename = `${video.title}.mp4`
-      const streamUrl = `/api/youtube-download/stream?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(filename)}`
+      const ext = type === 'mp3' ? 'm4a' : 'mp4'
+      const filename = `${video.title}.${ext}`
+      const kind = type === 'mp3' ? 'audio' : 'video'
 
       try {
-        toast.info('Đang bắt đầu tải xuống...')
-        // Probe server first (HEAD-like via small range) so we can show proper
-        // error if proxy is offline. Server redirects 302 to ngrok if healthy.
-        const probe = await fetch(streamUrl, { method: 'GET', redirect: 'manual' })
-        if (probe.type === 'opaqueredirect' || probe.status === 0 || probe.status === 302) {
-          // Healthy — let browser handle actual download natively (no buffering, no Vercel 60s cap).
-        } else if (!probe.ok) {
-          const err = await probe.json().catch(() => ({ error: `Lỗi ${probe.status}` }))
-          throw new Error(err.error || `Lỗi ${probe.status}`)
+        toast.info('Đang chuẩn bị tải xuống...')
+        // 1) Ask Vercel for direct tunnel URL (avoids Vercel 60s cap on the stream itself).
+        const resolveRes = await fetch(
+          `/api/youtube-download/resolve?url=${encodeURIComponent(url.trim())}&kind=${kind}&filename=${encodeURIComponent(filename)}`,
+        )
+        if (!resolveRes.ok) {
+          const err = await resolveRes.json().catch(() => ({ error: `Lỗi ${resolveRes.status}` }))
+          throw new Error(err.error || `Lỗi ${resolveRes.status}`)
         }
+        const { streamUrl } = (await resolveRes.json()) as { streamUrl: string }
 
+        // 2) Fetch the media cross-origin with CORS (tunnel allows *), then save as blob.
+        //    Keeps the user on thuvienso.top — no visible redirect to ngrok.
+        toast.info('Đang tải xuống, vui lòng chờ...')
+        const mediaRes = await fetch(streamUrl, {
+          headers: { 'ngrok-skip-browser-warning': '1' },
+        })
+        if (!mediaRes.ok) throw new Error(`Tải xuống thất bại (${mediaRes.status})`)
+        const blob = await mediaRes.blob()
+
+        const blobUrl = URL.createObjectURL(blob)
         const a = document.createElement('a')
-        a.href = streamUrl
+        a.href = blobUrl
         a.download = filename
         a.style.display = 'none'
         document.body.appendChild(a)
         a.click()
         a.remove()
-        toast.success(type === 'mp3' ? 'Đã bắt đầu tải âm thanh!' : 'Đã bắt đầu tải video!')
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+        toast.success(type === 'mp3' ? 'Đã tải âm thanh!' : 'Đã tải video!')
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Không thể tải video. Vui lòng thử lại.')
       } finally {

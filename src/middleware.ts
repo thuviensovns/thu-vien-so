@@ -90,7 +90,7 @@ export function middleware(req: NextRequest) {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com",
       "font-src 'self' data:",
-      `connect-src 'self' https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
+      `connect-src 'self' https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.trycloudflare.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
       `worker-src 'self'${isAIToolPage ? ' blob:' : ''}`,
       "frame-src 'self' https://www.youtube.com",
       "object-src 'none'",

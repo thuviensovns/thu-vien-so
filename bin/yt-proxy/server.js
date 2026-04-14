@@ -54,34 +54,57 @@ function extractVideoId(u) {
   return m?.[1] || null
 }
 
-async function fetchInfo(videoId) {
+async function resolveFormatUrl(fmt, player) {
+  if (fmt.url) return fmt.url
+  try { return await fmt.decipher(player) } catch { return null }
+}
+
+async function fetchInfo(videoId, kind = 'video') {
   const yt = await getInnertube()
   const clients = ['ANDROID', 'IOS', 'MWEB', 'WEB']
   for (const client of clients) {
     try {
       const info = await yt.getBasicInfo(videoId, { client })
-      const formats = info.streaming_data?.formats || []
-      for (const fmt of formats) {
-        let url = null
-        if (fmt.url) url = fmt.url
-        else {
-          try { url = await fmt.decipher(yt.session.player) } catch { continue }
-        }
-        if (url) {
-          const d = info.basic_info
-          return {
-            id: videoId,
-            title: d.title || '',
-            channel: d.channel?.name || d.author || '',
-            duration: d.duration || 0,
-            view_count: d.view_count || 0,
-            thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-            cdnUrl: url,
-            client,
-          }
+      const sd = info.streaming_data
+      if (!sd) continue
+
+      let chosen = null
+      let mime = null
+
+      if (kind === 'audio') {
+        // Prefer adaptive audio-only (m4a/mp4a). Falls back to combined if none.
+        const audioOnly = (sd.adaptive_formats || []).filter(f =>
+          (f.mime_type || '').startsWith('audio/'),
+        )
+        audioOnly.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))
+        for (const f of audioOnly) {
+          const u = await resolveFormatUrl(f, yt.session.player)
+          if (u) { chosen = u; mime = f.mime_type; break }
         }
       }
-      console.log(`[yt-proxy] ${videoId} client=${client} no usable URL (${formats.length} formats)`)
+
+      if (!chosen) {
+        for (const f of sd.formats || []) {
+          const u = await resolveFormatUrl(f, yt.session.player)
+          if (u) { chosen = u; mime = f.mime_type || 'video/mp4'; break }
+        }
+      }
+
+      if (chosen) {
+        const d = info.basic_info
+        return {
+          id: videoId,
+          title: d.title || '',
+          channel: d.channel?.name || d.author || '',
+          duration: d.duration || 0,
+          view_count: d.view_count || 0,
+          thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+          cdnUrl: chosen,
+          mime: mime || 'video/mp4',
+          client,
+        }
+      }
+      console.log(`[yt-proxy] ${videoId} client=${client} no usable URL`)
     } catch (e) {
       console.log(`[yt-proxy] ${videoId} client=${client} error: ${String(e.message || e).slice(0, 100)}`)
     }
@@ -109,7 +132,7 @@ function requireAuth(req, res, urlObj) {
   return true
 }
 
-function streamFromCdn(url, res, filename) {
+function streamFromCdn(url, res, filename, forcedType) {
   const req = https.get(
     url,
     {
@@ -128,10 +151,11 @@ function streamFromCdn(url, res, filename) {
         return
       }
       const headers = {
-        'Content-Type': upstream.headers['content-type'] || 'video/mp4',
+        'Content-Type': forcedType || upstream.headers['content-type'] || 'video/mp4',
         'Content-Length': upstream.headers['content-length'] || '',
         'Cache-Control': 'no-store',
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Expose-Headers': 'Content-Length, Content-Type, Content-Disposition',
       }
       if (filename) {
         const safe = filename.replace(/"/g, '')
@@ -161,7 +185,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, x-proxy-secret',
+        'Access-Control-Allow-Headers': 'Content-Type, x-proxy-secret, ngrok-skip-browser-warning',
       })
       res.end()
       return
@@ -175,26 +199,30 @@ const server = http.createServer(async (req, res) => {
 
     if (!requireAuth(req, res, url)) return
 
-    // GET /info?url=...
+    // GET /info?url=...&kind=video|audio
     if (req.method === 'GET' && url.pathname === '/info') {
       const y = url.searchParams.get('url')
+      const kind = url.searchParams.get('kind') === 'audio' ? 'audio' : 'video'
       const videoId = extractVideoId(y)
       if (!videoId) return sendJson(res, 400, { error: 'invalid youtube url' })
-      const info = await fetchInfo(videoId)
+      const info = await fetchInfo(videoId, kind)
       if (!info) return sendJson(res, 404, { error: 'no usable stream found', id: videoId })
       sendJson(res, 200, info)
       return
     }
 
-    // GET /stream?url=...  — proxy the actual video bytes
+    // GET /stream?url=...&kind=video|audio  — proxy the actual media bytes
     if (req.method === 'GET' && url.pathname === '/stream') {
       const y = url.searchParams.get('url')
+      const kind = url.searchParams.get('kind') === 'audio' ? 'audio' : 'video'
       const videoId = extractVideoId(y)
       if (!videoId) return sendJson(res, 400, { error: 'invalid youtube url' })
-      const info = await fetchInfo(videoId)
+      const info = await fetchInfo(videoId, kind)
       if (!info?.cdnUrl) return sendJson(res, 404, { error: 'no stream' })
-      const filename = url.searchParams.get('filename') || `${info.title || videoId}.mp4`
-      streamFromCdn(info.cdnUrl, res, filename)
+      const ext = kind === 'audio' ? 'm4a' : 'mp4'
+      const filename = url.searchParams.get('filename') || `${info.title || videoId}.${ext}`
+      const forcedType = kind === 'audio' ? (info.mime?.startsWith('audio/') ? info.mime.split(';')[0] : 'audio/mp4') : null
+      streamFromCdn(info.cdnUrl, res, filename, forcedType)
       return
     }
 
