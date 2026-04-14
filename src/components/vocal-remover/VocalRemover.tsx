@@ -23,6 +23,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Lock, Coins } from 'lucide-react'
 import { isModelCached } from '@/lib/audio/ai-separator'
 import { vocalJob, type JobMode } from '@/lib/audio/vocal-job'
+import { VocalHistoryList } from './VocalHistoryList'
+import type { HistoryRecord } from '@/lib/audio/vocal-history'
 
 interface ProcessedAudio {
   vocals: AudioBuffer
@@ -103,6 +105,7 @@ export function VocalRemover() {
 
   const [currentTime, setCurrentTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const sourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -162,6 +165,8 @@ export function VocalRemover() {
         setProcessing(false)
         setProgress(100)
         setProgressPhase('Hoàn tất!')
+        // Bump history so the freshly completed job appears in the list
+        setHistoryRefresh((n) => n + 1)
       } else if (s.status === 'error') {
         setProcessing(false)
       }
@@ -209,6 +214,70 @@ export function VocalRemover() {
       return buf
     },
     [getAudioContext],
+  )
+
+  // Load a previously-saved job from IndexedDB history. Rebuilds AudioBuffers
+  // and slots them into the right result state based on stored mode.
+  const handleLoadFromHistory = useCallback(
+    (record: HistoryRecord) => {
+      // Inline stop (stopPlayback declared later — avoid TDZ in dep array)
+      cancelAnimationFrame(rafRef.current)
+      if (sourceRef.current) {
+        sourceRef.current.onended = null
+        try { sourceRef.current.stop() } catch { /* already stopped */ }
+        sourceRef.current.disconnect()
+        sourceRef.current = null
+      }
+      playStateRef.current = null
+      setPlaying(null)
+      setCurrentTime(0)
+      setResult(null)
+      setMultiResult(null)
+      setFourResult(null)
+      vocalJob.clear()
+
+      // Synthesize a File-like stub so downloadTrack's baseName derivation works.
+      // Use a zero-byte File so the "please reprocess" check elsewhere doesn't
+      // try to re-upload the same content.
+      const stubFile = new File([new Uint8Array(0)], record.fileName, {
+        type: 'audio/wav',
+      })
+      setFile(stubFile)
+
+      const sr = record.sampleRate
+      const stems = record.stems
+      // Build a silent "original" buffer since we don't persist the source mix.
+      const len = stems[Object.keys(stems)[0]].left.length
+      const orig = makeStereoBuffer(new Float32Array(len), new Float32Array(len), sr)
+
+      if (record.mode === 'ai7') {
+        setMultiResult({
+          original: orig,
+          vocals: makeStereoBuffer(stems.vocals.left, stems.vocals.right, sr),
+          drums: makeStereoBuffer(stems.drums.left, stems.drums.right, sr),
+          bass: makeStereoBuffer(stems.bass.left, stems.bass.right, sr),
+          guitar: makeStereoBuffer(stems.guitar.left, stems.guitar.right, sr),
+          piano: makeStereoBuffer(stems.piano.left, stems.piano.right, sr),
+          strings: makeStereoBuffer(stems.strings.left, stems.strings.right, sr),
+          others: makeStereoBuffer(stems.others.left, stems.others.right, sr),
+        })
+      } else if (record.mode === 'ai4') {
+        setFourResult({
+          original: orig,
+          vocals: makeStereoBuffer(stems.vocals.left, stems.vocals.right, sr),
+          drums: makeStereoBuffer(stems.drums.left, stems.drums.right, sr),
+          bass: makeStereoBuffer(stems.bass.left, stems.bass.right, sr),
+          others: makeStereoBuffer(stems.others.left, stems.others.right, sr),
+        })
+      } else if (stems.vocals && stems.instrumental) {
+        setResult({
+          vocals: makeStereoBuffer(stems.vocals.left, stems.vocals.right, sr),
+          instrumental: makeStereoBuffer(stems.instrumental.left, stems.instrumental.right, sr),
+          original: orig,
+        })
+      }
+    },
+    [makeStereoBuffer],
   )
 
   // Hydrate AudioBuffers from singleton when a job result exists (e.g. user
@@ -494,21 +563,57 @@ export function VocalRemover() {
       }
       if (!buffer) return
 
-      const wav = audioBufferToWav(buffer)
-      const blob = new Blob([wav], { type: 'audio/wav' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      const baseName = file.name.replace(/\.[^.]+$/, '')
-      a.href = url
-      a.download = `${baseName}_${track}.wav`
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
-      toast.success(`Đã tải ${track}`)
+      // Show loading toast for tracks > 2 minutes (encode may take >1s)
+      const longTrack = buffer.duration > 120
+      const toastId = longTrack ? toast.loading(`Đang tạo WAV ${track}...`) : undefined
+      try {
+        const wav = await audioBufferToWav(buffer)
+        const blob = new Blob([wav], { type: 'audio/wav' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        const baseName = file.name.replace(/\.[^.]+$/, '')
+        a.href = url
+        a.download = `${baseName}_${track}.wav`
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        // Revoke a tick later so the download actually starts on Safari/iOS
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+        if (toastId !== undefined) toast.dismiss(toastId)
+        toast.success(`Đã tải ${track}`)
+      } catch (err) {
+        if (toastId !== undefined) toast.dismiss(toastId)
+        console.error('WAV encode/download failed:', err)
+        toast.error('Tải WAV thất bại — thử lại?')
+      }
     },
     [result, multiResult, fourResult, file],
+  )
+
+  const downloadAllTracks = useCallback(
+    async () => {
+      if (!file) return
+      let tracks: (TrackType | StemKey)[] = []
+      if (multiResult) tracks = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'strings', 'others']
+      else if (fourResult) tracks = ['vocals', 'drums', 'bass', 'others']
+      else if (result) tracks = ['vocals', 'instrumental']
+      if (tracks.length === 0) return
+
+      const toastId = toast.loading(`Đang tạo ${tracks.length} file WAV...`)
+      try {
+        for (let i = 0; i < tracks.length; i++) {
+          toast.loading(`Đang tạo ${tracks[i]} (${i + 1}/${tracks.length})...`, { id: toastId })
+          await downloadTrack(tracks[i])
+          // Brief gap so the browser's download manager queues each file cleanly
+          await new Promise((r) => setTimeout(r, 400))
+        }
+        toast.success(`Đã tải tất cả ${tracks.length} tracks`, { id: toastId })
+      } catch {
+        toast.error('Lỗi khi tải — một vài file có thể chưa tải xong.', { id: toastId })
+      }
+    },
+    [file, multiResult, fourResult, result, downloadTrack],
   )
 
   const handleReset = useCallback(() => {
@@ -589,6 +694,11 @@ export function VocalRemover() {
           Tách giọng hát và nhạc nền bằng AI — xử lý ngay trên trình duyệt
         </p>
       </div>
+
+      {/* History panel — shows completed jobs from IndexedDB, survives F5 */}
+      {!processing && (
+        <VocalHistoryList onLoad={handleLoadFromHistory} refreshKey={historyRefresh} />
+      )}
 
       {/* Upload Area */}
       {!file && !hasResult && (
@@ -886,6 +996,16 @@ export function VocalRemover() {
                 <p className="font-medium text-sm truncate">{file?.name}</p>
                 <p className="text-xs text-muted-foreground">Đã xử lý xong</p>
               </div>
+              <Button
+                onClick={downloadAllTracks}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                title="Tải WAV tất cả các tracks"
+              >
+                <Download className="size-3.5" />
+                <span className="hidden sm:inline">Tải tất cả</span>
+              </Button>
               <Button onClick={handleReset} variant="outline" size="sm" className="gap-1.5 shrink-0">
                 <RotateCcw className="size-3.5" />
                 File khác
@@ -1013,6 +1133,16 @@ export function VocalRemover() {
                   <p className="text-xs text-muted-foreground">Đã tách xong</p>
                 </div>
               </div>
+              <Button
+                onClick={downloadAllTracks}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                title="Tải WAV tất cả các tracks"
+              >
+                <Download className="size-3.5" />
+                <span className="hidden sm:inline">Tải tất cả</span>
+              </Button>
               <Button onClick={handleReset} variant="outline" size="sm" className="gap-1.5 shrink-0">
                 <RotateCcw className="size-3.5" />
                 File khác
@@ -1098,6 +1228,16 @@ export function VocalRemover() {
                   <p className="text-xs text-muted-foreground">Đã tách xong</p>
                 </div>
               </div>
+              <Button
+                onClick={downloadAllTracks}
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                title="Tải WAV tất cả các tracks"
+              >
+                <Download className="size-3.5" />
+                <span className="hidden sm:inline">Tải tất cả</span>
+              </Button>
               <Button onClick={handleReset} variant="outline" size="sm" className="gap-1.5 shrink-0">
                 <RotateCcw className="size-3.5" />
                 File khác
@@ -1237,7 +1377,9 @@ export function VocalRemover() {
 }
 
 // ── WAV encoder ──────────────────────────────────────────────
-function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
+// 16-bit PCM stereo. Encoding yields to the event loop every CHUNK samples
+// so long tracks (10+ minutes) don't freeze the tab during download.
+async function audioBufferToWav(buffer: AudioBuffer): Promise<ArrayBuffer> {
   const numChannels = buffer.numberOfChannels
   const sampleRate = buffer.sampleRate
   const format = 1
@@ -1270,12 +1412,16 @@ function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
     channels.push(buffer.getChannelData(ch))
   }
 
+  const YIELD_EVERY = 262144 // ~6s of stereo @44.1kHz — balances UI responsiveness with encode speed
   let offset = 44
   for (let i = 0; i < buffer.length; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
       const sample = Math.max(-1, Math.min(1, channels[ch][i]))
       view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
       offset += 2
+    }
+    if ((i & (YIELD_EVERY - 1)) === YIELD_EVERY - 1) {
+      await new Promise((r) => setTimeout(r, 0))
     }
   }
 

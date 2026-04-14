@@ -16,6 +16,7 @@ import {
   type AIProgress,
 } from './ai-separator'
 import { separateVocals } from './vocal-separator'
+import { saveJob as saveJobToHistory } from './vocal-history'
 
 export type JobMode = 'ai2' | 'ai4' | 'ai7' | 'dsp'
 export type JobStatus = 'idle' | 'processing' | 'done' | 'error'
@@ -250,6 +251,13 @@ class VocalJobManager {
             vocals: { left: r.vocalsL, right: r.vocalsR },
             instrumental: { left: r.instL, right: r.instR },
           },
+        })
+      }
+      // Persist to history (IndexedDB) so it survives F5. Non-blocking.
+      const finalState = this.state
+      if (finalState.status === 'done' && finalState.result) {
+        saveJobToHistory(finalState.result, params.fileName, params.fileSize).catch(() => {
+          /* storage quota or permission — non-fatal */
         })
       }
     } catch (err) {
