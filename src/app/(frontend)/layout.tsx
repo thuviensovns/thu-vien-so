@@ -11,6 +11,7 @@ import SiteContentSync from '@/components/providers/SiteContentSync'
 import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
 import { RouteProgress } from '@/components/shared/RouteProgress'
 import { ScrollToTop } from '@/components/shared/ScrollToTop'
+import { PageTransition } from '@/components/shared/PageTransition'
 import '@/styles/globals.css'
 
 const inter = Inter({
@@ -122,7 +123,7 @@ export default async function FrontendLayout({
 
           <div className="flex min-h-screen flex-col">
             <Header />
-            <main id="main-content" className="flex-1 animate-page-in">{children}</main>
+            <main id="main-content" className="flex-1"><PageTransition>{children}</PageTransition></main>
             <Footer initialSettings={siteContent.settings} />
             <ChatWidgetLazy />
             <VocalJobPill />

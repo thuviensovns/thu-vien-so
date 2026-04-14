@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ProductCard } from '@/components/shared/ProductCard'
 import { TopUpLeaderboard } from '@/components/shared/TopUpLeaderboard'
+import { FadeIn, Reveal, Stagger, StaggerItem } from '@/components/shared/motion'
 import { getCategoryDescriptions, type DemoProduct } from '@/lib/demo-data'
 import { getSiteSettings, defaultSiteSettings, categoryMeta } from '@/lib/config'
 import { mapPayloadDoc } from '@/lib/product-mapper'
@@ -129,7 +130,7 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
         <div className="container relative mx-auto px-4 py-12 sm:py-16 md:py-20 lg:py-24">
           <div className="flex flex-col lg:flex-row lg:items-start lg:gap-8">
             {/* Left: Hero content */}
-            <div className="flex-1 text-center lg:text-left">
+            <FadeIn className="flex-1 text-center lg:text-left">
               <Badge variant="secondary" className="mb-4 bg-secondary/10 text-secondary border-secondary/20 text-xs sm:text-sm">
                 {settings.heroBadge || `Hơn ${totalProducts}+ tài nguyên cho Producer`}
               </Badge>
@@ -164,16 +165,16 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
               </div>
 
               {/* Stats */}
-              <div className="mt-10 sm:mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+              <Stagger className="mt-10 sm:mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 {stats.map((stat) => (
-                  <div key={stat.label} className="text-center p-3 rounded-xl bg-card/50 border border-border/50 backdrop-blur-sm">
+                  <StaggerItem key={stat.label} className="text-center p-3 rounded-xl bg-card/50 border border-border/50 backdrop-blur-sm">
                     <stat.icon className="h-4 w-4 text-primary mx-auto mb-1" />
                     <div className="text-xl sm:text-2xl font-bold text-primary font-mono">{stat.value}</div>
                     <div className="text-xs sm:text-sm text-muted-foreground">{stat.label}</div>
-                  </div>
+                  </StaggerItem>
                 ))}
-              </div>
-            </div>
+              </Stagger>
+            </FadeIn>
 
             {/* Right: Top Nạp Leaderboard */}
             <div className="mt-8 lg:mt-0 lg:w-80 lg:shrink-0">
@@ -194,12 +195,13 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
             Xem tất cả <ArrowRight className="h-3 w-3" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+        <Stagger className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
           {categoryMeta.map((cat) => {
             const Icon = categoryIcons[cat.iconName as keyof typeof categoryIcons] || Music
             const cs = catStats[cat.slug]
             return (
-              <Link key={cat.slug} href={`/danh-muc/${cat.slug}`}>
+              <StaggerItem key={cat.slug}>
+              <Link href={`/danh-muc/${cat.slug}`}>
                 <Card className="group border-border bg-card hover:border-primary/30 hover:shadow-glow-sm transition-all duration-300 h-full hover:-translate-y-0.5">
                   <CardContent className="p-4 sm:p-5 text-center">
                     <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center mx-auto mb-3 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300">
@@ -215,9 +217,10 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
                   </CardContent>
                 </Card>
               </Link>
+              </StaggerItem>
             )
           })}
-        </div>
+        </Stagger>
       </section>
 
       {/* ===== FEATURED PRODUCTS ===== */}
@@ -242,11 +245,13 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Stagger className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {featuredProducts.slice(0, 8).map((product) => (
-              <ProductCard key={product.slug} {...toCardProps(product)} />
+              <StaggerItem key={product.slug}>
+                <ProductCard {...toCardProps(product)} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
@@ -273,11 +278,13 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <Stagger className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {freeProducts.slice(0, 8).map((product) => (
-              <ProductCard key={product.slug} {...toCardProps(product)} />
+              <StaggerItem key={product.slug}>
+                <ProductCard {...toCardProps(product)} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
@@ -301,16 +308,18 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Stagger className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {products.slice(0, 8).map((product) => (
-            <ProductCard key={product.slug} {...toCardProps(product)} />
+            <StaggerItem key={product.slug}>
+              <ProductCard {...toCardProps(product)} />
+            </StaggerItem>
           ))}
-        </div>
+        </Stagger>
       </section>
 
       {/* ===== CTA ===== */}
       <section className="container mx-auto px-4 py-12 sm:py-16 md:py-20">
-        <div className="relative rounded-xl sm:rounded-2xl border border-border overflow-hidden">
+        <Reveal className="relative rounded-xl sm:rounded-2xl border border-border overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/5" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,var(--glow),transparent_70%)]" />
           <div className="relative p-6 sm:p-8 md:p-12 text-center">
@@ -330,7 +339,7 @@ export function HomeContent({ serverProducts = [], serverCategories = [], hasRea
               </Button>
             </div>
           </div>
-        </div>
+        </Reveal>
       </section>
     </>
   )
