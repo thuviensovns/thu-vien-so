@@ -19,6 +19,7 @@ import { separateVocals } from './vocal-separator'
 import { saveJob as saveJobToHistory } from './vocal-history'
 import { separateEnsemble } from './ai-ensemble'
 import { separateWithHTDemucs } from './htdemucs-separator'
+import { separateWithRoFormer } from './roformer-separator'
 import { PRESETS, type PresetId } from './ai-models'
 import { equalizeStems } from './loudness'
 import { separateInstruments } from './multi-stem-separator'
@@ -223,6 +224,7 @@ class VocalJobManager {
       const primaryModel = modelIds[0] || 'mdx_a'
       const useEnsemble = modelIds.length > 1
       const useHtDemucs = presetId === 'htdemucs'
+      const useRoFormer = modelIds[0] === 'roformer'
       const useTTA = !!presetObj?.tta
       const overlapOverride = presetObj?.overlap
 
@@ -253,6 +255,12 @@ class VocalJobManager {
             instL, instR,
             htStems: r, // expose drums/bass/other if caller wants them
           }
+        }
+        if (useRoFormer) {
+          const r = await separateWithRoFormer(left, right, sampleRate, (p) => {
+            onProgress({ phase: p.phase as AIProgress['phase'], percent: p.percent, detail: p.detail })
+          })
+          return { vocalsL: r.vocalsL, vocalsR: r.vocalsR, instL: r.instL, instR: r.instR }
         }
         if (useEnsemble) {
           const r = await separateEnsemble(left, right, sampleRate, modelIds, onProgress, useTTA)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload,
   Music,
@@ -26,6 +26,7 @@ import { vocalJob, type JobMode } from '@/lib/audio/vocal-job'
 import { VocalHistoryList } from './VocalHistoryList'
 import type { HistoryRecord } from '@/lib/audio/vocal-history'
 import { listAvailablePresets, type PresetId } from '@/lib/audio/ai-models'
+import { AIModelSettings } from './AIModelSettings'
 
 interface ProcessedAudio {
   vocals: AudioBuffer
@@ -107,8 +108,10 @@ export function VocalRemover() {
   const [currentTime, setCurrentTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
   const [historyRefresh, setHistoryRefresh] = useState(0)
+  const [presetsVersion, setPresetsVersion] = useState(0)
   const [preset, setPreset] = useState<PresetId | 'htdemucs'>('fast')
-  const availablePresets = listAvailablePresets()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const availablePresets = useMemo(() => listAvailablePresets(), [presetsVersion])
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const sourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -852,6 +855,11 @@ export function VocalRemover() {
                     )
                   })}
                 </div>
+                {isAdmin && (
+                  <div className="mt-2">
+                    <AIModelSettings onChanged={() => setPresetsVersion((v) => v + 1)} />
+                  </div>
+                )}
               </div>
             )}
 

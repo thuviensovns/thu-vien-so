@@ -80,7 +80,7 @@ function getOrtBase(): string {
 // This module is the STFT/CAC pipeline — used by all MDX-family models.
 // HTDemucs uses a different waveform pipeline in htdemucs-separator.ts.
 
-import { getModel } from './ai-models'
+import { getModel, resolveClientModelUrl } from './ai-models'
 
 const MODEL_CACHE_DB = 'vocal-separator-cache'
 const MODEL_CACHE_STORE = 'models'
@@ -454,7 +454,7 @@ export async function separateWithAI(
 
   // ── Step 1: Download model ───────────────────────────────────
   onProgress?.({ phase: 'download', percent: 0, detail: `Kiểm tra ${model.label}...` })
-  const modelBuffer = await downloadModel(model.url, model.cacheKey, (pct) => {
+  const modelBuffer = await downloadModel(resolveClientModelUrl(modelId), model.cacheKey, (pct) => {
     onProgress?.({
       phase: 'download',
       percent: pct,

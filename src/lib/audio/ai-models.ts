@@ -177,7 +177,7 @@ export const MODELS: Record<string, ModelEntry> = {
   },
 }
 
-export type PresetId = 'fast' | 'quality' | 'best' | 'ultra'
+export type PresetId = 'fast' | 'quality' | 'best' | 'ultra' | 'roformer'
 
 export interface Preset {
   id: PresetId
@@ -232,6 +232,13 @@ export const PRESETS: Record<PresetId, Preset> = {
     tta: true,
     overlap: 0.5,
   },
+  roformer: {
+    id: 'roformer',
+    label: 'BS-RoFormer (SOTA)',
+    description: 'Band-split Rotary Transformer — SDR cao nhất, chậm ~3x',
+    models: ['roformer'],
+    slowdown: 3,
+  },
 }
 
 export function getModel(id: string): ModelEntry {
@@ -240,15 +247,54 @@ export function getModel(id: string): ModelEntry {
   return m
 }
 
+/**
+ * Runtime URL override — admin can paste an ONNX URL into localStorage
+ * without redeploying. The client appends `?upstream=` to the proxy route
+ * and the server validates the host against the allowlist.
+ */
+export function getOverriddenUpstreamUrl(id: string): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(`ai_upstream_override:${id}`) || null
+  } catch {
+    return null
+  }
+}
+
+export function setOverriddenUpstreamUrl(id: string, url: string | null): void {
+  if (typeof window === 'undefined') return
+  try {
+    if (url) window.localStorage.setItem(`ai_upstream_override:${id}`, url)
+    else window.localStorage.removeItem(`ai_upstream_override:${id}`)
+  } catch { /* quota / privacy mode */ }
+}
+
+/**
+ * Returns the client-facing URL to fetch the ONNX from. If the admin has
+ * pasted a runtime override, encode it into the proxy's `?upstream=` param.
+ */
+export function resolveClientModelUrl(id: string): string {
+  const m = getModel(id)
+  const override = getOverriddenUpstreamUrl(id)
+  if (override) return `${m.url}?upstream=${encodeURIComponent(override)}`
+  return m.url
+}
+
+function modelConfigured(m: ModelEntry): boolean {
+  if (!m.requiresEnvUrl) return true
+  if (m.upstreamUrl) return true
+  return !!getOverriddenUpstreamUrl(m.id)
+}
+
 export function listAvailableModels(): ModelEntry[] {
-  return Object.values(MODELS).filter((m) => !m.requiresEnvUrl || !!m.upstreamUrl)
+  return Object.values(MODELS).filter(modelConfigured)
 }
 
 export function listAvailablePresets(): Preset[] {
   return Object.values(PRESETS).filter((p) =>
     p.models.every((id) => {
       const m = MODELS[id]
-      return m && (!m.requiresEnvUrl || !!m.upstreamUrl)
+      return !!m && modelConfigured(m)
     }),
   )
 }

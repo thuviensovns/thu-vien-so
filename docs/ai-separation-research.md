@@ -18,17 +18,18 @@ Ghi chú các kỹ thuật SOTA đã áp dụng vào `/cong-cu/xoa-giong-ai` và
 - Ưu: ra 4 stems native, phase coherent.
 - Bật: set `NEXT_PUBLIC_AI_HTDEMUCS_URL` trỏ đến ONNX export.
 
-### 3. BS-RoFormer (registry có, adapter chưa)
+### 3. BS-RoFormer (đã tích hợp, adapter raw-waveform)
 - Band-Split + Rotary Position Embedding Transformer — ZFTurbo / lucidrains.
-- Input: STFT chia 62 band không đều (dense ở low freq).
-- SDR vocals ≈ 12.9 dB (SOTA hiện tại trên MUSDB18-HQ).
-- Rào cản: PyTorch reference chưa có canonical ONNX export; input
-  signature (tên tensor, band boundaries, chuẩn hoá) khác nhau theo từng
-  checkpoint. Muốn tích hợp cần:
-    1. ONNX export kèm file mô tả I/O
-    2. Viết band-split / band-merge adapter trong
-       `src/lib/audio/roformer-separator.ts`
-    3. Set `NEXT_PUBLIC_AI_ROFORMER_URL`
+- Input: band-split STFT + rotary PE, SDR vocals ~12.9 dB (SOTA MUSDB18-HQ).
+- Adapter [roformer-separator.ts](../src/lib/audio/roformer-separator.ts)
+  giả định export raw waveform I/O `[1, 2, T] → [1, 2, T]` (vocals), bám
+  theo các community conversion phổ biến nhất. Band-split + rotary PE nằm
+  trong graph ONNX, không cần code riêng.
+- Overlap-add Hann crossfade, per-channel normalize, residual instrumental.
+- Segment mặc định 524288 (~11.9s @ 44.1kHz), tự probe fixed input dim
+  từ `session.inputMetadata` nếu có.
+- Enable: set `NEXT_PUBLIC_AI_ROFORMER_URL` hoặc dán URL qua **Cài đặt
+  mô hình AI** (admin panel trên trang).
 
 ## Kỹ thuật nâng cao đã áp dụng
 

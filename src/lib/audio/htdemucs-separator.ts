@@ -12,7 +12,7 @@
  * separator throws a descriptive error so the UI can surface a helpful message.
  */
 
-import { getModel } from './ai-models'
+import { getModel, getOverriddenUpstreamUrl, resolveClientModelUrl } from './ai-models'
 import { downloadModel } from './ai-separator'
 
 export interface HtDemucsProgress {
@@ -99,9 +99,11 @@ export async function separateWithHTDemucs(
   if (model.spec.architecture !== 'htdemucs') {
     throw new Error('htdemucs model spec malformed')
   }
-  if (!model.upstreamUrl) {
+  const upstream = model.upstreamUrl || getOverriddenUpstreamUrl('htdemucs')
+  if (!upstream) {
     throw new Error(
-      'HTDemucs chưa được cấu hình — thiết lập NEXT_PUBLIC_AI_HTDEMUCS_URL rồi rebuild.',
+      'HTDemucs chưa được cấu hình — set NEXT_PUBLIC_AI_HTDEMUCS_URL ' +
+        'hoặc dán URL trong Cài đặt mô hình AI (admin).',
     )
   }
 
@@ -116,7 +118,7 @@ export async function separateWithHTDemucs(
 
   // ── Download model ───────────────────────────────────────────
   onProgress?.({ phase: 'download', percent: 0, detail: `Tải ${model.label}...` })
-  const modelBuffer = await downloadModel(model.url, model.cacheKey, (pct) => {
+  const modelBuffer = await downloadModel(resolveClientModelUrl('htdemucs'), model.cacheKey, (pct) => {
     onProgress?.({ phase: 'download', percent: pct, detail: `Tải HTDemucs... ${pct}%` })
   })
 
