@@ -15,8 +15,9 @@ if (!existsSync(src)) {
 }
 mkdirSync(dst, { recursive: true })
 
-// Only files needed by ort.wasm.min.js at runtime
+// Files needed by ort.all.min.js at runtime (WASM + WebGPU + proxy worker)
 const patterns = [
+  /^ort\.all\.min\.js$/,
   /^ort\.wasm\.min\.js$/,
   /^ort-wasm-simd-threaded\.(jsep|asyncify)?\.?mjs$/,
   /^ort-wasm-simd-threaded\.(jsep|asyncify)?\.?wasm$/,

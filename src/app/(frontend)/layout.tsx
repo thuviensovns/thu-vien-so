@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import { ChatWidgetLazy } from '@/components/chat/ChatWidgetLazy'
+import { VocalJobPill } from '@/components/vocal-remover/VocalJobPill'
 import { Providers } from '@/components/providers/Providers'
 import SiteContentSync from '@/components/providers/SiteContentSync'
 import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
@@ -124,6 +125,7 @@ export default async function FrontendLayout({
             <main id="main-content" className="flex-1 animate-page-in">{children}</main>
             <Footer initialSettings={siteContent.settings} />
             <ChatWidgetLazy />
+            <VocalJobPill />
           </div>
         </Providers>
       </body>

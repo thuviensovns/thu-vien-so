@@ -48,8 +48,8 @@ async function loadOrtFromCDN(): Promise<any> {
   if (g.ort) return g.ort
 
   const sources: Array<[string, string]> = [
-    [`${ORT_LOCAL_BASE}ort.wasm.min.js`, ORT_LOCAL_BASE],
-    [`${ORT_CDN_BASE}ort.wasm.min.js`, ORT_CDN_BASE],
+    [`${ORT_LOCAL_BASE}ort.all.min.js`, ORT_LOCAL_BASE],
+    [`${ORT_CDN_BASE}ort.all.min.js`, ORT_CDN_BASE],
   ]
   let lastErr: unknown = null
   for (const [url, base] of sources) {
@@ -454,16 +454,26 @@ export async function separateWithAI(
 
   ort.env.wasm.wasmPaths = getOrtBase()
 
-  // Try multi-threaded first, fall back to single-threaded if it fails
+  // Off-main-thread inference — moves ORT session into its own Web Worker
+  // so STFT/ISTFT + React UI on the main thread stay smooth (no tab freeze).
+  ort.env.wasm.proxy = true
+
+  // Detect WebGPU support to use the fastest available backend first.
+  const hasWebGPU =
+    typeof navigator !== 'undefined' &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    !!(navigator as any).gpu
+
   let session: InstanceType<typeof ort.InferenceSession>
   try {
     ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4)
+    const eps = hasWebGPU ? ['webgpu', 'wasm'] : ['wasm']
     session = await ort.InferenceSession.create(modelBuffer, {
-      executionProviders: ['wasm'],
+      executionProviders: eps,
     })
-    console.log('[AI-Sep] ONNX loaded with', ort.env.wasm.numThreads, 'threads')
+    console.log('[AI-Sep] ONNX loaded (proxy=true) EPs:', eps, 'threads:', ort.env.wasm.numThreads)
   } catch (mtErr) {
-    console.warn('[AI-Sep] Multi-threaded WASM failed, falling back to single thread:', mtErr)
+    console.warn('[AI-Sep] Preferred EPs failed, falling back to single-thread wasm:', mtErr)
     ort.env.wasm.numThreads = 1
     session = await ort.InferenceSession.create(modelBuffer, {
       executionProviders: ['wasm'],

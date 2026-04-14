@@ -21,16 +21,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Lock, Coins } from 'lucide-react'
-import { separateVocals, type SeparationProgress } from '@/lib/audio/vocal-separator'
-import {
-  separateWithAI,
-  separateMultiStemWithAI,
-  separate4StemWithAI,
-  isModelCached,
-  type AIProgress,
-  type MultiStemAIResult,
-  type FourStemAIResult,
-} from '@/lib/audio/ai-separator'
+import { isModelCached } from '@/lib/audio/ai-separator'
+import { vocalJob, type JobMode } from '@/lib/audio/vocal-job'
 
 interface ProcessedAudio {
   vocals: AudioBuffer
@@ -149,9 +141,32 @@ export function VocalRemover() {
       .catch(() => setSevenTrackFee(15))
   }, [])
 
-  // Cleanup AudioContext on unmount
+  // Cleanup AudioContext on unmount — keep alive if a job is still processing
+  // (singleton job survives unmount so user can navigate away without losing work).
   useEffect(() => {
-    return () => { audioCtxRef.current?.close() }
+    return () => {
+      if (vocalJob.isBusy()) return
+      audioCtxRef.current?.close()
+    }
+  }, [])
+
+  // Subscribe to global job state — hydrates UI on mount (e.g. when user
+  // navigates back to this page while a job is still in flight).
+  useEffect(() => {
+    const unsub = vocalJob.subscribe((s) => {
+      if (s.status === 'processing') {
+        setProcessing(true)
+        setProgress(s.progress)
+        setProgressPhase(s.phase)
+      } else if (s.status === 'done' && s.result) {
+        setProcessing(false)
+        setProgress(100)
+        setProgressPhase('Hoàn tất!')
+      } else if (s.status === 'error') {
+        setProcessing(false)
+      }
+    })
+    return unsub
   }, [])
 
   const getAudioContext = useCallback(() => {
@@ -196,21 +211,77 @@ export function VocalRemover() {
     [getAudioContext],
   )
 
+  // Hydrate AudioBuffers from singleton when a job result exists (e.g. user
+  // navigated back to the page while job finished on its own).
+  useEffect(() => {
+    const s = vocalJob.getState()
+    if (s.status !== 'done' || !s.result) return
+    const r = s.result
+    const sr = r.sampleRate
+    const orig = makeStereoBuffer(r.original.left, r.original.right, sr)
+    if (r.mode === 'ai7' && r.drums && r.guitar && r.piano && r.strings && r.others && r.bass && r.vocals) {
+      setMultiResult({
+        original: orig,
+        vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+        drums: makeStereoBuffer(r.drums.left, r.drums.right, sr),
+        bass: makeStereoBuffer(r.bass.left, r.bass.right, sr),
+        guitar: makeStereoBuffer(r.guitar.left, r.guitar.right, sr),
+        piano: makeStereoBuffer(r.piano.left, r.piano.right, sr),
+        strings: makeStereoBuffer(r.strings.left, r.strings.right, sr),
+        others: makeStereoBuffer(r.others.left, r.others.right, sr),
+      })
+    } else if (r.mode === 'ai4' && r.vocals && r.drums && r.bass && r.others) {
+      setFourResult({
+        original: orig,
+        vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+        drums: makeStereoBuffer(r.drums.left, r.drums.right, sr),
+        bass: makeStereoBuffer(r.bass.left, r.bass.right, sr),
+        others: makeStereoBuffer(r.others.left, r.others.right, sr),
+      })
+    } else if ((r.mode === 'ai2' || r.mode === 'dsp') && r.vocals && r.instrumental) {
+      setResult({
+        vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+        instrumental: makeStereoBuffer(r.instrumental.left, r.instrumental.right, sr),
+        original: orig,
+      })
+    }
+  }, [processing, makeStereoBuffer])
+
   const processAudio = useCallback(async () => {
     if (!file) return
+    if (vocalJob.isBusy()) {
+      toast.info('Đang có job đang xử lý. Vui lòng đợi hoàn tất.')
+      return
+    }
+    const jobModeDesired: JobMode = stemCount === 7
+      ? 'ai7'
+      : stemCount === 4 ? 'ai4' : mode === 'ai' ? 'ai2' : 'dsp'
+    // Guard: if singleton already has a completed result for this exact
+    // file + mode, don't re-charge or re-process — just surface it.
+    const existing = vocalJob.getState()
+    if (
+      existing.status === 'done' &&
+      existing.fileName === file.name &&
+      existing.fileSize === file.size &&
+      existing.mode === jobModeDesired
+    ) {
+      toast.info('Đã có kết quả — hiển thị lại.')
+      return
+    }
+    // Reset any stale result from a previous completed job.
+    vocalJob.clear()
+    setResult(null)
+    setMultiResult(null)
+    setFourResult(null)
     setProcessing(true)
-    setProgress(0)
-    setProgressPhase('')
+    setProgress(2)
+    setProgressPhase('Đang giải mã âm thanh...')
 
     try {
       const ctx = getAudioContext()
       const arrayBuffer = await file.arrayBuffer()
-      setProgress(2)
-      setProgressPhase('Đang giải mã âm thanh...')
-
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
       const sampleRate = audioBuffer.sampleRate
-      const length = audioBuffer.length
       const numChannels = audioBuffer.numberOfChannels
 
       if (numChannels < 2) {
@@ -219,19 +290,25 @@ export function VocalRemover() {
         return
       }
 
-      const left = audioBuffer.getChannelData(0)
-      const right = audioBuffer.getChannelData(1)
+      // Copy channel data so it's independent of the AudioBuffer (which is
+      // bound to this component's AudioContext and may be gc'd on unmount).
+      const left = new Float32Array(audioBuffer.getChannelData(0))
+      const right = new Float32Array(audioBuffer.getChannelData(1))
 
-      if (stemCount === 7) {
-        // ── 7-Track Mode: Fee check + AI vocals + DSP instrument separation ──
-        if (sevenTrackFee > 0 && !isAdmin) {
-          if (!isLoggedIn) {
-            toast.error('Vui lòng đăng nhập để sử dụng tính năng 7 tracks')
-            setProcessing(false)
-            window.location.href = `/dang-nhap?redirect=${encodeURIComponent('/cong-cu/xoa-giong-ai')}`
-            return
-          }
-          // Deduct balance via API
+      // ── 7-Track: fee/balance check ─────────────────────────────
+      if (stemCount === 7 && sevenTrackFee > 0 && !isAdmin) {
+        if (!isLoggedIn) {
+          toast.error('Vui lòng đăng nhập để sử dụng tính năng 7 tracks')
+          setProcessing(false)
+          window.location.href = `/dang-nhap?redirect=${encodeURIComponent('/cong-cu/xoa-giong-ai')}`
+          return
+        }
+        // Skip re-charge if this same file was already paid for in a prior
+        // run that's still in the singleton (e.g. user navigated away then
+        // re-clicked Process without clearing).
+        const s = vocalJob.getState()
+        const alreadyPaid = s.paidFee === sevenTrackFee && s.fileName === file.name && s.fileSize === file.size
+        if (!alreadyPaid) {
           const creditRes = await fetch('/api/vocal-remover/use-credit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -249,162 +326,67 @@ export function VocalRemover() {
             return
           }
           setUserBalance(creditData.newBalance)
-          toast.success(`Đã trừ ${sevenTrackFee.toLocaleString('vi-VN')}đ — Đang xử lý...`)
+          vocalJob.setPaidFee(sevenTrackFee)
+          toast.success(`Đã trừ ${sevenTrackFee.toLocaleString('vi-VN')}đ — Đang xử lý song song, bạn có thể rời trang.`)
+        } else {
+          toast.info('Tiếp tục job đã thanh toán trước đó...')
         }
-
-        const handleProgress = (p: AIProgress) => {
-          const phaseMap: Record<AIProgress['phase'], [number, number]> = {
-            download: [3, 20],
-            load: [20, 25],
-            stft: [25, 35],
-            inference: [35, 60],
-            reconstruct: [60, 65],
-            stems: [65, 98],
-          }
-          const [start, end] = phaseMap[p.phase] || [0, 100]
-          setProgress(Math.round(start + (p.percent / 100) * (end - start)))
-          setProgressPhase(p.detail || '')
-        }
-
-        try {
-          const stems: MultiStemAIResult = await separateMultiStemWithAI(
-            left, right, sampleRate, handleProgress,
-          )
-          setModelReady(true)
-
-          setMultiResult({
-            original: audioBuffer,
-            vocals: makeStereoBuffer(stems.vocals.left, stems.vocals.right, sampleRate),
-            drums: makeStereoBuffer(stems.drums.left, stems.drums.right, sampleRate),
-            bass: makeStereoBuffer(stems.bass.left, stems.bass.right, sampleRate),
-            guitar: makeStereoBuffer(stems.guitar.left, stems.guitar.right, sampleRate),
-            piano: makeStereoBuffer(stems.piano.left, stems.piano.right, sampleRate),
-            strings: makeStereoBuffer(stems.strings.left, stems.strings.right, sampleRate),
-            others: makeStereoBuffer(stems.others.left, stems.others.right, sampleRate),
-          })
-          setResult(null)
-          setFourResult(null)
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          console.error('7-track separation failed:', errMsg, err)
-          toast.error(`Lỗi tách 7 tracks: ${errMsg.slice(0, 200)}`, { duration: 15000 })
-          setProcessing(false)
-          return
-        }
-      } else if (stemCount === 4) {
-        // ── 4-Track Mode: AI vocals + DSP drums/bass/others ──
-        const handleProgress = (p: AIProgress) => {
-          const phaseMap: Record<AIProgress['phase'], [number, number]> = {
-            download: [3, 20],
-            load: [20, 25],
-            stft: [25, 35],
-            inference: [35, 60],
-            reconstruct: [60, 65],
-            stems: [65, 98],
-          }
-          const [start, end] = phaseMap[p.phase] || [0, 100]
-          setProgress(Math.round(start + (p.percent / 100) * (end - start)))
-          setProgressPhase(p.detail || '')
-        }
-
-        try {
-          const stems: FourStemAIResult = await separate4StemWithAI(
-            left, right, sampleRate, handleProgress,
-          )
-          setModelReady(true)
-
-          setFourResult({
-            original: audioBuffer,
-            vocals: makeStereoBuffer(stems.vocals.left, stems.vocals.right, sampleRate),
-            drums: makeStereoBuffer(stems.drums.left, stems.drums.right, sampleRate),
-            bass: makeStereoBuffer(stems.bass.left, stems.bass.right, sampleRate),
-            others: makeStereoBuffer(stems.others.left, stems.others.right, sampleRate),
-          })
-          setResult(null)
-          setMultiResult(null)
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          console.error('4-track separation failed:', errMsg, err)
-          toast.error(`Lỗi tách 4 tracks: ${errMsg.slice(0, 200)}`, { duration: 15000 })
-          setProcessing(false)
-          return
-        }
-      } else if (mode === 'ai') {
-        // ── 2-Track AI Mode ──
-        const handleAIProgress = (p: AIProgress) => {
-          const phaseMap: Record<AIProgress['phase'], [number, number]> = {
-            download: [3, 25],
-            load: [25, 30],
-            stft: [30, 45],
-            inference: [45, 85],
-            reconstruct: [85, 98],
-            stems: [85, 98],
-          }
-          const [start, end] = phaseMap[p.phase] || [0, 100]
-          setProgress(Math.round(start + (p.percent / 100) * (end - start)))
-          setProgressPhase(p.detail || '')
-        }
-
-        try {
-          const aiRes = await separateWithAI(left, right, sampleRate, handleAIProgress)
-          setResult({
-            vocals: makeStereoBuffer(aiRes.vocalsL, aiRes.vocalsR, sampleRate),
-            instrumental: makeStereoBuffer(aiRes.instL, aiRes.instR, sampleRate),
-            original: audioBuffer,
-          })
-          setMultiResult(null)
-          setFourResult(null)
-          setModelReady(true)
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : String(err)
-          console.error('AI separation failed, falling back to DSP:', errMsg, err)
-          toast.error(`AI lỗi: ${errMsg.slice(0, 200)}`, { duration: 15000 })
-          const dspRes = await separateVocals(left, right, sampleRate, (p) => {
-            setProgress(10 + Math.round(p.percent * 0.88))
-            setProgressPhase('Chế độ nhanh (DSP)...')
-          })
-          setResult({
-            vocals: makeStereoBuffer(dspRes.vocalsL, dspRes.vocalsR, sampleRate),
-            instrumental: makeStereoBuffer(dspRes.instL, dspRes.instR, sampleRate),
-            original: audioBuffer,
-          })
-          setMultiResult(null)
-          setFourResult(null)
-        }
-      } else {
-        // ── 2-Track DSP Mode ──
-        const handleDSPProgress = (p: SeparationProgress) => {
-          setProgress(5 + Math.round(p.percent * 0.93))
-          const labels: Record<SeparationProgress['phase'], string> = {
-            stft: 'Phân tích phổ tần số...',
-            hpss: 'Tách harmonic/percussive...',
-            mask: 'Tạo mặt nạ tách giọng...',
-            wiener: 'Lọc Wiener...',
-            reconstruct: 'Tái tạo âm thanh...',
-          }
-          setProgressPhase(labels[p.phase])
-        }
-        const dspRes = await separateVocals(left, right, sampleRate, handleDSPProgress)
-        setResult({
-          vocals: makeStereoBuffer(dspRes.vocalsL, dspRes.vocalsR, sampleRate),
-          instrumental: makeStereoBuffer(dspRes.instL, dspRes.instR, sampleRate),
-          original: audioBuffer,
-        })
-        setMultiResult(null)
-        setFourResult(null)
       }
 
-      // Only show success after all branches complete without early return
-      setProgress(100)
-      setProgressPhase('Hoàn tất!')
-      toast.success(`Đã tách ${stemCount} tracks xong!`)
+      await vocalJob.start({
+        mode: jobModeDesired,
+        fileName: file.name,
+        fileSize: file.size,
+        sampleRate,
+        left,
+        right,
+      })
+
+      const final = vocalJob.getState()
+      if (final.status === 'error') {
+        toast.error(`Lỗi tách: ${(final.error || '').slice(0, 200)}`, { duration: 15000 })
+        return
+      }
+      if (final.status === 'done' && final.result) {
+        const r = final.result
+        const sr = r.sampleRate
+        const orig = audioBuffer
+        if (r.mode === 'ai7' && r.vocals && r.drums && r.bass && r.guitar && r.piano && r.strings && r.others) {
+          setMultiResult({
+            original: orig,
+            vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+            drums: makeStereoBuffer(r.drums.left, r.drums.right, sr),
+            bass: makeStereoBuffer(r.bass.left, r.bass.right, sr),
+            guitar: makeStereoBuffer(r.guitar.left, r.guitar.right, sr),
+            piano: makeStereoBuffer(r.piano.left, r.piano.right, sr),
+            strings: makeStereoBuffer(r.strings.left, r.strings.right, sr),
+            others: makeStereoBuffer(r.others.left, r.others.right, sr),
+          })
+        } else if (r.mode === 'ai4' && r.vocals && r.drums && r.bass && r.others) {
+          setFourResult({
+            original: orig,
+            vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+            drums: makeStereoBuffer(r.drums.left, r.drums.right, sr),
+            bass: makeStereoBuffer(r.bass.left, r.bass.right, sr),
+            others: makeStereoBuffer(r.others.left, r.others.right, sr),
+          })
+        } else if (r.vocals && r.instrumental) {
+          setResult({
+            vocals: makeStereoBuffer(r.vocals.left, r.vocals.right, sr),
+            instrumental: makeStereoBuffer(r.instrumental.left, r.instrumental.right, sr),
+            original: orig,
+          })
+        }
+        setModelReady(true)
+        toast.success(`Đã tách ${stemCount} tracks xong!`)
+      }
     } catch (err) {
       console.error('Audio processing error:', err)
       toast.error('Không thể xử lý file âm thanh')
     } finally {
       setProcessing(false)
     }
-  }, [file, getAudioContext, mode, stemCount, makeStereoBuffer])
+  }, [file, getAudioContext, mode, stemCount, makeStereoBuffer, sevenTrackFee, isAdmin, isLoggedIn])
 
   const stopPlayback = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
