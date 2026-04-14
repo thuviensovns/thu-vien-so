@@ -825,23 +825,68 @@ export function VocalRemover() {
 
       {/* Processing */}
       {processing && (
-        <Card>
+        <Card className="overflow-hidden border-purple-500/20 bg-gradient-to-br from-purple-500/[0.03] via-transparent to-pink-500/[0.03]">
           <CardContent className="pt-0">
-            <div className="flex flex-col items-center gap-4 py-8">
-              <Loader2 className="size-10 animate-spin text-purple-500" />
-              <div className="text-center">
-                <p className="font-medium text-sm">Đang xử lý...</p>
-                <p className="text-xs text-muted-foreground mt-1">
+            <div className="flex flex-col items-center gap-5 sm:gap-6 py-8 sm:py-10">
+              {/* Radial progress — compositor-friendly (transform/opacity only) */}
+              <div className="relative size-24 sm:size-28">
+                {/* Pulsing glow halo */}
+                <div className="absolute inset-0 rounded-full bg-purple-500/25 blur-2xl motion-safe:animate-vr-pulse motion-reduce:opacity-40" />
+                {/* Rotating gradient ring */}
+                <svg
+                  className="relative size-full -rotate-90 motion-safe:will-change-transform"
+                  viewBox="0 0 100 100"
+                  aria-hidden
+                >
+                  <defs>
+                    <linearGradient id="vr-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#ec4899" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" className="text-muted/40" strokeWidth="6" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="44"
+                    fill="none"
+                    stroke="url(#vr-grad)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 44}
+                    strokeDashoffset={2 * Math.PI * 44 * (1 - Math.max(0, Math.min(100, progress)) / 100)}
+                    style={{ transition: 'stroke-dashoffset 400ms cubic-bezier(0.22, 1, 0.36, 1)' }}
+                  />
+                </svg>
+                {/* Center percent */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-xl sm:text-2xl font-bold tabular-nums bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">
+                    {progress}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-center max-w-[22rem] px-4">
+                <p className="font-semibold text-sm sm:text-base">Đang xử lý</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 min-h-[2.25em]">
                   {progressPhase || 'Đang chuẩn bị...'}
                 </p>
               </div>
-              <div className="w-full max-w-xs bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
+
+              {/* Linear bar — GPU-accelerated via transform: scaleX */}
+              <div className="w-full max-w-sm px-2">
+                <div className="relative h-1.5 sm:h-2 rounded-full bg-muted/60 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 right-0 origin-left rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500"
+                    style={{
+                      transform: `scaleX(${Math.max(0, Math.min(100, progress)) / 100})`,
+                      transition: 'transform 400ms cubic-bezier(0.22, 1, 0.36, 1)',
+                    }}
+                  />
+                  {/* Shimmer sweep */}
+                  <div className="pointer-events-none absolute inset-0 motion-safe:animate-vr-shimmer motion-reduce:hidden bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">{progress}%</p>
             </div>
           </CardContent>
         </Card>

@@ -235,4 +235,24 @@
       transform: translateY(0);
     }
   }
+
+  /* Vocal-remover progress animations — compositor-only (transform/opacity) */
+  .animate-vr-pulse {
+    animation: vrPulse 2.4s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+  .animate-vr-shimmer {
+    animation: vrShimmer 1.6s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes vrPulse {
+    0%, 100% { transform: scale(0.92); opacity: 0.55; }
+    50%      { transform: scale(1.08); opacity: 0.85; }
+  }
+
+  @keyframes vrShimmer {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
 }
