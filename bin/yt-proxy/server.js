@@ -70,6 +70,8 @@ async function fetchInfo(videoId, kind = 'video') {
 
       let chosen = null
       let mime = null
+      let contentLength = 0
+      let isAdaptive = false
 
       if (kind === 'audio') {
         // Prefer adaptive audio-only (m4a/mp4a). Falls back to combined if none.
@@ -79,14 +81,25 @@ async function fetchInfo(videoId, kind = 'video') {
         audioOnly.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))
         for (const f of audioOnly) {
           const u = await resolveFormatUrl(f, yt.session.player)
-          if (u) { chosen = u; mime = f.mime_type; break }
+          if (u) {
+            chosen = u
+            mime = f.mime_type
+            contentLength = Number(f.content_length) || 0
+            isAdaptive = true
+            break
+          }
         }
       }
 
       if (!chosen) {
         for (const f of sd.formats || []) {
           const u = await resolveFormatUrl(f, yt.session.player)
-          if (u) { chosen = u; mime = f.mime_type || 'video/mp4'; break }
+          if (u) {
+            chosen = u
+            mime = f.mime_type || 'video/mp4'
+            contentLength = Number(f.content_length) || 0
+            break
+          }
         }
       }
 
@@ -101,6 +114,8 @@ async function fetchInfo(videoId, kind = 'video') {
           thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
           cdnUrl: chosen,
           mime: mime || 'video/mp4',
+          contentLength,
+          isAdaptive,
           client,
         }
       }
@@ -132,6 +147,66 @@ function requireAuth(req, res, urlObj) {
   return true
 }
 
+/**
+ * Stream in bounded-range chunks. YouTube's adaptive (DASH) audio URLs 403 any
+ * Range > ~256KB or unbounded `bytes=0-`. Sequential 200KB chunks stay under
+ * the throttle ceiling and concatenate into a complete file client-side.
+ */
+function streamChunked(url, res, filename, forcedType, totalLength) {
+  const CHUNK = 200 * 1024
+  const UA = 'com.google.android.youtube/19.09.36 (Linux; U; Android 14) gzip'
+
+  const headers = {
+    'Content-Type': forcedType || 'audio/mp4',
+    'Content-Length': String(totalLength),
+    'Cache-Control': 'no-store',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Type, Content-Disposition',
+  }
+  if (filename) {
+    const safe = filename.replace(/"/g, '')
+    headers['Content-Disposition'] =
+      `attachment; filename="${safe.replace(/[^\x20-\x7E]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(safe)}`
+  }
+  res.writeHead(200, headers)
+
+  let pos = 0
+  let cancelled = false
+  res.on('close', () => { cancelled = true })
+
+  function fetchNext() {
+    if (cancelled) return
+    if (pos >= totalLength) { res.end(); return }
+    const end = Math.min(pos + CHUNK - 1, totalLength - 1)
+    const rangeStart = pos
+    const req = https.get(url, { headers: { 'User-Agent': UA, Range: `bytes=${rangeStart}-${end}` } }, (up) => {
+      if (up.statusCode !== 206 && up.statusCode !== 200) {
+        console.error(`[yt-proxy] chunk ${rangeStart}-${end} -> ${up.statusCode}`)
+        res.destroy(new Error(`CDN returned ${up.statusCode} for chunk`))
+        return
+      }
+      up.on('data', (buf) => {
+        if (!cancelled) res.write(buf)
+      })
+      up.on('end', () => {
+        pos = end + 1
+        fetchNext()
+      })
+      up.on('error', (e) => {
+        console.error('[yt-proxy] chunk stream error:', e.message)
+        res.destroy(e)
+      })
+    })
+    req.setTimeout(30_000, () => req.destroy(new Error('chunk timeout')))
+    req.on('error', (e) => {
+      console.error('[yt-proxy] chunk req error:', e.message)
+      if (!res.headersSent) sendJson(res, 502, { error: e.message })
+      else res.destroy(e)
+    })
+  }
+  fetchNext()
+}
+
 function streamFromCdn(url, res, filename, forcedType) {
   const req = https.get(
     url,
@@ -143,16 +218,23 @@ function streamFromCdn(url, res, filename, forcedType) {
     },
     (upstream) => {
       if (upstream.statusCode >= 300 && upstream.statusCode < 400 && upstream.headers.location) {
-        streamFromCdn(upstream.headers.location, res)
+        streamFromCdn(upstream.headers.location, res, filename, forcedType)
         return
       }
-      if (upstream.statusCode !== 200) {
+      if (upstream.statusCode !== 200 && upstream.statusCode !== 206) {
         sendJson(res, 502, { error: `CDN returned ${upstream.statusCode}` })
         return
       }
+      // Derive full length: prefer Content-Range total, fall back to Content-Length.
+      let contentLength = upstream.headers['content-length'] || ''
+      const cr = upstream.headers['content-range']
+      if (cr) {
+        const m = /\/(\d+)$/.exec(cr)
+        if (m) contentLength = m[1]
+      }
       const headers = {
         'Content-Type': forcedType || upstream.headers['content-type'] || 'video/mp4',
-        'Content-Length': upstream.headers['content-length'] || '',
+        'Content-Length': contentLength,
         'Cache-Control': 'no-store',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Expose-Headers': 'Content-Length, Content-Type, Content-Disposition',
@@ -219,10 +301,16 @@ const server = http.createServer(async (req, res) => {
       if (!videoId) return sendJson(res, 400, { error: 'invalid youtube url' })
       const info = await fetchInfo(videoId, kind)
       if (!info?.cdnUrl) return sendJson(res, 404, { error: 'no stream' })
-      const ext = kind === 'audio' ? 'm4a' : 'mp4'
+      const isAudio = kind === 'audio' && info.mime?.startsWith('audio/')
+      const isWebm = (info.mime || '').includes('webm')
+      const ext = isAudio ? (isWebm ? 'weba' : 'm4a') : 'mp4'
       const filename = url.searchParams.get('filename') || `${info.title || videoId}.${ext}`
-      const forcedType = kind === 'audio' ? (info.mime?.startsWith('audio/') ? info.mime.split(';')[0] : 'audio/mp4') : null
-      streamFromCdn(info.cdnUrl, res, filename, forcedType)
+      const forcedType = isAudio ? info.mime.split(';')[0] : null
+      if (info.isAdaptive && info.contentLength > 0) {
+        streamChunked(info.cdnUrl, res, filename, forcedType, info.contentLength)
+      } else {
+        streamFromCdn(info.cdnUrl, res, filename, forcedType)
+      }
       return
     }
 
