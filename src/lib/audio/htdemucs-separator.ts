@@ -97,7 +97,7 @@ export async function separateWithHTDemucs(
   if (model.spec.architecture !== 'htdemucs') {
     throw new Error('htdemucs model spec malformed')
   }
-  if (!model.url) {
+  if (!model.upstreamUrl) {
     throw new Error(
       'HTDemucs chưa được cấu hình — thiết lập NEXT_PUBLIC_AI_HTDEMUCS_URL rồi rebuild.',
     )

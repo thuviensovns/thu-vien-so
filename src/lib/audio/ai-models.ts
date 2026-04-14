@@ -43,8 +43,14 @@ export interface ModelEntry {
   label: string
   /** Short description shown in UI */
   description: string
-  /** ONNX URL (may be env-overridden) */
+  /**
+   * Client-facing URL to fetch ONNX from. Always the same-origin proxy route
+   * `/api/ai-models/{id}` to bypass upstream CORS (HuggingFace only allows
+   * Origin=huggingface.co). The proxy reads `upstreamUrl` server-side.
+   */
   url: string
+  /** Upstream ONNX URL resolved by the proxy server-side (may be env-overridden). */
+  upstreamUrl: string
   /** IndexedDB cache key — bump to invalidate */
   cacheKey: string
   /** Approximate download size for UI */
@@ -74,7 +80,8 @@ export const MODELS: Record<string, ModelEntry> = {
     id: 'mdx_a',
     label: 'MDX-A (Nhanh)',
     description: 'Cân bằng tốc độ & chất lượng — mặc định',
-    url: MDX_A_URL,
+    url: '/api/ai-models/mdx_a',
+    upstreamUrl: MDX_A_URL,
     cacheKey: process.env.NEXT_PUBLIC_AI_MDX_A_KEY || 'kuielab_a_vocals_v1',
     sizeMB: 58,
     spec: {
@@ -91,7 +98,8 @@ export const MODELS: Record<string, ModelEntry> = {
     id: 'mdx_b',
     label: 'MDX-B (Cao cấp)',
     description: 'Giữ chi tiết giọng hát tốt hơn, chậm hơn ~10%',
-    url: MDX_B_URL,
+    url: '/api/ai-models/mdx_b',
+    upstreamUrl: MDX_B_URL,
     cacheKey: process.env.NEXT_PUBLIC_AI_MDX_B_KEY || 'kuielab_b_vocals_v1',
     sizeMB: 58,
     spec: {
@@ -108,7 +116,8 @@ export const MODELS: Record<string, ModelEntry> = {
     id: 'htdemucs',
     label: 'HTDemucs (Chất lượng studio)',
     description: 'Hybrid Transformer, 4 stems, chậm hơn ~3x',
-    url: HTDEMUCS_URL,
+    url: '/api/ai-models/htdemucs',
+    upstreamUrl: HTDEMUCS_URL,
     cacheKey: process.env.NEXT_PUBLIC_AI_HTDEMUCS_KEY || 'htdemucs_v4',
     sizeMB: 80,
     requiresEnvUrl: !HTDEMUCS_URL,
@@ -169,14 +178,14 @@ export function getModel(id: string): ModelEntry {
 }
 
 export function listAvailableModels(): ModelEntry[] {
-  return Object.values(MODELS).filter((m) => !m.requiresEnvUrl || !!m.url)
+  return Object.values(MODELS).filter((m) => !m.requiresEnvUrl || !!m.upstreamUrl)
 }
 
 export function listAvailablePresets(): Preset[] {
   return Object.values(PRESETS).filter((p) =>
     p.models.every((id) => {
       const m = MODELS[id]
-      return m && (!m.requiresEnvUrl || !!m.url)
+      return m && (!m.requiresEnvUrl || !!m.upstreamUrl)
     }),
   )
 }
