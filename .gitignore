@@ -4,9 +4,13 @@ node_modules/
 # binaries
 bin/*
 !bin/yt-proxy/
+!bin/yt-proxy-cf/
 bin/yt-proxy/node_modules/
 bin/yt-proxy/.env
 bin/yt-proxy/cloudflared.exe
+bin/yt-proxy-cf/node_modules/
+bin/yt-proxy-cf/.wrangler/
+bin/yt-proxy-cf/.dev.vars
 .pnp
 .pnp.js
 .pnp.cjs
