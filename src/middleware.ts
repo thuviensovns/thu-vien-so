@@ -30,6 +30,7 @@ export function middleware(req: NextRequest) {
     && !pathname.startsWith('/api/debug-db')
     && !pathname.startsWith('/api/health')
     && !pathname.startsWith('/api/ping')
+    && !pathname.startsWith('/api/vocal-remover')
   if (isPayloadApi) return NextResponse.next()
 
   // Rate limit custom API routes
@@ -79,16 +80,18 @@ export function middleware(req: NextRequest) {
 
   // CSP — include R2/Cloudflare domains for product images
   const isDev = process.env.NODE_ENV !== 'production'
+  const isAIToolPage = pathname.startsWith('/cong-cu/xoa-giong-ai')
   res.headers.set(
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+      `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ''}${isAIToolPage ? ' https://cdn.jsdelivr.net blob:' : ''}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev",
+      "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com",
       "font-src 'self' data:",
-      "connect-src 'self' https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev",
-      "frame-src 'none'",
+      `connect-src 'self' https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
+      `worker-src 'self'${isAIToolPage ? ' blob:' : ''}`,
+      "frame-src 'self' https://www.youtube.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -101,6 +104,10 @@ export function middleware(req: NextRequest) {
   if (!isApi) {
     res.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
     res.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
+    // Enable SharedArrayBuffer for ONNX Runtime WASM (AI vocal separator)
+    if (isAIToolPage) {
+      res.headers.set('Cross-Origin-Embedder-Policy', 'credentialless')
+    }
   }
 
   return res

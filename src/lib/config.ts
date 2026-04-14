@@ -25,6 +25,8 @@ export const navItems = [
   { label: 'Sóng nhạc Lyrics', href: '/danh-muc/song-nhac-lyrics' },
   { label: 'Cài đặt phần mềm', href: '/danh-muc/cai-dat-phan-mem' },
   { label: 'Blog', href: '/blog' },
+  { label: 'Tải YouTube', href: '/cong-cu/tai-youtube' },
+  { label: 'Xóa Giọng AI', href: '/cong-cu/xoa-giong-ai' },
 ] as const
 
 /** Product type labels for display */
@@ -212,6 +214,8 @@ export interface SiteSettings {
   minTopup: number
   maxDownloads: number
   downloadExpiryHours: number
+  // AI Tools pricing
+  sevenTrackFee: number // VND per 7-track separation use (0 = free)
   // Footer
   footerText: string
   copyrightText: string
@@ -242,6 +246,7 @@ export const defaultSiteSettings: SiteSettings = {
   minTopup: MIN_TOPUP,
   maxDownloads: 5,
   downloadExpiryHours: 72,
+  sevenTrackFee: 5000, // 5,000 VND per 7-track use
   footerText: 'Tài nguyên FLP, VST, Sample Pack cho Producer Việt Nam. Download miễn phí và premium cho Producer Việt.',
   copyrightText: '',
 }

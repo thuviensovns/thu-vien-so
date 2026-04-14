@@ -29,7 +29,7 @@ const sections: { key: SectionKey; label: string; icon: typeof Globe; desc: stri
   { key: 'seo', label: 'SEO & Meta', icon: Search, desc: 'Tiêu đề, mô tả, từ khóa' },
   { key: 'hero', label: 'Trang chủ (Hero)', icon: Layout, desc: 'Tiêu đề, mô tả hero' },
   { key: 'announcement', label: 'Thông báo', icon: Bell, desc: 'Banner thông báo' },
-  { key: 'payment', label: 'Thanh toán', icon: CreditCard, desc: 'Nạp tiền tối thiểu' },
+  { key: 'payment', label: 'Thanh toán & Phí', icon: CreditCard, desc: 'Nạp tiền, phí công cụ AI' },
   { key: 'download', label: 'Download', icon: Download, desc: 'Giới hạn tải xuống' },
   { key: 'footer', label: 'Footer', icon: FileText, desc: 'Chân trang, copyright' },
 ]
@@ -131,6 +131,7 @@ export default function SettingsPage() {
       ]
       case 'payment': return [
         { key: 'minTopup', label: 'Số tiền nạp tối thiểu (VND)', type: 'number', min: 1000, step: 1000 },
+        { key: 'sevenTrackFee', label: 'Phí tách 7 Tracks AI (VND)', type: 'number', min: 0, step: 1000, help: 'Phí mỗi lần sử dụng tính năng tách 7 tracks. Đặt 0 = miễn phí. Admin luôn miễn phí.' },
       ]
       case 'download': return [
         { key: 'maxDownloads', label: 'Số lần tải tối đa / sản phẩm', type: 'number', min: 1, step: 1, help: 'Giới hạn lượt tải cho mỗi sản phẩm đã mua' },

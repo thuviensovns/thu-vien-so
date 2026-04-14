@@ -1,1 +1,13 @@
+allowBuilds:
+  '-': true
+  b: true
+  c: true
+  d: true
+  e: true
+  l: true
+  o: true
+  t: true
+  u: true
+  x: true
+  y: true
 approveBuilds: esbuild,sharp
