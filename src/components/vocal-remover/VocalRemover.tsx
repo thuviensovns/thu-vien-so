@@ -25,6 +25,7 @@ import { isModelCached } from '@/lib/audio/ai-separator'
 import { vocalJob, type JobMode } from '@/lib/audio/vocal-job'
 import { VocalHistoryList } from './VocalHistoryList'
 import type { HistoryRecord } from '@/lib/audio/vocal-history'
+import { listAvailablePresets, type PresetId } from '@/lib/audio/ai-models'
 
 interface ProcessedAudio {
   vocals: AudioBuffer
@@ -106,6 +107,8 @@ export function VocalRemover() {
   const [currentTime, setCurrentTime] = useState(0)
   const [trackDuration, setTrackDuration] = useState(0)
   const [historyRefresh, setHistoryRefresh] = useState(0)
+  const [preset, setPreset] = useState<PresetId | 'htdemucs'>('fast')
+  const availablePresets = listAvailablePresets()
 
   const audioCtxRef = useRef<AudioContext | null>(null)
   const sourceRef = useRef<AudioBufferSourceNode | null>(null)
@@ -409,6 +412,7 @@ export function VocalRemover() {
         sampleRate,
         left,
         right,
+        presetId: jobModeDesired === 'dsp' ? undefined : preset,
       })
 
       const final = vocalJob.getState()
@@ -455,7 +459,7 @@ export function VocalRemover() {
     } finally {
       setProcessing(false)
     }
-  }, [file, getAudioContext, mode, stemCount, makeStereoBuffer, sevenTrackFee, isAdmin, isLoggedIn])
+  }, [file, getAudioContext, mode, stemCount, makeStereoBuffer, sevenTrackFee, isAdmin, isLoggedIn, preset])
 
   const stopPlayback = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
@@ -811,6 +815,45 @@ export function VocalRemover() {
                 </div>
               </button>
             </div>
+
+            {/* AI quality preset selector — picks which model(s) to run.
+                Hidden in DSP mode (no AI involved). */}
+            {mode === 'ai' && (
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground mb-1.5">
+                  Chất lượng AI
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {availablePresets.map((p) => {
+                    const active = preset === p.id
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPreset(p.id)}
+                        className={`flex flex-col gap-0.5 rounded-lg border p-2 text-left transition-all ${
+                          active
+                            ? 'border-fuchsia-500 bg-fuchsia-500/10'
+                            : 'border-muted hover:border-fuchsia-500/30'
+                        }`}
+                      >
+                        <span className={`text-[11px] font-semibold ${active ? 'text-fuchsia-400' : ''}`}>
+                          {p.label}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">
+                          {p.description}
+                        </span>
+                        {p.slowdown > 1 && (
+                          <span className="text-[9px] text-amber-500/80 mt-0.5">
+                            ~{p.slowdown}× thời gian
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Mode selector (only for 2-track) */}
             {stemCount === 2 && (

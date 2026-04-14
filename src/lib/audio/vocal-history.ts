@@ -24,6 +24,8 @@ export interface HistoryMeta {
   createdAt: number
   stemNames: string[]
   durationSec: number
+  /** Which AI preset produced these stems (fast/quality/best/htdemucs) */
+  presetId?: string
 }
 
 export interface HistoryRecord extends HistoryMeta {
@@ -98,6 +100,7 @@ export async function saveJob(
       createdAt: Date.now(),
       stemNames,
       durationSec: sampleCount / result.sampleRate,
+      presetId: result.presetId,
     }
 
     const db = await openDB()

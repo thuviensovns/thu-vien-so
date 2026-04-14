@@ -12,11 +12,15 @@
 import {
   separateWithAI,
   separateMultiStemWithAI,
-  separate4StemWithAI,
   type AIProgress,
 } from './ai-separator'
 import { separateVocals } from './vocal-separator'
 import { saveJob as saveJobToHistory } from './vocal-history'
+import { separateEnsemble } from './ai-ensemble'
+import { separateWithHTDemucs } from './htdemucs-separator'
+import { PRESETS, type PresetId } from './ai-models'
+import { equalizeStems } from './loudness'
+import { separateInstruments } from './multi-stem-separator'
 
 export type JobMode = 'ai2' | 'ai4' | 'ai7' | 'dsp'
 export type JobStatus = 'idle' | 'processing' | 'done' | 'error'
@@ -30,6 +34,8 @@ export interface JobResult {
   mode: JobMode
   sampleRate: number
   original: StemPairRaw
+  /** AI preset used (fast / quality / best ensemble / htdemucs) */
+  presetId?: PresetId | 'htdemucs'
   // 2-track
   vocals?: StemPairRaw
   instrumental?: StemPairRaw
@@ -159,13 +165,16 @@ class VocalJobManager {
     sampleRate: number
     left: Float32Array
     right: Float32Array
+    /** Quality preset — picks model(s) for AI modes. Ignored for 'dsp' mode. */
+    presetId?: PresetId | 'htdemucs'
   }): Promise<void> {
-    // Idempotent: same file + same mode + already running/done → skip.
+    // Idempotent: same file + same mode + preset + already running/done → skip.
     if (
       this.state.status !== 'idle' &&
       this.state.mode === params.mode &&
       this.state.fileName === params.fileName &&
-      this.state.fileSize === params.fileSize
+      this.state.fileSize === params.fileSize &&
+      (this.state.result?.presetId || 'fast') === (params.presetId || 'fast')
     ) {
       return
     }
@@ -204,39 +213,148 @@ class VocalJobManager {
 
     try {
       const { mode, left, right, sampleRate } = params
+      const presetId = params.presetId || 'fast'
       const original: StemPairRaw = { left, right }
 
+      // Resolve model ids for the chosen preset (ignored by 'htdemucs' & 'dsp')
+      const modelIds =
+        presetId === 'htdemucs'
+          ? []
+          : (PRESETS[presetId as PresetId]?.models ?? ['mdx_a'])
+      const primaryModel = modelIds[0] || 'mdx_a'
+      const useEnsemble = modelIds.length > 1
+      const useHtDemucs = presetId === 'htdemucs'
+
+      // Helper: run the vocals separator chosen by preset. Returns {vocalsL/R, instL/R}.
+      const runVocalsSep = async () => {
+        if (useHtDemucs) {
+          const r = await separateWithHTDemucs(left, right, sampleRate, (p) => {
+            onProgress({
+              phase: p.phase === 'reconstruct' ? 'reconstruct' : (p.phase as AIProgress['phase']),
+              percent: p.percent,
+              detail: p.detail,
+            })
+          })
+          // Use HTDemucs vocals; derive instrumental from residual for coherence.
+          const len = left.length
+          const instL = new Float32Array(len)
+          const instR = new Float32Array(len)
+          for (let i = 0; i < len; i++) {
+            instL[i] = Math.max(-1, Math.min(1, left[i] - r.vocals.left[i]))
+            instR[i] = Math.max(-1, Math.min(1, right[i] - r.vocals.right[i]))
+          }
+          equalizeStems(
+            { vocals: r.vocals, inst: { left: instL, right: instR } },
+            { left, right },
+          )
+          return {
+            vocalsL: r.vocals.left, vocalsR: r.vocals.right,
+            instL, instR,
+            htStems: r, // expose drums/bass/other if caller wants them
+          }
+        }
+        if (useEnsemble) {
+          const r = await separateEnsemble(left, right, sampleRate, modelIds, onProgress)
+          return { vocalsL: r.vocalsL, vocalsR: r.vocalsR, instL: r.instL, instR: r.instR }
+        }
+        const r = await separateWithAI(left, right, sampleRate, onProgress, primaryModel)
+        return { vocalsL: r.vocalsL, vocalsR: r.vocalsR, instL: r.instL, instR: r.instR }
+      }
+
       if (mode === 'ai2') {
-        const r = await separateWithAI(left, right, sampleRate, onProgress)
+        const r = await runVocalsSep()
         this.setState({
           status: 'done',
           progress: 100,
           phase: 'Hoàn tất!',
           result: {
-            mode, sampleRate, original,
+            mode, sampleRate, original, presetId,
             vocals: { left: r.vocalsL, right: r.vocalsR },
             instrumental: { left: r.instL, right: r.instR },
           },
         })
       } else if (mode === 'ai4') {
-        const r = await separate4StemWithAI(left, right, sampleRate, onProgress)
-        this.setState({
-          status: 'done', progress: 100, phase: 'Hoàn tất!',
-          result: {
-            mode, sampleRate, original,
-            vocals: r.vocals, drums: r.drums, bass: r.bass, others: r.others,
-          },
-        })
+        if (useHtDemucs) {
+          // HTDemucs natively produces 4 stems — use them directly.
+          const r = await separateWithHTDemucs(left, right, sampleRate, (p) => {
+            onProgress({ phase: p.phase as AIProgress['phase'], percent: p.percent, detail: p.detail })
+          })
+          this.setState({
+            status: 'done', progress: 100, phase: 'Hoàn tất!',
+            result: {
+              mode, sampleRate, original, presetId,
+              vocals: r.vocals, drums: r.drums, bass: r.bass, others: r.other,
+            },
+          })
+        } else {
+          // MDX / ensemble → vocals sep + DSP stem split of residual
+          const vocs = await runVocalsSep()
+          const stem = await separateInstruments(vocs.instL, vocs.instR, sampleRate, (p) => {
+            this.setState({
+              progress: 80 + Math.round(p.percent * 0.18),
+              phase: 'Tách nhạc cụ...',
+            })
+          })
+          const len = stem.others.left.length
+          const othL = new Float32Array(len)
+          const othR = new Float32Array(len)
+          for (let i = 0; i < len; i++) {
+            othL[i] = stem.guitar.left[i] + stem.piano.left[i] + stem.strings.left[i] + stem.others.left[i]
+            othR[i] = stem.guitar.right[i] + stem.piano.right[i] + stem.strings.right[i] + stem.others.right[i]
+          }
+          this.setState({
+            status: 'done', progress: 100, phase: 'Hoàn tất!',
+            result: {
+              mode, sampleRate, original, presetId,
+              vocals: { left: vocs.vocalsL, right: vocs.vocalsR },
+              drums: stem.drums, bass: stem.bass,
+              others: { left: othL, right: othR },
+            },
+          })
+        }
       } else if (mode === 'ai7') {
-        const r = await separateMultiStemWithAI(left, right, sampleRate, onProgress)
-        this.setState({
-          status: 'done', progress: 100, phase: 'Hoàn tất!',
-          result: {
-            mode, sampleRate, original,
-            vocals: r.vocals, drums: r.drums, bass: r.bass,
-            guitar: r.guitar, piano: r.piano, strings: r.strings, others: r.others,
-          },
-        })
+        if (useHtDemucs) {
+          // HTDemucs gives 4 stems; split 'other' via DSP into guitar/piano/strings/others
+          const r = await separateWithHTDemucs(left, right, sampleRate, (p) => {
+            onProgress({ phase: p.phase as AIProgress['phase'], percent: Math.round(p.percent * 0.8), detail: p.detail })
+          })
+          const stem = await separateInstruments(r.other.left, r.other.right, sampleRate, (p) => {
+            this.setState({ progress: 80 + Math.round(p.percent * 0.18), phase: 'Tách nhạc cụ từ "Khác"...' })
+          })
+          this.setState({
+            status: 'done', progress: 100, phase: 'Hoàn tất!',
+            result: {
+              mode, sampleRate, original, presetId,
+              vocals: r.vocals, drums: r.drums, bass: r.bass,
+              guitar: stem.guitar, piano: stem.piano, strings: stem.strings, others: stem.others,
+            },
+          })
+        } else if (useEnsemble) {
+          // Ensemble vocals → DSP stem split of residual into 6 instrument stems
+          const vocs = await runVocalsSep()
+          const stem = await separateInstruments(vocs.instL, vocs.instR, sampleRate, (p) => {
+            this.setState({ progress: 80 + Math.round(p.percent * 0.18), phase: 'Tách nhạc cụ...' })
+          })
+          this.setState({
+            status: 'done', progress: 100, phase: 'Hoàn tất!',
+            result: {
+              mode, sampleRate, original, presetId,
+              vocals: { left: vocs.vocalsL, right: vocs.vocalsR },
+              drums: stem.drums, bass: stem.bass,
+              guitar: stem.guitar, piano: stem.piano, strings: stem.strings, others: stem.others,
+            },
+          })
+        } else {
+          const r = await separateMultiStemWithAI(left, right, sampleRate, onProgress, primaryModel)
+          this.setState({
+            status: 'done', progress: 100, phase: 'Hoàn tất!',
+            result: {
+              mode, sampleRate, original, presetId,
+              vocals: r.vocals, drums: r.drums, bass: r.bass,
+              guitar: r.guitar, piano: r.piano, strings: r.strings, others: r.others,
+            },
+          })
+        }
       } else {
         const r = await separateVocals(left, right, sampleRate, (p) => {
           this.setState({

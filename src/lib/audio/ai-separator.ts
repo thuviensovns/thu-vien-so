@@ -76,23 +76,17 @@ function getOrtBase(): string {
 
 // ── Model config ───────────────────────────────────────────────
 //
-// Default: MDX-Net kuielab_a_vocals (STFT-based, CAC format).
-// To switch to a RoFormer model (BS-RoFormer / Mel-Band RoFormer), set the
-// following public env vars at build time — the separator adapts by reading
-// the probed ONNX input shape at runtime, so any CAC-compatible 4-channel
-// spectrogram model works. Raw-waveform RoFormer exports need a different
-// preprocessing path (not yet implemented; these envs remain the extension point).
-//   NEXT_PUBLIC_AI_MODEL_URL         — HTTPS URL to the .onnx file
-//   NEXT_PUBLIC_AI_MODEL_KEY         — IndexedDB cache key (bump to invalidate)
-//   NEXT_PUBLIC_AI_MODEL_COMPENSATE  — gain compensation after separation
+// Model metadata lives in ai-models.ts (URL, cache key, architecture spec).
+// This module is the STFT/CAC pipeline — used by all MDX-family models.
+// HTDemucs uses a different waveform pipeline in htdemucs-separator.ts.
 
-const MODEL_URL =
-  process.env.NEXT_PUBLIC_AI_MODEL_URL ||
-  'https://huggingface.co/seanghay/uvr_models/resolve/main/kuielab_a_vocals.onnx'
+import { getModel } from './ai-models'
+
 const MODEL_CACHE_DB = 'vocal-separator-cache'
 const MODEL_CACHE_STORE = 'models'
-const MODEL_CACHE_KEY =
-  process.env.NEXT_PUBLIC_AI_MODEL_KEY || 'kuielab_a_vocals_v1'
+
+/** Default model when caller doesn't specify */
+const DEFAULT_MODEL_ID = 'mdx_a'
 
 // MDX-Net parameters for kuielab_a_vocals
 const N_FFT = 6144
@@ -100,7 +94,7 @@ const HOP = 1024
 const DIM_F = 2048 // frequency bins model expects (cropped from N_FFT/2+1)
 const DIM_T = 512 // time frames per segment (kuielab_a_vocals model expects 512)
 const DIM_C = 4 // channels: L_real, L_imag, R_real, R_imag (CAC format)
-const COMPENSATE = Number(process.env.NEXT_PUBLIC_AI_MODEL_COMPENSATE) || 1.035
+// COMPENSATE is now read per-model from the registry (MdxSpec.compensate).
 const CHUNK_SIZE = (DIM_T - 1) * HOP // 261120 samples per chunk (~5.9s @44.1kHz)
 const N_BINS = N_FFT / 2 + 1 // 3073
 
@@ -365,12 +359,12 @@ function openDB(): Promise<IDBDatabase> {
   })
 }
 
-async function getCachedModel(): Promise<ArrayBuffer | null> {
+export async function getCachedModel(cacheKey: string): Promise<ArrayBuffer | null> {
   try {
     const db = await openDB()
     return new Promise((resolve) => {
       const tx = db.transaction(MODEL_CACHE_STORE, 'readonly')
-      const req = tx.objectStore(MODEL_CACHE_STORE).get(MODEL_CACHE_KEY)
+      const req = tx.objectStore(MODEL_CACHE_STORE).get(cacheKey)
       req.onsuccess = () => resolve(req.result ?? null)
       req.onerror = () => resolve(null)
     })
@@ -379,11 +373,11 @@ async function getCachedModel(): Promise<ArrayBuffer | null> {
   }
 }
 
-async function cacheModel(data: ArrayBuffer): Promise<void> {
+export async function cacheModel(cacheKey: string, data: ArrayBuffer): Promise<void> {
   try {
     const db = await openDB()
     const tx = db.transaction(MODEL_CACHE_STORE, 'readwrite')
-    tx.objectStore(MODEL_CACHE_STORE).put(data, MODEL_CACHE_KEY)
+    tx.objectStore(MODEL_CACHE_STORE).put(data, cacheKey)
   } catch {
     // Cache failure is non-critical
   }
@@ -391,18 +385,20 @@ async function cacheModel(data: ArrayBuffer): Promise<void> {
 
 // ── Model download ─────────────────────────────────────────────
 
-async function downloadModel(
+export async function downloadModel(
+  modelUrl: string,
+  cacheKey: string,
   onProgress?: (pct: number) => void,
 ): Promise<ArrayBuffer> {
   // Try cache first
-  const cached = await getCachedModel()
+  const cached = await getCachedModel(cacheKey)
   if (cached) {
     onProgress?.(100)
     return cached
   }
 
   // Download with progress
-  const response = await fetch(MODEL_URL)
+  const response = await fetch(modelUrl)
   if (!response.ok) throw new Error(`Model download failed: ${response.status}`)
 
   const contentLength = Number(response.headers.get('content-length') || 0)
@@ -430,14 +426,14 @@ async function downloadModel(
   }
 
   // Cache for next time
-  await cacheModel(buffer)
+  await cacheModel(cacheKey, buffer)
   return buffer
 }
 
 // ── Check if model is cached ───────────────────────────────────
 
-export async function isModelCached(): Promise<boolean> {
-  return (await getCachedModel()) !== null
+export async function isModelCached(cacheKey = 'kuielab_a_vocals_v1'): Promise<boolean> {
+  return (await getCachedModel(cacheKey)) !== null
 }
 
 // ── Main AI separation ─────────────────────────────────────────
@@ -447,16 +443,22 @@ export async function separateWithAI(
   right: Float32Array,
   sampleRate: number,
   onProgress?: (p: AIProgress) => void,
+  modelId: string = DEFAULT_MODEL_ID,
 ): Promise<AISeparationResult> {
   const length = left.length
+  const model = getModel(modelId)
+  if (model.spec.architecture !== 'mdx') {
+    throw new Error(`separateWithAI called with non-MDX model: ${modelId}`)
+  }
+  const mdxCompensate = model.spec.compensate
 
   // ── Step 1: Download model ───────────────────────────────────
-  onProgress?.({ phase: 'download', percent: 0, detail: 'Kiểm tra model AI...' })
-  const modelBuffer = await downloadModel((pct) => {
+  onProgress?.({ phase: 'download', percent: 0, detail: `Kiểm tra ${model.label}...` })
+  const modelBuffer = await downloadModel(model.url, model.cacheKey, (pct) => {
     onProgress?.({
       phase: 'download',
       percent: pct,
-      detail: pct < 100 ? `Tải model AI... ${pct}%` : 'Model đã sẵn sàng',
+      detail: pct < 100 ? `Tải ${model.label}... ${pct}%` : `${model.label} đã sẵn sàng`,
     })
   })
 
@@ -655,8 +657,8 @@ export async function separateWithAI(
 
     // Accumulate
     for (let i = 0; i < useChunkSize; i++) {
-      vocalsL[chunkStart + i] = wavL[i] * COMPENSATE
-      vocalsR[chunkStart + i] = wavR[i] * COMPENSATE
+      vocalsL[chunkStart + i] = wavL[i] * mdxCompensate
+      vocalsR[chunkStart + i] = wavR[i] * mdxCompensate
     }
 
     await new Promise((r) => setTimeout(r, 0))
@@ -720,6 +722,7 @@ export async function separateMultiStemWithAI(
   right: Float32Array,
   sampleRate: number,
   onProgress?: (p: AIProgress) => void,
+  modelId: string = DEFAULT_MODEL_ID,
 ): Promise<MultiStemAIResult> {
   // Phase 1: AI vocal separation (0-70%)
   const aiResult = await separateWithAI(left, right, sampleRate, (p) => {
@@ -728,7 +731,7 @@ export async function separateMultiStemWithAI(
       percent: Math.round(p.percent * 0.7),
       detail: p.detail,
     })
-  })
+  }, modelId)
 
   // Phase 2: DSP instrument separation on instrumental track (70-100%)
   onProgress?.({ phase: 'stems', percent: 70, detail: 'Tách nhạc cụ...' })
@@ -776,6 +779,7 @@ export async function separate4StemWithAI(
   right: Float32Array,
   sampleRate: number,
   onProgress?: (p: AIProgress) => void,
+  modelId: string = DEFAULT_MODEL_ID,
 ): Promise<FourStemAIResult> {
   // Phase 1: AI vocal separation (0-70%)
   const aiResult = await separateWithAI(left, right, sampleRate, (p) => {
@@ -784,7 +788,7 @@ export async function separate4StemWithAI(
       percent: Math.round(p.percent * 0.7),
       detail: p.detail,
     })
-  })
+  }, modelId)
 
   // Phase 2: DSP instrument separation on instrumental track (70-100%)
   onProgress?.({ phase: 'stems', percent: 70, detail: 'Tách nhạc cụ...' })
