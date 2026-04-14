@@ -13,6 +13,7 @@
 import http from 'node:http'
 import https from 'node:https'
 import { Innertube } from 'youtubei.js'
+import { generate as generatePoToken } from 'youtube-po-token-generator'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -40,10 +41,47 @@ let innertubeInstance = null
 let instanceCreatedAt = 0
 const INSTANCE_TTL = 30 * 60_000
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms)),
+  ])
+}
+
+// Cache PO token across Innertube rebuilds (generation is expensive: ~2-5s + jsdom memory).
+let cachedPoToken = null
+let cachedVisitorData = null
+let poTokenAt = 0
+const POTOKEN_TTL = 6 * 60 * 60_000 // 6h
+
+async function getPoToken() {
+  const now = Date.now()
+  if (cachedPoToken && now - poTokenAt < POTOKEN_TTL) {
+    return { poToken: cachedPoToken, visitorData: cachedVisitorData }
+  }
+  try {
+    const { poToken, visitorData } = await withTimeout(generatePoToken(), 10_000, 'PO token')
+    cachedPoToken = poToken
+    cachedVisitorData = visitorData
+    poTokenAt = now
+    console.log('[yt-proxy] PO token generated')
+    return { poToken, visitorData }
+  } catch (e) {
+    console.warn('[yt-proxy] PO token generation failed:', e.message)
+    return { poToken: null, visitorData: null }
+  }
+}
+
 async function getInnertube() {
   const now = Date.now()
   if (!innertubeInstance || now - instanceCreatedAt > INSTANCE_TTL) {
-    innertubeInstance = await Innertube.create({ generate_session_locally: true })
+    const { poToken, visitorData } = await getPoToken()
+    const opts = { generate_session_locally: true }
+    if (poToken && visitorData) {
+      opts.po_token = poToken
+      opts.visitor_data = visitorData
+    }
+    innertubeInstance = await Innertube.create(opts)
     instanceCreatedAt = now
   }
   return innertubeInstance
@@ -59,14 +97,18 @@ async function resolveFormatUrl(fmt, player) {
   try { return await fmt.decipher(player) } catch { return null }
 }
 
-async function fetchInfo(videoId, kind = 'video') {
+async function fetchInfo(videoId, kind = 'video', _retry = false) {
   const yt = await getInnertube()
-  const clients = ['ANDROID', 'IOS', 'MWEB', 'WEB']
+  // TV_EMBEDDED and WEB_EMBEDDED bypass LOGIN_REQUIRED for most non-age-restricted videos.
+  const clients = ['TV_EMBEDDED', 'WEB_EMBEDDED', 'ANDROID', 'IOS', 'MWEB', 'WEB']
   for (const client of clients) {
     try {
       const info = await yt.getBasicInfo(videoId, { client })
       const sd = info.streaming_data
-      if (!sd) continue
+      if (!sd) {
+        console.log(`[yt-proxy] ${videoId} client=${client} no streaming_data (playability=${info.playability_status?.status || '?'})`)
+        continue
+      }
 
       let chosen = null
       let mime = null
@@ -119,10 +161,16 @@ async function fetchInfo(videoId, kind = 'video') {
           client,
         }
       }
-      console.log(`[yt-proxy] ${videoId} client=${client} no usable URL`)
+      console.log(`[yt-proxy] ${videoId} client=${client} no usable URL (formats=${sd.formats?.length || 0} adaptive=${sd.adaptive_formats?.length || 0})`)
     } catch (e) {
-      console.log(`[yt-proxy] ${videoId} client=${client} error: ${String(e.message || e).slice(0, 100)}`)
+      console.log(`[yt-proxy] ${videoId} client=${client} error: ${String(e.message || e).slice(0, 200)}`)
     }
+  }
+  // If nothing worked and we haven't retried yet, rebuild the Innertube session once.
+  if (!_retry) {
+    console.log(`[yt-proxy] ${videoId} refreshing Innertube session & retrying`)
+    innertubeInstance = null
+    return fetchInfo(videoId, kind, true)
   }
   return null
 }
