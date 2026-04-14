@@ -84,7 +84,10 @@ export async function GET(req: NextRequest) {
       if (!videoId) return NextResponse.json({ error: 'URL không hợp lệ' }, { status: 400 })
       const proxyUrl = `${proxy.base}/stream?url=${encodeURIComponent(youtubeUrl)}`
       console.log('[YouTube Stream] routing via proxy tunnel')
-      streamSrc = await nativeFetch(proxyUrl, proxy.secret ? { 'x-proxy-secret': proxy.secret } : {})
+      streamSrc = await nativeFetch(proxyUrl, {
+        'ngrok-skip-browser-warning': '1',
+        ...(proxy.secret ? { 'x-proxy-secret': proxy.secret } : {}),
+      })
     } else {
       // DIRECT PATH — resolve CDN URL via Innertube, fetch from Vercel.
       const info = await getVideoInfo(youtubeUrl)

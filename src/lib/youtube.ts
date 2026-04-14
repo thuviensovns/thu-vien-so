@@ -88,7 +88,10 @@ async function tryProxy(videoId: string): Promise<YtVideoInfo | null> {
       `${base}/info?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`,
       {
         signal: AbortSignal.timeout(15_000),
-        headers: secret ? { 'x-proxy-secret': secret } : {},
+        headers: {
+          'ngrok-skip-browser-warning': '1',
+          ...(secret ? { 'x-proxy-secret': secret } : {}),
+        },
       },
     )
     if (!res.ok) {
