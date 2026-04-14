@@ -80,9 +80,9 @@ async function fetchOembedInfo(videoId: string): Promise<{ title: string; channe
  * because residential IPs are not blocked by YouTube.
  */
 async function tryProxy(videoId: string): Promise<YtVideoInfo | null> {
-  const base = process.env.YT_PROXY_URL?.replace(/\/$/, '')
+  const base = process.env.YT_PROXY_URL?.trim().replace(/\/$/, '')
   if (!base) return null
-  const secret = process.env.YT_PROXY_SECRET
+  const secret = process.env.YT_PROXY_SECRET?.trim()
   try {
     const res = await fetch(
       `${base}/info?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`,
@@ -194,7 +194,7 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
  * Exposed for the stream route to know whether to proxy bytes via tunnel or fetch direct.
  */
 export function getProxyConfig() {
-  const base = process.env.YT_PROXY_URL?.replace(/\/$/, '')
+  const base = process.env.YT_PROXY_URL?.trim().replace(/\/$/, '')
   if (!base) return null
-  return { base, secret: process.env.YT_PROXY_SECRET || '' }
+  return { base, secret: process.env.YT_PROXY_SECRET?.trim() || '' }
 }
