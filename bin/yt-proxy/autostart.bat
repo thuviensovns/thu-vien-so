@@ -17,7 +17,7 @@ echo [autostart] WARN: network timeout, continuing anyway.
 
 REM Start Node server in minimized window (stays open, so server keeps running)
 echo [autostart] Starting node server.js...
-start "yt-proxy-server" /min cmd /c "cd /d %~dp0 && set NODE_OPTIONS=--max-old-space-size=1024 && node server.js"
+start "yt-proxy-server" /min cmd /c "cd /d %~dp0 && node server.js"
 
 REM Start ngrok in minimized window
 echo [autostart] Starting ngrok...

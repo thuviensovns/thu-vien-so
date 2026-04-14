@@ -13,7 +13,7 @@
 import http from 'node:http'
 import https from 'node:https'
 import { Innertube } from 'youtubei.js'
-import { generate as generatePoToken } from 'youtube-po-token-generator'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -54,17 +54,45 @@ let cachedVisitorData = null
 let poTokenAt = 0
 const POTOKEN_TTL = 6 * 60 * 60_000 // 6h
 
+function runPoWorker() {
+  return new Promise((resolve, reject) => {
+    const workerPath = path.join(__dirname, 'po-worker.mjs')
+    const child = spawn(process.execPath, ['--max-old-space-size=512', workerPath], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (d) => { out += d })
+    child.stderr.on('data', (d) => { err += d })
+    const to = setTimeout(() => {
+      try { child.kill('SIGKILL') } catch {}
+      reject(new Error('po-worker timeout'))
+    }, 20_000)
+    child.on('exit', (code) => {
+      clearTimeout(to)
+      if (code !== 0) return reject(new Error(`po-worker exit=${code} ${err.slice(0, 200)}`))
+      try {
+        const parsed = JSON.parse(out)
+        if (!parsed.poToken) return reject(new Error('po-worker no token'))
+        resolve(parsed)
+      } catch (e) { reject(e) }
+    })
+    child.on('error', reject)
+  })
+}
+
 async function getPoToken() {
   const now = Date.now()
   if (cachedPoToken && now - poTokenAt < POTOKEN_TTL) {
     return { poToken: cachedPoToken, visitorData: cachedVisitorData }
   }
   try {
-    const { poToken, visitorData } = await withTimeout(generatePoToken(), 10_000, 'PO token')
+    const { poToken, visitorData } = await runPoWorker()
     cachedPoToken = poToken
     cachedVisitorData = visitorData
     poTokenAt = now
-    console.log('[yt-proxy] PO token generated')
+    console.log('[yt-proxy] PO token generated (child)')
     return { poToken, visitorData }
   } catch (e) {
     console.warn('[yt-proxy] PO token generation failed:', e.message)
