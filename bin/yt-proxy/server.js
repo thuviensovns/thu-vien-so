@@ -57,7 +57,7 @@ const POTOKEN_TTL = 6 * 60 * 60_000 // 6h
 function runPoWorker() {
   return new Promise((resolve, reject) => {
     const workerPath = path.join(__dirname, 'po-worker.mjs')
-    const child = spawn(process.execPath, ['--max-old-space-size=512', workerPath], {
+    const child = spawn(process.execPath, ['--max-old-space-size=1536', workerPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
@@ -131,6 +131,9 @@ async function fetchInfo(videoId, kind = 'video', _retry = false) {
   const clients = ['TV_EMBEDDED', 'WEB_EMBEDDED', 'ANDROID', 'IOS', 'MWEB', 'WEB']
   for (const client of clients) {
     try {
+      // NOTE: pass {client} object — was tried as bare string, but that returns
+      // ciphered URLs our local player can't decipher. Object form keeps WEB
+      // defaults + PO token flow while still tagging the attempt.
       const info = await yt.getBasicInfo(videoId, { client })
       const sd = info.streaming_data
       if (!sd) {
