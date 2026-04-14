@@ -454,79 +454,91 @@ export async function separateWithAI(
 
   ort.env.wasm.wasmPaths = getOrtBase()
 
-  // Off-main-thread inference — moves ORT session into its own Web Worker
-  // so STFT/ISTFT + React UI on the main thread stay smooth (no tab freeze).
-  ort.env.wasm.proxy = true
+  // ── Capability detection (varies across machines/browsers) ─────
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _self = (typeof self !== 'undefined' ? self : globalThis) as any
+  const coi = _self.crossOriginIsolated === true
+  const hasSAB = typeof SharedArrayBuffer !== 'undefined'
+  const hasWebGPU = typeof navigator !== 'undefined' && !!_self.navigator?.gpu
+  const hwThreads = Math.min(navigator.hardwareConcurrency || 4, 4)
 
-  // Detect WebGPU support to use the fastest available backend first.
-  const hasWebGPU =
-    typeof navigator !== 'undefined' &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    !!(navigator as any).gpu
+  console.log('[AI-Sep] Env:', { coi, hasSAB, hasWebGPU, hwThreads })
 
-  let session: InstanceType<typeof ort.InferenceSession>
-  try {
-    ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 4, 4)
-    const eps = hasWebGPU ? ['webgpu', 'wasm'] : ['wasm']
-    session = await ort.InferenceSession.create(modelBuffer, {
-      executionProviders: eps,
-    })
-    console.log('[AI-Sep] ONNX loaded (proxy=true) EPs:', eps, 'threads:', ort.env.wasm.numThreads)
-  } catch (mtErr) {
-    console.warn('[AI-Sep] Preferred EPs failed, falling back to single-thread wasm:', mtErr)
-    ort.env.wasm.numThreads = 1
-    session = await ort.InferenceSession.create(modelBuffer, {
-      executionProviders: ['wasm'],
-    })
-    console.log('[AI-Sep] ONNX loaded with 1 thread (fallback)')
-  }
+  // ── Robust EP cascade — different machines support different backends.
+  // Each config creates a session AND runs a shape probe to validate the
+  // backend actually works (not just creates). Release and try next if any
+  // step fails. This is the key fix for "works on one machine, errors on
+  // another": WebGPU may init but fail at run() on buggy drivers; threaded
+  // WASM may fail without SharedArrayBuffer; proxy may fail on old browsers.
+  type EpCfg = { name: string; ep: string[]; threads: number; proxy: boolean }
+  const configs: EpCfg[] = []
+  if (hasWebGPU) configs.push({ name: 'webgpu', ep: ['webgpu'], threads: 1, proxy: false })
+  if (hasSAB && coi) configs.push({ name: 'wasm-mt-proxy', ep: ['wasm'], threads: hwThreads, proxy: true })
+  configs.push({ name: 'wasm-st-proxy', ep: ['wasm'], threads: 1, proxy: true })
+  configs.push({ name: 'wasm-st', ep: ['wasm'], threads: 1, proxy: false })
 
-  // Debug: log model input/output info
-  const inNames = session.inputNames
-  const outNames = session.outputNames
-  console.log('[AI-Sep] Model inputs:', inNames, 'outputs:', outNames)
-
-  // Try to detect expected shape by probing with a small tensor
+  let session: InstanceType<typeof ort.InferenceSession> | null = null
+  let chosen: EpCfg | null = null
   let detectedDimT = DIM_T
   let detectedDimF = DIM_F
   let detectedDimC = DIM_C
-  try {
-    // Try the expected shape first
-    const probe = new Float32Array(DIM_C * DIM_F * DIM_T)
-    const probeTensor = new ort.Tensor('float32', probe, [1, DIM_C, DIM_F, DIM_T])
-    const probeResult = await session.run({ [inNames[0]]: probeTensor })
-    const outShape = probeResult[outNames[0]].dims
-    console.log('[AI-Sep] Probe OK. Output shape:', outShape)
-  } catch (probeErr: unknown) {
-    const msg = probeErr instanceof Error ? probeErr.message : String(probeErr)
-    console.warn('[AI-Sep] Probe [1,' + DIM_C + ',' + DIM_F + ',' + DIM_T + '] failed, trying alternatives...', msg)
+  let lastErr: unknown = null
 
-    // Try alternative shapes to find what works
-    const shapes = [
-      [1, 2, DIM_F, DIM_T],
-      [1, DIM_C, DIM_F, DIM_T / 2],
-      [1, DIM_C, DIM_F, DIM_T * 2],
-      [1, DIM_C, DIM_T, DIM_F],
-    ]
-    for (const shape of shapes) {
+  const shapeCandidates: Array<[number, number, number, number]> = [
+    [1, DIM_C, DIM_F, DIM_T],
+    [1, 2, DIM_F, DIM_T],
+    [1, DIM_C, DIM_F, DIM_T / 2],
+    [1, DIM_C, DIM_F, DIM_T * 2],
+    [1, DIM_C, DIM_T, DIM_F],
+  ]
+
+  for (const cfg of configs) {
+    let s: InstanceType<typeof ort.InferenceSession> | null = null
+    try {
+      ort.env.wasm.numThreads = cfg.threads
+      ort.env.wasm.proxy = cfg.proxy
+      s = await ort.InferenceSession.create(modelBuffer, { executionProviders: cfg.ep })
+    } catch (err) {
+      lastErr = err
+      console.warn(`[AI-Sep] create(${cfg.name}) failed:`, err)
+      continue
+    }
+
+    // Validate with shape probe — catches run-time EP bugs
+    let probeOk = false
+    for (const shape of shapeCandidates) {
       try {
         const sz = shape.reduce((a, b) => a * b, 1)
         const t = new ort.Tensor('float32', new Float32Array(sz), shape)
-        await session.run({ [inNames[0]]: t })
+        await s.run({ [s.inputNames[0]]: t })
         detectedDimC = shape[1]
         detectedDimF = shape[2]
         detectedDimT = shape[3]
-        console.log('[AI-Sep] Found working shape:', shape)
+        probeOk = true
         break
-      } catch {
-        console.log('[AI-Sep] Shape', shape, 'also failed')
+      } catch (err) {
+        lastErr = err
       }
     }
 
-    if (detectedDimT !== DIM_T || detectedDimF !== DIM_F || detectedDimC !== DIM_C) {
-      console.log('[AI-Sep] Using detected dims: C=' + detectedDimC + ' F=' + detectedDimF + ' T=' + detectedDimT)
+    if (probeOk) {
+      session = s
+      chosen = cfg
+      console.log(`[AI-Sep] Backend ready: ${cfg.name} (C=${detectedDimC} F=${detectedDimF} T=${detectedDimT})`)
+      break
     }
+    try { s.release() } catch { /* noop */ }
+    console.warn(`[AI-Sep] ${cfg.name}: all shape probes failed — trying next backend`)
   }
+
+  if (!session || !chosen) {
+    const msg = lastErr instanceof Error ? lastErr.message : String(lastErr)
+    throw new Error(`Không khởi tạo được AI backend nào (${msg}). Thử cập nhật trình duyệt.`)
+  }
+
+  const inNames = session.inputNames
+  const outNames = session.outputNames
+  console.log('[AI-Sep] Model inputs:', inNames, 'outputs:', outNames, 'backend:', chosen.name)
 
   onProgress?.({ phase: 'load', percent: 100, detail: 'ONNX Runtime sẵn sàng' })
 
