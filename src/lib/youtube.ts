@@ -1,4 +1,5 @@
 import { Innertube, Platform } from 'youtubei.js'
+import { generate as generatePoToken } from 'youtube-po-token-generator'
 import vm from 'vm'
 
 // Override Platform evaluator with Node.js vm for URL deciphering (needed for WEB/MWEB clients)
@@ -12,10 +13,26 @@ let innertubeInstance: Awaited<ReturnType<typeof Innertube.create>> | null = nul
 let instanceCreatedAt = 0
 const INSTANCE_TTL = 30 * 60_000
 
+/**
+ * Get Innertube instance with PO token (Proof of Origin).
+ * PO tokens bypass YouTube's bot detection on datacenter IPs (like Vercel).
+ * Falls back to session without PO token if generation fails.
+ */
 async function getInnertube() {
   const now = Date.now()
   if (!innertubeInstance || now - instanceCreatedAt > INSTANCE_TTL) {
-    innertubeInstance = await Innertube.create({ generate_session_locally: true })
+    try {
+      const { poToken, visitorData } = await generatePoToken()
+      innertubeInstance = await Innertube.create({
+        po_token: poToken,
+        visitor_data: visitorData,
+        generate_session_locally: true,
+      })
+      console.log('[YouTube] Innertube initialized with PO token')
+    } catch (err) {
+      console.warn('[YouTube] PO token generation failed, using session without it:', (err as Error).message)
+      innertubeInstance = await Innertube.create({ generate_session_locally: true })
+    }
     instanceCreatedAt = now
   }
   return innertubeInstance
@@ -62,28 +79,19 @@ async function fetchOembedInfo(videoId: string): Promise<{ title: string; channe
  */
 async function tryClients(videoId: string) {
   const yt = await getInnertube()
-  const clients: Array<'ANDROID' | 'IOS' | 'MWEB' | 'TV_SIMPLY' | 'WEB'> = [
-    'ANDROID',
-    'IOS',
-    'MWEB',
-    'TV_SIMPLY',
-    'WEB',
-  ]
+  const clients: Array<'ANDROID' | 'IOS' | 'MWEB' | 'WEB'> = ['ANDROID', 'IOS', 'MWEB', 'WEB']
 
   for (const client of clients) {
     try {
       const info = await yt.getBasicInfo(videoId, { client })
       const formats = info.streaming_data?.formats || []
 
-      // Try to get a usable URL from any format (direct or via decipher)
       for (const fmt of formats) {
         let url: string | null = null
 
-        // Direct URL (ANDROID/IOS)
         if (fmt.url) {
           url = fmt.url
         } else {
-          // Needs decipher (WEB/MWEB)
           try {
             url = await fmt.decipher(yt.session.player)
           } catch {
@@ -108,13 +116,12 @@ async function tryClients(videoId: string) {
 
 /**
  * Get video metadata + direct CDN download URL.
- * Uses multiple Innertube clients with fallback, plus oEmbed API for reliable metadata.
+ * Uses PO token + multi-client fallback + oEmbed for reliable operation on Vercel.
  */
 export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
   const videoId = extractVideoId(videoUrl)
   if (!videoId) throw new Error('Invalid YouTube URL')
 
-  // Try Innertube clients for streaming data
   const result = await tryClients(videoId)
 
   let cdnUrl: string | null = null
@@ -134,7 +141,7 @@ export async function getVideoInfo(videoUrl: string): Promise<YtVideoInfo> {
     client = result.client
   }
 
-  // Fallback to oEmbed for metadata if Innertube failed or returned empty
+  // Fallback to oEmbed for metadata
   if (!title) {
     const oembed = await fetchOembedInfo(videoId)
     if (oembed) {

@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 3600,
   },
-  serverExternalPackages: ['youtubei.js'],
+  serverExternalPackages: ['youtubei.js', 'youtube-po-token-generator'],
   experimental: {
     optimizePackageImports: [
       'lucide-react',
