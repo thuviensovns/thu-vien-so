@@ -87,23 +87,38 @@ export function YoutubeDownloader() {
   }, [url])
 
   const handleDownload = useCallback(
-    (type: 'mp4' | 'mp3') => {
+    async (type: 'mp4' | 'mp3') => {
       if (!video) return
       setDownloading(type)
 
       const filename = `${video.title}.mp4`
       const streamUrl = `/api/youtube-download/stream?url=${encodeURIComponent(url.trim())}&filename=${encodeURIComponent(filename)}`
 
-      const a = document.createElement('a')
-      a.href = streamUrl
-      a.download = filename
-      a.style.display = 'none'
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
+      try {
+        toast.info('Đang chuẩn bị tải xuống...')
+        const res = await fetch(streamUrl)
 
-      toast.success(type === 'mp3' ? 'Đang tải âm thanh...' : 'Đang tải video...')
-      setTimeout(() => setDownloading(null), 3000)
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Lỗi không xác định' }))
+          throw new Error(err.error || `Lỗi ${res.status}`)
+        }
+
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = filename
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(blobUrl)
+        toast.success(type === 'mp3' ? 'Đã tải âm thanh!' : 'Đã tải video!')
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Không thể tải video. Vui lòng thử lại.')
+      } finally {
+        setDownloading(null)
+      }
     },
     [video, url]
   )
