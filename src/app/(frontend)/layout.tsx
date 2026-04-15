@@ -12,6 +12,7 @@ import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
 import { RouteProgress } from '@/components/shared/RouteProgress'
 import { ScrollToTop } from '@/components/shared/ScrollToTop'
 import { PageTransition } from '@/components/shared/PageTransition'
+import { MobileBottomBar } from '@/components/layout/MobileBottomBar'
 import '@/styles/globals.css'
 
 const inter = Inter({
@@ -121,13 +122,14 @@ export default async function FrontendLayout({
             Bỏ qua đến nội dung chính
           </a>
 
-          <div className="flex min-h-screen flex-col">
+          <div className="flex min-h-screen flex-col pb-[calc(56px+env(safe-area-inset-bottom,0px))] md:pb-0">
             <Header />
             <main id="main-content" className="flex-1"><PageTransition>{children}</PageTransition></main>
             <Footer initialSettings={siteContent.settings} />
             <ChatWidgetLazy />
             <VocalJobPill />
           </div>
+          <MobileBottomBar />
         </Providers>
       </body>
     </html>

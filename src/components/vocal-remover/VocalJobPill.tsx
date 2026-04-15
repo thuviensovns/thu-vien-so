@@ -42,7 +42,7 @@ export function VocalJobPill() {
         : 'from-red-500 to-orange-500'
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] motion-safe:animate-fade-in-up">
+    <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] md:bottom-4 right-4 z-[60] motion-safe:animate-fade-in-up">
       <div className="relative flex items-center gap-3 rounded-full border border-white/10 bg-background/95 backdrop-blur pl-3 pr-2 py-2 shadow-2xl max-w-[min(92vw,22rem)]">
         <div className={`relative flex items-center justify-center size-8 rounded-full bg-gradient-to-br ${color} text-white shrink-0`}>
           {state.status === 'processing' ? (

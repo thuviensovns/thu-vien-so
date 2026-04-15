@@ -127,7 +127,7 @@ export function ChatWidget() {
       {!open && (
         <button
           onClick={handleOpen}
-          className="fixed bottom-5 right-5 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
+          className="fixed bottom-[calc(72px+env(safe-area-inset-bottom,0px))] md:bottom-5 right-5 z-50 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
           aria-label="Mở chat hỗ trợ"
         >
           <MessageCircle className="h-6 w-6" />
@@ -143,7 +143,7 @@ export function ChatWidget() {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 w-[360px] max-w-[calc(100vw-40px)] h-[520px] max-h-[calc(100vh-100px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed bottom-[calc(64px+env(safe-area-inset-bottom,0px))] md:bottom-5 right-5 z-50 w-[360px] max-w-[calc(100vw-40px)] h-[520px] max-h-[calc(100vh-100px-64px)] md:max-h-[calc(100vh-100px)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-primary text-primary-foreground px-4 py-3 flex items-center gap-3 shrink-0">
             <div className="h-9 w-9 rounded-full bg-primary-foreground/20 flex items-center justify-center text-lg">
