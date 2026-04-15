@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { Menu, FileAudio, Guitar, Plug, Sliders, Mic, Monitor, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet, Music } from 'lucide-react'
+import { Menu, FileAudio, Guitar, Plug, Sliders, Mic, Monitor, BookOpen, Home, Search, Info, HelpCircle, Phone, Wallet, Music, Video, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Separator } from '@/components/ui/separator'
@@ -22,6 +22,11 @@ const mobileNavItems = [
   { label: 'Sóng nhạc Lyrics', href: '/danh-muc/song-nhac-lyrics', icon: Mic },
   { label: 'Cài đặt phần mềm', href: '/danh-muc/cai-dat-phan-mem', icon: Monitor },
   { label: 'Blog', href: '/blog', icon: BookOpen },
+]
+
+const toolNavItems = [
+  { label: 'Tải YouTube', href: '/cong-cu/tai-youtube', icon: Video },
+  { label: 'Xóa Giọng AI', href: '/cong-cu/xoa-giong-ai', icon: Wand2 },
 ]
 
 const extraNavItems = [
@@ -96,6 +101,34 @@ export function MobileNav() {
                 style={{ animationDelay: `${index * 30}ms` }}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <Separator className="mx-4" />
+
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">Công cụ</p>
+        </div>
+        <nav className="flex flex-col gap-0.5 p-2 pt-0">
+          {toolNavItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                prefetch={true}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  isActive
+                    ? 'text-primary bg-primary/10'
+                    : 'text-muted-foreground hover:text-primary hover:bg-primary/5 active:scale-[0.98]'
+                )}
+              >
+                <item.icon className="h-4 w-4 shrink-0 text-fuchsia-400" />
                 {item.label}
               </Link>
             )
