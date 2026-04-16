@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-const POLL_INTERVAL = 15_000 // 15 seconds
+const POLL_INTERVAL = 120_000 // 2 minutes — server memoizes 30s so shorter polling just wastes RTT
 
 /**
  * Fetches site content from the database and writes to localStorage.

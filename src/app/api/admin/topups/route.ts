@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { getDbPool } from '@/lib/db-pool'
 
-/** GET: List topups from DB for admin management page */
+type Row = Record<string, unknown>
+
+/** GET: List topups for admin page.
+ *
+ *  Polled every 15s by [quan-ly/nap-tien/page.tsx]. Uses raw SQL instead of
+ *  Payload `find({ depth:1 })` so we avoid full-user hydration for a list view
+ *  that only needs { email, displayName }.
+ */
 export async function GET(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
@@ -10,56 +18,71 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const search = req.nextUrl.searchParams.get('search') || ''
-    const page = Number(req.nextUrl.searchParams.get('page')) || 1
-
-    // Build where clause
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {}
-    if (search) {
-      where.or = [
-        { transferCode: { contains: search } },
-        { bankDescription: { contains: search } },
-        { bankTransactionId: { contains: search } },
-      ]
-    }
-
+    const search = (req.nextUrl.searchParams.get('search') || '').trim()
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 1)
+    const limit = 50
+    const offset = (page - 1) * limit
     const statusFilter = req.nextUrl.searchParams.get('status') || ''
-    if (statusFilter && statusFilter !== 'all') {
-      where.status = { equals: statusFilter }
+
+    const conditions: string[] = []
+    const params: unknown[] = []
+    let i = 1
+
+    if (search) {
+      const like = `%${search}%`
+      conditions.push(
+        `(t.transfer_code ILIKE $${i} OR t.bank_description ILIKE $${i} OR t.bank_transaction_id ILIKE $${i})`,
+      )
+      params.push(like)
+      i += 1
     }
+    if (statusFilter && statusFilter !== 'all') {
+      conditions.push(`t.status = $${i}`)
+      params.push(statusFilter)
+      i += 1
+    }
+    const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
-    const topups = await payload.find({
-      collection: 'topups',
-      where,
-      sort: '-createdAt',
-      limit: 50,
+    const pool = getDbPool()
+
+    const [{ rows: countRows }, { rows: docs }] = await Promise.all([
+      pool.query<Row>(`SELECT COUNT(*)::int AS c FROM topups t ${whereSql}`, params),
+      pool.query<Row>(
+        `SELECT t.id, t.amount, t.transfer_code, t.status, t.bank_transaction_id,
+                t.bank_description, t.confirmed_at, t.created_at, t.user_id,
+                u.email AS user_email, u.display_name AS user_name
+         FROM topups t
+         LEFT JOIN users u ON u.id = t.user_id
+         ${whereSql}
+         ORDER BY t.created_at DESC
+         LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      ),
+    ])
+
+    const totalDocs = Number(countRows[0]?.c || 0)
+    const totalPages = Math.max(1, Math.ceil(totalDocs / limit))
+
+    const res = NextResponse.json({
+      docs: docs.map((t: Row) => ({
+        id: t.id,
+        userEmail: (t.user_email as string) || 'Unknown',
+        userName: (t.user_name as string) || null,
+        userId: t.user_id ?? null,
+        amount: Number(t.amount || 0),
+        transferCode: t.transfer_code,
+        status: t.status,
+        bankTransactionId: t.bank_transaction_id,
+        bankDescription: (t.bank_description as string) || null,
+        confirmedAt: t.confirmed_at,
+        createdAt: t.created_at,
+      })),
+      totalDocs,
+      totalPages,
       page,
-      depth: 1, // populate user
-      overrideAccess: true,
     })
-
-    return NextResponse.json({
-      docs: topups.docs.map((t) => {
-        const u = typeof t.user === 'object' && t.user ? t.user : null
-        return {
-          id: t.id,
-          userEmail: (u as Record<string, unknown>)?.email || 'Unknown',
-          userName: (u as Record<string, unknown>)?.displayName || null,
-          userId: u ? (u as Record<string, unknown>).id : null,
-          amount: t.amount,
-          transferCode: t.transferCode,
-          status: t.status,
-          bankTransactionId: t.bankTransactionId,
-          bankDescription: t.bankDescription || null,
-          confirmedAt: t.confirmedAt,
-          createdAt: t.createdAt,
-        }
-      }),
-      totalDocs: topups.totalDocs,
-      totalPages: topups.totalPages,
-      page: topups.page,
-    })
+    res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=15')
+    return res
   } catch (error) {
     console.error('[Admin topups] Error:', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

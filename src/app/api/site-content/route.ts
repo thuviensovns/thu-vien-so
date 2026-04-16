@@ -1,20 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 
+/** In-process memo: site-content is a global singleton that changes rarely
+ *  (only when an admin saves the settings panel). Every visitor polls this
+ *  endpoint, so serving from memory for 30s eliminates almost all DB load. */
+let memoAt = 0
+let memoBody: { settings: Record<string, unknown> | null; categoryDescriptions: Record<string, string> | null } | null = null
+const MEMO_TTL_MS = 30_000
+
 /** GET: Public — returns site content (settings + category descriptions) */
 export async function GET() {
   try {
-    const payload = await getPayloadForApi()
+    const now = Date.now()
+    if (memoBody && now - memoAt < MEMO_TTL_MS) {
+      return NextResponse.json(memoBody, {
+        headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' },
+      })
+    }
 
+    const payload = await getPayloadForApi()
     const data = await payload.findGlobal({ slug: 'site-content' }) as { settings?: Record<string, unknown> | null; categoryDescriptions?: Record<string, string> | null }
 
-    return NextResponse.json({
+    memoBody = {
       settings: data?.settings || null,
       categoryDescriptions: data?.categoryDescriptions || null,
-    }, {
-      headers: {
-        'Cache-Control': 'no-store, max-age=0',
-      },
+    }
+    memoAt = now
+
+    return NextResponse.json(memoBody, {
+      headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=120' },
     })
   } catch {
     return NextResponse.json({ settings: null, categoryDescriptions: null })
@@ -48,6 +62,9 @@ export async function POST(req: NextRequest) {
       slug: 'site-content',
       data: updateData,
     })
+
+    memoBody = null
+    memoAt = 0
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { getDbPool } from '@/lib/db-pool'
 
-/** GET: List orders for admin management page */
+type Row = Record<string, unknown>
+
+/** GET: List orders for admin management page.
+ *
+ *  Uses raw SQL instead of Payload `find({ depth:1 })`. Items are fetched in a
+ *  single follow-up query keyed by the page of order ids (N+1 avoided).
+ */
 export async function GET(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
@@ -10,55 +17,96 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const search = req.nextUrl.searchParams.get('search') || ''
+    const search = (req.nextUrl.searchParams.get('search') || '').trim()
     const status = req.nextUrl.searchParams.get('status') || ''
-    const page = Number(req.nextUrl.searchParams.get('page')) || 1
+    const page = Math.max(1, Number(req.nextUrl.searchParams.get('page')) || 1)
     const sort = req.nextUrl.searchParams.get('sort') || '-createdAt'
+    const limit = 20
+    const offset = (page - 1) * limit
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: any = {}
+    const orderBy = sort === 'createdAt'
+      ? 'o.created_at ASC'
+      : sort === 'total'
+        ? 'o.total DESC'
+        : sort === '-total'
+          ? 'o.total ASC'
+          : 'o.created_at DESC'
+
+    const conditions: string[] = []
+    const params: unknown[] = []
+    let i = 1
+
     if (search) {
-      where.or = [
-        { orderNumber: { contains: search } },
-        { customerEmail: { contains: search } },
-      ]
+      const like = `%${search}%`
+      conditions.push(`(o.order_number ILIKE $${i} OR o.customer_email ILIKE $${i})`)
+      params.push(like)
+      i += 1
     }
     if (status && status !== 'all') {
-      where.status = { equals: status }
+      conditions.push(`o.status = $${i}`)
+      params.push(status)
+      i += 1
+    }
+    const whereSql = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    const pool = getDbPool()
+
+    const [{ rows: countRows }, { rows: orders }] = await Promise.all([
+      pool.query<Row>(`SELECT COUNT(*)::int AS c FROM orders o ${whereSql}`, params),
+      pool.query<Row>(
+        `SELECT o.id, o.order_number, o.total, o.status, o.payment_method,
+                o.customer_email, o.created_at,
+                u.email AS u_email
+         FROM orders o
+         LEFT JOIN users u ON u.id = o.user_id
+         ${whereSql}
+         ORDER BY ${orderBy}
+         LIMIT ${limit} OFFSET ${offset}`,
+        params,
+      ),
+    ])
+
+    const totalDocs = Number(countRows[0]?.c || 0)
+    const totalPages = Math.max(1, Math.ceil(totalDocs / limit))
+
+    let itemsByOrder = new Map<number, { name: string; price: number }[]>()
+    if (orders.length > 0) {
+      const orderIds = orders.map((o: Row) => Number(o.id))
+      const { rows: items } = await pool.query<Row>(
+        `SELECT _parent_id AS order_id, product_name, price, _order
+         FROM orders_items
+         WHERE _parent_id = ANY($1::int[])
+         ORDER BY _parent_id, _order ASC`,
+        [orderIds],
+      )
+      itemsByOrder = new Map()
+      for (const it of items) {
+        const k = Number(it.order_id)
+        if (!itemsByOrder.has(k)) itemsByOrder.set(k, [])
+        itemsByOrder.get(k)!.push({
+          name: String(it.product_name || 'Sản phẩm'),
+          price: Number(it.price || 0),
+        })
+      }
     }
 
-    const orders = await payload.find({
-      collection: 'orders',
-      where,
-      sort,
-      limit: 20,
+    const res = NextResponse.json({
+      docs: orders.map((o: Row) => ({
+        id: o.id,
+        orderNumber: o.order_number,
+        email: (o.customer_email as string) || (o.u_email as string) || 'Unknown',
+        total: Number(o.total || 0),
+        status: o.status,
+        method: (o.payment_method as string) || 'balance',
+        items: itemsByOrder.get(Number(o.id)) || [],
+        createdAt: o.created_at,
+      })),
+      totalDocs,
+      totalPages,
       page,
-      depth: 1,
-      overrideAccess: true,
     })
-
-    return NextResponse.json({
-      docs: orders.docs.map((o) => {
-        const u = typeof o.user === 'object' && o.user ? o.user : null
-        return {
-          id: o.id,
-          orderNumber: o.orderNumber,
-          email: o.customerEmail || (u as Record<string, unknown>)?.email || 'Unknown',
-          total: o.total,
-          status: o.status,
-          method: o.payment?.method || 'balance',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          items: (o.items || []).map((item: any) => ({
-            name: item.productName || (typeof item.product === 'object' && item.product ? item.product.name : 'Sản phẩm'),
-            price: item.price,
-          })),
-          createdAt: o.createdAt,
-        }
-      }),
-      totalDocs: orders.totalDocs,
-      totalPages: orders.totalPages,
-      page: orders.page,
-    })
+    res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=15')
+    return res
   } catch (error) {
     console.error('[Admin orders] Error:', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

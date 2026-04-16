@@ -329,27 +329,26 @@ export async function getBlogPosts(opts?: GetBlogPostsOpts) {
   }
 }
 
-/** Get site-wide stats — cached for 2 minutes */
+/** Get site-wide stats — one raw SQL query instead of 3 Payload counts. */
 async function _fetchSiteStats() {
-  const payload = await safeGetPayload()
-  if (!payload) throw new Error('Payload unavailable')
-
-  const [allProducts, freeProducts, users, downloadSum] = await Promise.all([
-    payload.find({ collection: 'products', limit: 0, depth: 0 }),
-    payload.find({ collection: 'products', where: { 'pricing.isFree': { equals: true } }, limit: 0, depth: 0 }),
-    payload.find({ collection: 'users', limit: 0, depth: 0 }),
-    // Raw SQL SUM — single indexed column scan, ~1ms even on large tables
-    getDbPool()
-      .query('SELECT COALESCE(SUM(download_count), 0)::int AS total FROM products')
-      .then((r: { rows: { total: number }[] }) => r.rows[0]?.total ?? 0)
-      .catch(() => 0),
-  ])
-
+  const { rows } = await getDbPool().query<{
+    total_products: number
+    free_products: number
+    total_users: number
+    total_downloads: number
+  }>(
+    `SELECT
+       (SELECT COUNT(*)::int FROM products) AS total_products,
+       (SELECT COUNT(*)::int FROM products WHERE pricing_is_free IS TRUE) AS free_products,
+       (SELECT COUNT(*)::int FROM users) AS total_users,
+       (SELECT COALESCE(SUM(download_count), 0)::int FROM products) AS total_downloads`,
+  )
+  const r = rows[0] || { total_products: 0, free_products: 0, total_users: 0, total_downloads: 0 }
   return {
-    totalProducts: allProducts.totalDocs,
-    freeProducts: freeProducts.totalDocs,
-    totalUsers: users.totalDocs,
-    totalDownloads: downloadSum,
+    totalProducts: r.total_products,
+    freeProducts: r.free_products,
+    totalUsers: r.total_users,
+    totalDownloads: r.total_downloads,
   }
 }
 
@@ -374,58 +373,43 @@ export async function getSiteStats() {
   }
 }
 
-/** Get per-category stats — uses count queries by category ID (avoids relationship-slug traversal) */
+/** Get per-category stats — single raw SQL aggregation.
+ *
+ *  Previously fired 2 payload.find({limit:0}) per category — ~14 round-trips
+ *  for 7 categories. Now one grouped query counts + sums everything at once.
+ */
 async function _fetchCategoryStats() {
-  const payload = await safeGetPayload()
-  if (!payload) throw new Error('Payload unavailable')
+  const pool = getDbPool()
 
-  const categories = await payload.find({ collection: 'categories', sort: 'order', limit: 100, depth: 0 })
+  const [categories, agg] = await Promise.all([
+    pool.query<{ id: number; slug: string }>(
+      `SELECT id, slug FROM categories ORDER BY "order" ASC LIMIT 100`,
+    ),
+    pool.query<{ category_id: number; total: number; free: number; downloads: number }>(
+      `SELECT category_id,
+              COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE pricing_is_free IS TRUE)::int AS free,
+              COALESCE(SUM(download_count), 0)::int AS downloads
+       FROM products
+       WHERE category_id IS NOT NULL
+       GROUP BY category_id`,
+    ),
+  ])
+
+  const byCat: Record<number, { total: number; free: number; downloads: number }> = {}
+  for (const row of agg.rows) {
+    byCat[row.category_id] = { total: row.total, free: row.free, downloads: row.downloads }
+  }
 
   const stats: Record<string, { totalProducts: number; freeProducts: number; totalDownloads: number }> = {}
-
-  // Single raw SQL aggregation across all categories at once — avoids N+1 round-trips.
-  const downloadsByCategory = await getDbPool()
-    .query(
-      'SELECT category_id, COALESCE(SUM(download_count), 0)::int AS total FROM products WHERE category_id IS NOT NULL GROUP BY category_id'
-    )
-    .then((r: { rows: { category_id: number; total: number }[] }) => {
-      const map: Record<number, number> = {}
-      for (const row of r.rows) map[row.category_id] = row.total
-      return map
-    })
-    .catch(() => ({} as Record<number, number>))
-
-  // Count queries per category using direct ID match (more reliable than slug traversal)
-  await Promise.all(
-    categories.docs.map(async (cat) => {
-      const category = cat as unknown as { id: number; slug: string }
-      const [total, free] = await Promise.all([
-        payload.find({
-          collection: 'products',
-          where: { category: { equals: category.id } },
-          limit: 0,
-          depth: 0,
-        }),
-        payload.find({
-          collection: 'products',
-          where: {
-            and: [
-              { category: { equals: category.id } },
-              { 'pricing.isFree': { equals: true } },
-            ],
-          },
-          limit: 0,
-          depth: 0,
-        }),
-      ])
-      stats[category.slug] = {
-        totalProducts: total.totalDocs,
-        freeProducts: free.totalDocs,
-        totalDownloads: downloadsByCategory[category.id] ?? 0,
-      }
-    })
-  )
-
+  for (const c of categories.rows) {
+    const s = byCat[c.id]
+    stats[c.slug] = {
+      totalProducts: s?.total ?? 0,
+      freeProducts: s?.free ?? 0,
+      totalDownloads: s?.downloads ?? 0,
+    }
+  }
   return stats
 }
 

@@ -1,14 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { getDbPool } from '@/lib/db-pool'
 
+/** GET /api/notifications
+ *
+ *  Admin notification badge + recent-activity dropdown. Polled by the admin
+ *  layout roughly once a minute across every open admin tab, so we keep the
+ *  work tiny: 5 concurrent, indexed, *small* SELECTs instead of 5 Payload
+ *  `find({ depth:1 })` calls (each of which hydrates nested relations).
+ *
+ *  Composite indexes used (Phase 9):
+ *   - orders(status, created_at DESC)
+ *   - topups(status, created_at DESC)
+ *
+ *  Auth is still Payload-based so cookie/session semantics don't diverge.
+ */
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+type Row = Record<string, unknown>
 
 export async function GET(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
-
-    // SECURITY: Require admin authentication
     let isAdmin = false
     try {
       const { user } = await payload.auth({ headers: req.headers })
@@ -19,172 +33,104 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Get unread contact messages count + recent messages
-    const [newMessages, recentMessages] = await Promise.all([
-      payload.find({
-        collection: 'contact-messages',
-        where: { status: { equals: 'new' } },
-        limit: 0,
-        overrideAccess: true,
-      }),
-      payload.find({
-        collection: 'contact-messages',
-        sort: '-createdAt',
-        limit: 20,
-        overrideAccess: true,
-      }),
+    const pool = getDbPool()
+
+    const [
+      { rows: newMsgCountRows },
+      { rows: recentMsgs },
+      { rows: topUps },
+      { rows: orders },
+    ] = await Promise.all([
+      pool.query<Row>(
+        `SELECT COUNT(*)::int AS c FROM contact_messages WHERE status = 'new'`,
+      ),
+      pool.query<Row>(
+        `SELECT id, name, email, subject, message, status, admin_note, ip_address, created_at, updated_at
+         FROM contact_messages
+         ORDER BY created_at DESC
+         LIMIT 20`,
+      ),
+      pool.query<Row>(
+        `SELECT t.id, t.status, t.amount, t.transfer_code, t.confirmed_at, t.created_at,
+                u.display_name, u.email
+         FROM topups t
+         LEFT JOIN users u ON u.id = t.user_id
+         WHERE t.status = 'pending'
+            OR (t.status = 'completed' AND t.read_by_admin IS NOT TRUE)
+         ORDER BY t.created_at DESC
+         LIMIT 20`,
+      ),
+      pool.query<Row>(
+        `SELECT o.id, o.order_number, o.status, o.total, o.transfer_code,
+                o.payment_method, o.payment_paid_at, o.customer_name, o.customer_email,
+                o.customer_phone, o.created_at,
+                u.display_name AS u_name, u.email AS u_email, u.phone AS u_phone,
+                (SELECT COUNT(*)::int FROM orders_items WHERE _parent_id = o.id) AS item_count,
+                (SELECT STRING_AGG(COALESCE(product_name, 'Sản phẩm'), ', ' ORDER BY _order)
+                   FROM orders_items WHERE _parent_id = o.id) AS item_names
+         FROM orders o
+         LEFT JOIN users u ON u.id = o.user_id
+         WHERE (o.status = 'pending' AND o.payment_method = 'bank-transfer')
+            OR (o.status = 'paid' AND o.read_by_admin IS NOT TRUE)
+         ORDER BY o.created_at DESC
+         LIMIT 20`,
+      ),
     ])
 
-    // Topup notifications — wrapped in try/catch in case readByAdmin column
-    // hasn't been synced to DB yet (Payload push: true runs on first access)
-    // Topup notifications: both pending (customer just created) and completed (confirmed)
-    let unreadTopUpCount = 0
-    let topUpDocs: Record<string, unknown>[] = []
-    try {
-      const unreadTopUps = await payload.find({
-        collection: 'topups',
-        where: {
-          or: [
-            { status: { equals: 'pending' } },
-            {
-              and: [
-                { status: { equals: 'completed' } },
-                { readByAdmin: { not_equals: true } },
-              ],
-            },
-          ],
-        },
-        sort: '-createdAt',
-        limit: 20,
-        depth: 1,
-        overrideAccess: true,
-      })
-      unreadTopUpCount = unreadTopUps.totalDocs
-      topUpDocs = unreadTopUps.docs as unknown as Record<string, unknown>[]
-    } catch (e) {
-      console.warn('[Notifications] topup query failed, trying fallback:', (e as Error).message)
-      try {
-        const fallback = await payload.find({
-          collection: 'topups',
-          where: {
-            or: [
-              { status: { equals: 'pending' } },
-              { status: { equals: 'completed' } },
-            ],
-          },
-          sort: '-createdAt',
-          limit: 20,
-          depth: 1,
-          overrideAccess: true,
-        })
-        unreadTopUpCount = fallback.totalDocs
-        topUpDocs = fallback.docs as unknown as Record<string, unknown>[]
-      } catch { /* ignore */ }
-    }
+    const unreadMessages = Number(newMsgCountRows[0]?.c || 0)
+    const unreadTopUps = topUps.length
+    const unreadOrders = orders.length
 
-    // Order notifications: pending bank-transfer + recently paid but unread by admin
-    let unreadOrderCount = 0
-    let orderDocs: Record<string, unknown>[] = []
-    try {
-      const unreadOrders = await payload.find({
-        collection: 'orders',
-        where: {
-          or: [
-            {
-              and: [
-                { status: { equals: 'pending' } },
-                { 'payment.method': { equals: 'bank-transfer' } },
-              ],
-            },
-            {
-              and: [
-                { status: { equals: 'paid' } },
-                { readByAdmin: { not_equals: true } },
-              ],
-            },
-          ],
-        },
-        sort: '-createdAt',
-        limit: 20,
-        depth: 1,
-        overrideAccess: true,
-      })
-      unreadOrderCount = unreadOrders.totalDocs
-      orderDocs = unreadOrders.docs as unknown as Record<string, unknown>[]
-    } catch (e) {
-      console.warn('[Notifications] order query failed, trying fallback:', (e as Error).message)
-      try {
-        const fallback = await payload.find({
-          collection: 'orders',
-          where: {
-            or: [
-              { status: { equals: 'pending' } },
-              { status: { equals: 'paid' } },
-            ],
-          },
-          sort: '-createdAt',
-          limit: 20,
-          depth: 1,
-          overrideAccess: true,
-        })
-        unreadOrderCount = fallback.totalDocs
-        orderDocs = fallback.docs as unknown as Record<string, unknown>[]
-      } catch { /* ignore */ }
-    }
-
-    return NextResponse.json({
-      unreadCount: newMessages.totalDocs + unreadTopUpCount + unreadOrderCount,
-      unreadMessages: newMessages.totalDocs,
-      unreadTopUps: unreadTopUpCount,
-      unreadOrders: unreadOrderCount,
-      recent: recentMessages.docs.map((msg) => ({
-        id: msg.id,
-        name: msg.name,
-        email: msg.email,
-        subject: msg.subject,
-        message: msg.message,
-        status: msg.status,
-        adminNote: msg.adminNote,
-        ipAddress: msg.ipAddress,
-        createdAt: msg.createdAt,
-        updatedAt: msg.updatedAt,
+    const res = NextResponse.json({
+      unreadCount: unreadMessages + unreadTopUps + unreadOrders,
+      unreadMessages,
+      unreadTopUps,
+      unreadOrders,
+      recent: recentMsgs.map((m: Row) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        subject: m.subject,
+        message: m.message,
+        status: m.status,
+        adminNote: m.admin_note,
+        ipAddress: m.ip_address,
+        createdAt: m.created_at,
+        updatedAt: m.updated_at,
       })),
-      recentTopUps: topUpDocs.map((t) => {
-        const user = typeof t.user === 'object' && t.user ? (t.user as Record<string, unknown>) : null
-        return {
-          id: t.id,
-          type: 'topup' as const,
-          status: t.status as string,
-          userName: (user?.displayName as string) || null,
-          userEmail: (user?.email as string) || null,
-          amount: t.amount,
-          transferCode: t.transferCode,
-          confirmedAt: t.confirmedAt,
-          createdAt: t.createdAt,
-        }
-      }),
-      recentOrders: orderDocs.map((o) => {
-        const user = typeof o.user === 'object' && o.user ? (o.user as Record<string, unknown>) : null
-        const payment = o.payment as Record<string, unknown> | null
-        const items = Array.isArray(o.items) ? o.items as Record<string, unknown>[] : []
-        return {
-          id: o.id,
-          type: 'order' as const,
-          orderNumber: o.orderNumber as string,
-          status: o.status as string,
-          userName: (o.customerName as string) || (user?.displayName as string) || null,
-          userEmail: (o.customerEmail as string) || (user?.email as string) || null,
-          userPhone: (o.customerPhone as string) || (user?.phone as string) || null,
-          total: o.total as number,
-          transferCode: o.transferCode as string | null,
-          paymentMethod: (payment?.method as string) || null,
-          itemCount: items.length,
-          itemNames: items.map((i) => (i.productName as string) || 'Sản phẩm').join(', '),
-          paidAt: (payment?.paidAt as string) || null,
-          createdAt: o.createdAt as string,
-        }
-      }),
+      recentTopUps: topUps.map((t: Row) => ({
+        id: t.id,
+        type: 'topup' as const,
+        status: t.status,
+        userName: (t.display_name as string) || null,
+        userEmail: (t.email as string) || null,
+        amount: t.amount,
+        transferCode: t.transfer_code,
+        confirmedAt: t.confirmed_at,
+        createdAt: t.created_at,
+      })),
+      recentOrders: orders.map((o: Row) => ({
+        id: o.id,
+        type: 'order' as const,
+        orderNumber: o.order_number,
+        status: o.status,
+        userName: (o.customer_name as string) || (o.u_name as string) || null,
+        userEmail: (o.customer_email as string) || (o.u_email as string) || null,
+        userPhone: (o.customer_phone as string) || (o.u_phone as string) || null,
+        total: o.total,
+        transferCode: o.transfer_code || null,
+        paymentMethod: (o.payment_method as string) || null,
+        itemCount: Number(o.item_count || 0),
+        itemNames: (o.item_names as string) || '',
+        paidAt: (o.payment_paid_at as string) || null,
+        createdAt: o.created_at,
+      })),
     })
+    // Short private cache covers the case of multiple admin tabs polling in
+    // quick succession; CDN can't cache (Forbidden for non-admins) but browser
+    // reuse is safe for the same logged-in session.
+    res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=15')
+    return res
   } catch (error) {
     console.error('Notifications error:', error)
     const msg = error instanceof Error ? error.message : ''
