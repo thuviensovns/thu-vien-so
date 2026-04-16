@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Users, ShieldCheck, User, Mail, Trash2, AlertCircle,
   Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2, KeyRound, UserCog,
+  Receipt, ShoppingCart,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +27,40 @@ interface PayloadUser {
   createdAt?: string
 }
 
+interface TopupMatch {
+  id: number
+  transferCode: string | null
+  bankDescription: string | null
+  bankTransactionId: string | null
+  amount: number
+  status: string
+  createdAt: string
+}
+
+interface OrderMatch {
+  id: number
+  orderNumber: string | null
+  transferCode: string | null
+  customerEmail: string | null
+  customerName: string | null
+  customerPhone: string | null
+  note: string | null
+  total: number
+  status: string
+  createdAt: string
+}
+
+interface SearchHit {
+  id: string
+  email: string
+  displayName: string
+  balance: number
+  role: string
+  matchedUserField: boolean
+  topupMatches: TopupMatch[]
+  orderMatches: OrderMatch[]
+}
+
 export default function UsersPage() {
   const [dbUsers, setDbUsers] = useState<DemoUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +75,10 @@ export default function UsersPage() {
   const [availableRoles, setAvailableRoles] = useState<{ id: number; name: string; description: string | null }[]>([])
   const [userAssignments, setUserAssignments] = useState<Record<string, { role_id: number; role_name: string } | null>>({})
   const [roleAssigning, setRoleAssigning] = useState(false)
+  // Server-side cross-table search (email / name / topup content / order content)
+  const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const searchAbortRef = useRef<AbortController | null>(null)
 
   // Fetch real users from Payload API
   const fetchUsers = useCallback(async () => {
@@ -146,14 +185,66 @@ export default function UsersPage() {
 
   const allUsers = dbUsers
 
+  // Debounced cross-table search — fires server-side so admins can locate users
+  // by transaction content (transferCode, order number, bank desc, etc.) even if
+  // the user isn't in the initial 500-row batch.
+  useEffect(() => {
+    const q = search.trim()
+    if (q.length < 2) {
+      setSearchHits(null)
+      setSearchLoading(false)
+      searchAbortRef.current?.abort()
+      return
+    }
+    setSearchLoading(true)
+    const handle = setTimeout(() => {
+      searchAbortRef.current?.abort()
+      const ac = new AbortController()
+      searchAbortRef.current = ac
+      fetch(`/api/admin/users/search?q=${encodeURIComponent(q)}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        signal: ac.signal,
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+        .then((data: { docs: SearchHit[] }) => {
+          setSearchHits(data.docs || [])
+        })
+        .catch((err) => {
+          if (err?.name === 'AbortError') return
+          setSearchHits([])
+        })
+        .finally(() => setSearchLoading(false))
+    }, 300)
+    return () => clearTimeout(handle)
+  }, [search])
+
+  const hitsById = useMemo(() => {
+    if (!searchHits) return null
+    const map = new Map<string, SearchHit>()
+    for (const h of searchHits) map.set(h.id, h)
+    return map
+  }, [searchHits])
+
   const filtered = useMemo(() => {
-    if (!search) return allUsers
-    const q = search.toLowerCase()
-    return allUsers.filter((u) =>
-      u.email.toLowerCase().includes(q) ||
-      (u.displayName || '').toLowerCase().includes(q)
-    )
-  }, [allUsers, search])
+    if (!search.trim()) return allUsers
+    // Server search active — merge hits with local user data so all admin
+    // actions (role, balance, ban) still work via the cached users.
+    if (!searchHits) return []
+    const localById = new Map(allUsers.map((u) => [u.id, u]))
+    return searchHits.map((h) => {
+      const local = localById.get(h.id)
+      return local
+        ? { ...local, balance: h.balance }
+        : {
+            id: h.id,
+            email: h.email,
+            displayName: h.displayName,
+            role: (h.role === 'admin' ? 'admin' : 'customer') as 'admin' | 'customer',
+            balance: h.balance,
+          }
+    })
+  }, [allUsers, search, searchHits])
 
   const adminCount = allUsers.filter((u) => u.role === 'admin').length
   const customerCount = allUsers.filter((u) => u.role !== 'admin').length
@@ -379,10 +470,18 @@ export default function UsersPage() {
         <Input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Tìm theo email hoặc tên..."
-          className="pl-9 bg-muted/50"
+          placeholder="Tìm theo email / tên / mã CK / mã đơn / nội dung chuyển khoản..."
+          className="pl-9 pr-9 bg-muted/50"
         />
+        {searchLoading && (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+        )}
       </div>
+      {search.trim().length >= 2 && searchHits && (
+        <p className="text-xs text-muted-foreground -mt-4">
+          {searchHits.length} kết quả khớp · bao gồm cả giao dịch nạp / đơn hàng
+        </p>
+      )}
 
       {/* Users list */}
       {loading ? (
@@ -529,6 +628,81 @@ export default function UsersPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Matched transactions from cross-table search */}
+                {hitsById?.get(user.id) && (
+                  (() => {
+                    const hit = hitsById.get(user.id)!
+                    const hasTopups = hit.topupMatches.length > 0
+                    const hasOrders = hit.orderMatches.length > 0
+                    if (!hasTopups && !hasOrders) return null
+                    return (
+                      <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5">
+                        {hit.topupMatches.slice(0, 3).map((t) => (
+                          <div key={`t-${t.id}`} className="flex items-start gap-2 text-[11px] bg-primary/5 px-2 py-1.5 rounded">
+                            <Receipt className="h-3 w-3 text-primary shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">NẠP</Badge>
+                                <span className={`text-[9px] px-1 py-0 rounded ${
+                                  t.status === 'completed' ? 'bg-success/10 text-success' :
+                                  t.status === 'pending' ? 'bg-warning/10 text-warning' :
+                                  'bg-muted/30 text-muted-foreground'
+                                }`}>{t.status}</span>
+                                <span className="font-mono font-medium text-foreground">{t.transferCode || '—'}</span>
+                                <span className="text-success">{formatVND(Number(t.amount || 0))}</span>
+                              </div>
+                              {t.bankDescription && (
+                                <p className="text-muted-foreground truncate mt-0.5">{t.bankDescription}</p>
+                              )}
+                              {t.bankTransactionId && (
+                                <p className="text-muted-foreground/70 font-mono text-[10px] truncate">TxID: {t.bankTransactionId}</p>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {new Date(t.createdAt).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        ))}
+                        {hit.orderMatches.slice(0, 3).map((o) => (
+                          <div key={`o-${o.id}`} className="flex items-start gap-2 text-[11px] bg-blue-500/5 px-2 py-1.5 rounded">
+                            <ShoppingCart className="h-3 w-3 text-blue-500 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">ĐƠN</Badge>
+                                <span className={`text-[9px] px-1 py-0 rounded ${
+                                  o.status === 'paid' || o.status === 'completed' ? 'bg-success/10 text-success' :
+                                  o.status === 'pending' ? 'bg-warning/10 text-warning' :
+                                  'bg-muted/30 text-muted-foreground'
+                                }`}>{o.status}</span>
+                                <span className="font-mono font-medium text-foreground">{o.orderNumber || '—'}</span>
+                                <span className="text-success">{formatVND(Number(o.total || 0))}</span>
+                              </div>
+                              {o.note && (
+                                <p className="text-muted-foreground truncate mt-0.5">{o.note}</p>
+                              )}
+                              {(o.transferCode || o.customerEmail) && (
+                                <p className="text-muted-foreground/70 font-mono text-[10px] truncate">
+                                  {o.transferCode ? `CK: ${o.transferCode}` : ''}
+                                  {o.transferCode && o.customerEmail ? ' · ' : ''}
+                                  {o.customerEmail || ''}
+                                </p>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {new Date(o.createdAt).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        ))}
+                        {(hit.topupMatches.length + hit.orderMatches.length) > 6 && (
+                          <p className="text-[10px] text-muted-foreground text-center">
+                            + {hit.topupMatches.length + hit.orderMatches.length - 6} giao dịch khác khớp
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()
+                )}
 
                 {/* Balance adjustment form */}
                 {balanceUserId === user.id && (
