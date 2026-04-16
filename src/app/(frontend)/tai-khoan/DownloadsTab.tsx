@@ -10,11 +10,20 @@ import { toast } from 'sonner'
 
 interface DownloadRecord {
   id: string
-  product: { id: string; name: string; slug: string; thumbnail?: { url?: string } | string; type?: string }
+  product: {
+    id: string
+    name: string
+    slug: string
+    type?: string
+    /** R2/external URL — preferred. */
+    thumbnailUrl?: string
+    /** Legacy shape from Payload REST depth=1 — kept for back-compat. */
+    thumbnail?: { url?: string } | string
+  } | null
   downloadCount: number
   maxDownloads: number
   expiresAt: string
-  order?: { orderNumber: string }
+  order?: { orderNumber: string } | null
 }
 
 interface DownloadsTabProps {
@@ -96,10 +105,14 @@ export default function DownloadsTab({ downloads, loading, onRefresh, onDownload
       ) : (
         <div className="space-y-3">
           {downloads.map((dl) => {
-            const product = typeof dl.product === 'object' ? dl.product : null
-            const thumbUrl = product?.thumbnail
-              ? (typeof product.thumbnail === 'object' ? product.thumbnail.url : product.thumbnail)
-              : '/images/placeholder.jpg'
+            const product = dl.product && typeof dl.product === 'object' ? dl.product : null
+            const mediaUrl =
+              product?.thumbnail && typeof product.thumbnail === 'object'
+                ? product.thumbnail.url
+                : typeof product?.thumbnail === 'string'
+                  ? product.thumbnail
+                  : undefined
+            const thumbUrl = product?.thumbnailUrl || mediaUrl || '/images/placeholder.jpg'
             const isExpired = new Date(dl.expiresAt) < new Date()
             const remaining = dl.maxDownloads - dl.downloadCount
             const canDownload = remaining > 0 && !isExpired

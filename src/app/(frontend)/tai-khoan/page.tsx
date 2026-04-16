@@ -71,7 +71,7 @@ export default function AccountPage() {
   const fetchDownloads = useCallback(async () => {
     setLoadingDownloads(true)
     try {
-      const res = await fetch('/api/downloads?depth=1&sort=-createdAt&limit=20', { credentials: 'include' })
+      const res = await fetch('/api/user/downloads?limit=20', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setDownloads(data.docs || [])

@@ -304,6 +304,11 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
           ON email_queue(source_key)
           WHERE source_key IS NOT NULL`,
     },
+    // === Downloads perf index (Phase 8) ===
+    {
+      label: 'Create index downloads.user_id_created_at',
+      q: `CREATE INDEX IF NOT EXISTS downloads_user_created_at_idx ON downloads(user_id, created_at DESC)`,
+    },
     // === Automations (Phase 7) ===
     {
       label: 'Create automations table',
