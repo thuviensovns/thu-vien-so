@@ -190,14 +190,14 @@ export default function TopUpPage() {
             <div className="text-right hidden sm:block">
               <p className="text-xs text-muted-foreground">Số dư hiện tại</p>
               <p className="text-lg font-bold text-success">{formatVND(balance)}</p>
-              {affiliateEarned !== null && affiliateEarned > 0 && (
+              {affiliateEarned !== null && (
                 <Link
                   href="/tai-khoan?tab=affiliate"
                   className="text-[10px] text-primary hover:underline flex items-center gap-1 justify-end mt-0.5"
                   title="Hoa hồng giới thiệu đã cộng vào số dư"
                 >
                   <Gift className="h-3 w-3" />
-                  +{formatVND(affiliateEarned)} hoa hồng
+                  {affiliateEarned > 0 ? `+${formatVND(affiliateEarned)} hoa hồng` : 'Chưa có hoa hồng'}
                 </Link>
               )}
             </div>
@@ -381,7 +381,7 @@ export default function TopUpPage() {
                       <span className="text-sm text-muted-foreground">Số dư hiện tại</span>
                       <span className="text-lg font-bold text-success">{formatVND(balance)}</span>
                     </div>
-                    {affiliateEarned !== null && affiliateEarned > 0 && (
+                    {affiliateEarned !== null && (
                       <Link
                         href="/tai-khoan?tab=affiliate"
                         className="flex items-center justify-between pt-1.5 border-t border-success/20"
@@ -390,7 +390,9 @@ export default function TopUpPage() {
                           <Gift className="h-3 w-3 text-primary" />
                           Hoa hồng đã cộng
                         </span>
-                        <span className="text-sm font-semibold text-primary">+{formatVND(affiliateEarned)}</span>
+                        <span className={`text-sm font-semibold ${affiliateEarned > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                          {affiliateEarned > 0 ? `+${formatVND(affiliateEarned)}` : formatVND(0)}
+                        </span>
                       </Link>
                     )}
                   </CardContent>
