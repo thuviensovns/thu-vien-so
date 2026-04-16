@@ -35,6 +35,7 @@ export default function UsersPage() {
   const [resetPwUserId, setResetPwUserId] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [page, setPage] = useState(1)
+  const [balanceProcessing, setBalanceProcessing] = useState<null | 'add' | 'deduct'>(null)
 
   // Fetch real users from Payload API
   const fetchUsers = useCallback(async () => {
@@ -138,6 +139,7 @@ export default function UsersPage() {
   }
 
   async function handleAddBalance(userId: string) {
+    if (balanceProcessing) return
     const amount = parseInt(balanceAmount)
     if (isNaN(amount) || amount < 1000) {
       toast.error('Số tiền tối thiểu 1.000₫')
@@ -146,6 +148,7 @@ export default function UsersPage() {
     const user = allUsers.find((u) => u.id === userId)
     if (!user) return
 
+    setBalanceProcessing('add')
     try {
       const res = await fetch('/api/admin/topups', {
         method: 'POST',
@@ -167,14 +170,17 @@ export default function UsersPage() {
       ))
       // Re-fetch from server so any concurrent change is reflected too
       fetchUsers()
+      setBalanceUserId(null)
+      setBalanceAmount('')
     } catch {
       toast.error('Lỗi kết nối')
+    } finally {
+      setBalanceProcessing(null)
     }
-    setBalanceUserId(null)
-    setBalanceAmount('')
   }
 
   async function handleDeductBalance(userId: string) {
+    if (balanceProcessing) return
     const amount = parseInt(balanceAmount)
     if (isNaN(amount) || amount < 1000) {
       toast.error('Số tiền tối thiểu 1.000₫')
@@ -188,6 +194,7 @@ export default function UsersPage() {
       return
     }
 
+    setBalanceProcessing('deduct')
     try {
       const res = await fetch('/api/admin/topups/deduct', {
         method: 'POST',
@@ -207,11 +214,13 @@ export default function UsersPage() {
         u.id === userId ? { ...u, balance: data.newBalance } : u
       ))
       fetchUsers()
+      setBalanceUserId(null)
+      setBalanceAmount('')
     } catch {
       toast.error('Lỗi kết nối')
+    } finally {
+      setBalanceProcessing(null)
     }
-    setBalanceUserId(null)
-    setBalanceAmount('')
   }
 
   async function handleResetPassword(userId: string) {
@@ -453,16 +462,42 @@ export default function UsersPage() {
                       className="bg-muted/50 font-mono h-8 text-sm flex-1 min-w-[120px]"
                       min={1000}
                       step={1000}
+                      disabled={balanceProcessing !== null}
                     />
-                    <Button size="sm" className="h-8 text-xs" onClick={() => handleAddBalance(user.id)}>
-                      <ArrowUpCircle className="mr-1 h-3 w-3" />
-                      Cộng
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => handleAddBalance(user.id)}
+                      disabled={balanceProcessing !== null}
+                    >
+                      {balanceProcessing === 'add' ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <ArrowUpCircle className="mr-1 h-3 w-3" />
+                      )}
+                      {balanceProcessing === 'add' ? 'Đang cộng...' : 'Cộng'}
                     </Button>
-                    <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => handleDeductBalance(user.id)}>
-                      <ArrowDownCircle className="mr-1 h-3 w-3" />
-                      Trừ
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 text-xs"
+                      onClick={() => handleDeductBalance(user.id)}
+                      disabled={balanceProcessing !== null}
+                    >
+                      {balanceProcessing === 'deduct' ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <ArrowDownCircle className="mr-1 h-3 w-3" />
+                      )}
+                      {balanceProcessing === 'deduct' ? 'Đang trừ...' : 'Trừ'}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setBalanceUserId(null)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      onClick={() => setBalanceUserId(null)}
+                      disabled={balanceProcessing !== null}
+                    >
                       Hủy
                     </Button>
                   </div>
