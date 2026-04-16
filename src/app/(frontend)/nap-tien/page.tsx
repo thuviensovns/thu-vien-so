@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   Wallet, ChevronRight, QrCode, Copy, Check, Shield,
-  AlertCircle, Sparkles, CheckCircle2, Loader2,
+  AlertCircle, Sparkles, CheckCircle2, Loader2, Gift,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +38,7 @@ export default function TopUpPage() {
   const [polling, setPolling] = useState(false)
   const [topupCreated, setTopupCreated] = useState(false)
   const [authError, setAuthError] = useState(false)
+  const [affiliateEarned, setAffiliateEarned] = useState<number | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Fixed transfer code per user — same code every time for admin tracking
@@ -49,6 +50,20 @@ export default function TopUpPage() {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current)
     }
   }, [])
+
+  // Fetch affiliate commission that was auto-credited into the user's wallet.
+  // Refetches when balance changes (e.g., after a successful top-up by a referee).
+  useEffect(() => {
+    if (!user?.id) { setAffiliateEarned(null); return }
+    fetch('/api/affiliate/me', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.enabled && d.account) {
+          setAffiliateEarned(Number(d.account.auto_credited || 0))
+        }
+      })
+      .catch(() => {})
+  }, [user?.id, balance])
 
 
   const finalAmount = useCustom ? (parseInt(customAmount) || 0) : amount
@@ -175,6 +190,16 @@ export default function TopUpPage() {
             <div className="text-right hidden sm:block">
               <p className="text-xs text-muted-foreground">Số dư hiện tại</p>
               <p className="text-lg font-bold text-success">{formatVND(balance)}</p>
+              {affiliateEarned !== null && affiliateEarned > 0 && (
+                <Link
+                  href="/tai-khoan?tab=affiliate"
+                  className="text-[10px] text-primary hover:underline flex items-center gap-1 justify-end mt-0.5"
+                  title="Hoa hồng giới thiệu đã cộng vào số dư"
+                >
+                  <Gift className="h-3 w-3" />
+                  +{formatVND(affiliateEarned)} hoa hồng
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -216,6 +241,18 @@ export default function TopUpPage() {
               <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border">
                 <p className="text-xs text-muted-foreground">Số dư mới</p>
                 <p className="text-2xl font-bold text-success">{formatVND(balance)}</p>
+                {affiliateEarned !== null && affiliateEarned > 0 && (
+                  <Link
+                    href="/tai-khoan?tab=affiliate"
+                    className="mt-2 pt-2 border-t border-border flex items-center justify-between"
+                  >
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Gift className="h-3 w-3 text-primary" />
+                      Gồm hoa hồng giới thiệu
+                    </span>
+                    <span className="text-sm font-semibold text-primary">+{formatVND(affiliateEarned)}</span>
+                  </Link>
+                )}
               </div>
               <div className="flex gap-3 mt-6 justify-center">
                 <Button onClick={handleReset} variant="outline">Nạp thêm</Button>
@@ -339,9 +376,23 @@ export default function TopUpPage() {
               {/* Current balance - mobile */}
               {user && (
                 <Card className="border-success/20 bg-success/5 sm:hidden">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Số dư hiện tại</span>
-                    <span className="text-lg font-bold text-success">{formatVND(balance)}</span>
+                  <CardContent className="p-4 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Số dư hiện tại</span>
+                      <span className="text-lg font-bold text-success">{formatVND(balance)}</span>
+                    </div>
+                    {affiliateEarned !== null && affiliateEarned > 0 && (
+                      <Link
+                        href="/tai-khoan?tab=affiliate"
+                        className="flex items-center justify-between pt-1.5 border-t border-success/20"
+                      >
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Gift className="h-3 w-3 text-primary" />
+                          Hoa hồng đã cộng
+                        </span>
+                        <span className="text-sm font-semibold text-primary">+{formatVND(affiliateEarned)}</span>
+                      </Link>
+                    )}
                   </CardContent>
                 </Card>
               )}
