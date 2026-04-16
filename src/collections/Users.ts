@@ -1,4 +1,5 @@
 import type { CollectionConfig } from 'payload'
+import { ensureAffiliateAccount } from '@/lib/affiliate'
 
 const ADMIN_EMAIL = 'hoangdunggame2k@gmail.com'
 
@@ -76,4 +77,15 @@ export const Users: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    afterChange: [
+      async ({ doc, operation }) => {
+        // On new user creation, provision an affiliate_accounts row with an
+        // email-derived ref code so every customer has a shareable code ready.
+        // Fire-and-forget — a failure here must not block registration.
+        if (operation !== 'create' || !doc?.id) return
+        ensureAffiliateAccount(Number(doc.id), doc.email).catch(() => {})
+      },
+    ],
+  },
 }

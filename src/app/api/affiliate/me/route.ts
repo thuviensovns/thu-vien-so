@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ enabled: false, config: cfg })
     }
 
-    const refCode = await ensureAffiliateAccount(Number(user.id))
+    const refCode = await ensureAffiliateAccount(Number(user.id), user.email)
     await ensureTablesExist()
     const pool = getDbPool()
 

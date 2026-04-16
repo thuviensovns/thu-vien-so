@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { UserPlus, Music, Loader2, AlertCircle, Eye, EyeOff, Check } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { UserPlus, Music, Loader2, AlertCircle, Eye, EyeOff, Check, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,13 +13,29 @@ import { toast } from 'sonner'
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, isLoading: authLoading, register } = useAuth()
   const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [refCode, setRefCode] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+
+  // Prefill ref code from ?ref=XYZ query param or localStorage (captured earlier)
+  useEffect(() => {
+    const fromUrl = searchParams.get('ref')
+    if (fromUrl) {
+      setRefCode(fromUrl.toUpperCase())
+      try { localStorage.setItem('affiliate_ref', fromUrl.toUpperCase()) } catch {}
+      return
+    }
+    try {
+      const stored = localStorage.getItem('affiliate_ref')
+      if (stored) setRefCode(stored.toUpperCase())
+    } catch {}
+  }, [searchParams])
 
   // Redirect if already logged in
   useEffect(() => {
@@ -46,7 +62,12 @@ export default function RegisterPage() {
 
     setIsLoading(true)
     try {
-      const result = await register({ displayName, email, password })
+      const result = await register({
+        displayName,
+        email,
+        password,
+        refCode: refCode.trim().toUpperCase() || undefined,
+      })
       if (result.ok) {
         toast.success('Đăng ký thành công!', { description: 'Hãy đăng nhập để tiếp tục.' })
         router.push('/dang-nhap?registered=true')
@@ -150,6 +171,23 @@ export default function RegisterPage() {
                   <PasswordCheck ok={passwordChecks.hasNumber} label="Có chữ số" />
                 </div>
               )}
+            </div>
+            <div>
+              <label htmlFor="refCode" className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                <Gift className="h-3.5 w-3.5 text-primary" />
+                Mã giới thiệu <span className="text-xs text-muted-foreground font-normal">(không bắt buộc)</span>
+              </label>
+              <Input
+                id="refCode"
+                type="text"
+                placeholder="Nhập mã giới thiệu nếu có"
+                value={refCode}
+                onChange={(e) => setRefCode(e.target.value.toUpperCase())}
+                autoComplete="off"
+                disabled={isLoading}
+                className="bg-muted/50 uppercase tracking-wider"
+                maxLength={30}
+              />
             </div>
             <Button
               type="submit"

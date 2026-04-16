@@ -10,7 +10,7 @@ export interface AffiliateConfig {
 }
 
 const DEFAULT_CONFIG: AffiliateConfig = {
-  enabled: false,
+  enabled: true,
   commissionPercent: 5,
   minWithdrawal: 50_000,
   creditSources: ['topup'],
@@ -58,8 +58,21 @@ export function generateRefCode(): string {
   return ts + rand
 }
 
-/** Ensure the user has an affiliate_accounts row; creates one if missing. */
-export async function ensureAffiliateAccount(userId: number): Promise<string> {
+/** Derive a ref code from the email local-part, stripped of @gmail.com / any
+ *  domain and non-alphanumerics, uppercased. Returns empty string if the email
+ *  would yield nothing usable (e.g. all symbols). Caller must handle that. */
+export function refCodeFromEmail(email: string): string {
+  if (!email) return ''
+  const local = email.split('@')[0] || ''
+  const cleaned = local.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  return cleaned.slice(0, 20)
+}
+
+/** Ensure the user has an affiliate_accounts row; creates one if missing.
+ *  Prefers an email-derived code (per user request: "mã giới thiệu theo email
+ *  đăng ký, bỏ @gmail.com đi"). Falls back to a random code on collision so
+ *  two users named e.g. "admin@gmail.com" + "admin@yahoo.com" both succeed. */
+export async function ensureAffiliateAccount(userId: number, email?: string): Promise<string> {
   await ensureTablesExist()
   const pool = getDbPool()
   const { rows } = await pool.query(
@@ -68,7 +81,25 @@ export async function ensureAffiliateAccount(userId: number): Promise<string> {
   )
   if (rows.length > 0) return rows[0].ref_code
 
-  // Generate unique code with a few retries on collision
+  // Try email-derived code first, then short suffixed variants, then random.
+  const emailCode = refCodeFromEmail(email || '')
+  const candidates: string[] = []
+  if (emailCode) {
+    candidates.push(emailCode)
+    // short numeric suffix so "JOHN" → "JOHN1", "JOHN2" if already taken
+    for (let i = 1; i <= 3; i++) candidates.push(`${emailCode}${i}`)
+  }
+
+  for (const code of candidates) {
+    try {
+      await pool.query(
+        `INSERT INTO affiliate_accounts (user_id, ref_code) VALUES ($1, $2)`,
+        [userId, code],
+      )
+      return code
+    } catch { /* collision — try next */ }
+  }
+  // Fallback to random (guarantees termination even if all email variants taken)
   for (let i = 0; i < 5; i++) {
     const code = generateRefCode()
     try {
@@ -77,9 +108,7 @@ export async function ensureAffiliateAccount(userId: number): Promise<string> {
         [userId, code],
       )
       return code
-    } catch {
-      // collision — retry
-    }
+    } catch { /* collision — retry */ }
   }
   throw new Error('Không thể tạo mã giới thiệu')
 }

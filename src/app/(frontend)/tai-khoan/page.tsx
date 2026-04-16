@@ -5,7 +5,7 @@ import { confirmDialog } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import {
   User, Package, Download, Settings, LogIn, LogOut, Loader2,
-  Wallet, ShieldCheck, Save, Check,
+  Wallet, ShieldCheck, Save, Check, Gift,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -243,6 +243,14 @@ export default function AccountPage() {
                 <Wallet className="h-3.5 w-3.5 text-success" />Số dư
               </span>
               <span className="text-sm font-bold text-success">{formatVND(balance)}</span>
+            </Link>
+
+            <Link
+              href="/gioi-thieu-ban-be"
+              className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors mb-2"
+            >
+              <Gift className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="text-xs font-medium">Giới thiệu bạn bè — nhận hoa hồng</span>
             </Link>
 
             <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible scrollbar-hide">

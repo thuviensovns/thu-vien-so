@@ -13,7 +13,7 @@ interface AuthContextType {
   user: AuthUser | null
   isLoading: boolean
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
-  register: (data: { displayName: string; email: string; password: string }) => Promise<{ ok: boolean; error?: string }>
+  register: (data: { displayName: string; email: string; password: string; refCode?: string }) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -90,19 +90,24 @@ export function useAuthState(): AuthContextType {
     }
   }, [])
 
-  const register = useCallback(async (data: { displayName: string; email: string; password: string }) => {
+  const register = useCallback(async (data: { displayName: string; email: string; password: string; refCode?: string }) => {
     try {
+      // Strip refCode before POSTing to Payload /api/users — Payload rejects
+      // unknown fields and would reject the entire registration.
+      const { refCode: _refCode, ...createData } = data
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(createData),
         credentials: 'include',
       })
       if (res.ok) {
-        // Track affiliate referral if present in localStorage (captured earlier from ?ref=XYZ).
+        // Track affiliate referral. Prefer the code the user typed in the form,
+        // fall back to one captured earlier from ?ref=XYZ in localStorage.
         // Bounded so a stalled affiliate endpoint can't freeze the register form.
         try {
-          const refCode = typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
+          const fallback = typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
+          const refCode = (data.refCode || fallback || '').trim()
           if (refCode) {
             await fetch('/api/auth/login', {
               method: 'POST',
@@ -118,7 +123,7 @@ export function useAuthState(): AuthContextType {
               credentials: 'include',
               signal: AbortSignal.timeout(5000),
             })
-            localStorage.removeItem('affiliate_ref')
+            if (typeof window !== 'undefined') localStorage.removeItem('affiliate_ref')
           }
         } catch { /* non-fatal */ }
         return { ok: true }

@@ -414,6 +414,50 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
     results.errors.push(`Seed roles: ${(err as Error).message}`)
   }
 
+  // One-time backfill: give every existing user an affiliate_accounts row with
+  // an email-derived ref_code (e.g. "john@gmail.com" → "JOHN"). Idempotent —
+  // the WHERE NOT EXISTS filter + ON CONFLICT skip handles re-runs.
+  // PL/pgSQL loop with per-row collision handling: if "JOHN" already exists
+  // we fall back to "JOHN<user_id>" so every user gets a code.
+  try {
+    await pool.query(`
+      DO $backfill$
+      DECLARE
+        u RECORD;
+        base_code TEXT;
+        final_code TEXT;
+      BEGIN
+        FOR u IN
+          SELECT id, email FROM users
+          WHERE NOT EXISTS (SELECT 1 FROM affiliate_accounts a WHERE a.user_id = users.id)
+        LOOP
+          base_code := UPPER(REGEXP_REPLACE(SPLIT_PART(u.email, '@', 1), '[^A-Za-z0-9]', '', 'g'));
+          base_code := LEFT(base_code, 20);
+          IF base_code = '' THEN
+            base_code := 'U' || u.id::text;
+          END IF;
+          IF EXISTS (SELECT 1 FROM affiliate_accounts WHERE ref_code = base_code) THEN
+            final_code := base_code || u.id::text;
+          ELSE
+            final_code := base_code;
+          END IF;
+          BEGIN
+            INSERT INTO affiliate_accounts (user_id, ref_code) VALUES (u.id, final_code);
+          EXCEPTION WHEN unique_violation THEN
+            -- final_code collided too (extremely rare) — append a short hash
+            INSERT INTO affiliate_accounts (user_id, ref_code)
+            VALUES (u.id, base_code || u.id::text || SUBSTR(MD5(random()::text), 1, 4))
+            ON CONFLICT DO NOTHING;
+          END;
+        END LOOP;
+      END
+      $backfill$;
+    `)
+    results.executed.push('Backfilled affiliate_accounts for existing users')
+  } catch (err) {
+    results.errors.push(`Affiliate backfill: ${(err as Error).message}`)
+  }
+
   // Auto-create missing categories from categoryMeta
   for (const cat of categoryMeta) {
     try {
