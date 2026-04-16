@@ -5,7 +5,7 @@ import { confirmDialog } from '@/components/ui/confirm-dialog'
 import Link from 'next/link'
 import {
   User, Package, Download, Settings, LogIn, LogOut, Loader2,
-  Wallet, ShieldCheck, Save, Check, Gift,
+  Wallet, ShieldCheck, Save, Check, Gift, TrendingUp, CheckCircle2, Users as UsersIcon,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,8 +23,20 @@ const tabs = [
   { id: 'profile', label: 'Thông tin', icon: User },
   { id: 'orders', label: 'Đơn hàng', icon: Package },
   { id: 'downloads', label: 'Downloads', icon: Download },
+  { id: 'affiliate', label: 'Hoa hồng', icon: Gift },
   { id: 'settings', label: 'Cài đặt', icon: Settings },
 ] as const
+
+interface AffiliateCommission {
+  id: number
+  source_type: string
+  base_amount: string
+  commission_amount: string
+  commission_percent: string
+  status: string
+  created_at: string
+  referred_email: string | null
+}
 
 export default function AccountPage() {
   const { user, isLoading, logout, refreshUser } = useAuth()
@@ -35,7 +47,7 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window === 'undefined') return 'profile'
     const tab = new URLSearchParams(window.location.search).get('tab')
-    return tab && ['profile', 'orders', 'downloads', 'settings'].includes(tab) ? tab : 'profile'
+    return tab && ['profile', 'orders', 'downloads', 'affiliate', 'settings'].includes(tab) ? tab : 'profile'
   })
   const [orders, setOrders] = useState<Order[]>([])
   const [downloads, setDownloads] = useState<DownloadRecord[]>([])
@@ -52,6 +64,8 @@ export default function AccountPage() {
     autoCredited: number
     totalEarned: number
     referralCount: number
+    commissionPercent: number
+    commissions: AffiliateCommission[]
   } | null>(null)
   const [refCodeCopied, setRefCodeCopied] = useState(false)
 
@@ -121,6 +135,8 @@ export default function AccountPage() {
           autoCredited: Number(d.account?.auto_credited || 0),
           totalEarned: Number(d.account?.total_earned || 0),
           referralCount: Number(d.account?.referral_count || 0),
+          commissionPercent: Number(d.config?.commissionPercent || 5),
+          commissions: Array.isArray(d.commissions) ? d.commissions : [],
         })
       })
       .catch(() => {})
@@ -386,6 +402,102 @@ export default function AccountPage() {
 
               {activeTab === 'downloads' && (
                 <DownloadsTab downloads={downloads} loading={loadingDownloads} onRefresh={fetchDownloads} onDownloadsChange={setDownloads} />
+              )}
+
+              {activeTab === 'affiliate' && (
+                <div>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h2 className="font-bold flex items-center gap-2">
+                      <Gift className="h-4 w-4 text-primary" />
+                      Hoa hồng giới thiệu
+                    </h2>
+                    <Link
+                      href="/gioi-thieu-ban-be"
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Trang chia sẻ link →
+                    </Link>
+                  </div>
+
+                  {!affiliate ? (
+                    <div className="p-6 rounded-lg bg-muted/30 text-center">
+                      <Gift className="h-10 w-10 text-muted-foreground/50 mx-auto mb-2" />
+                      <p className="text-sm font-medium">Tính năng affiliate chưa được bật</p>
+                      <p className="text-xs text-muted-foreground mt-1">Vui lòng quay lại sau.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="p-3 rounded-lg bg-success/5 border border-success/20 flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-success shrink-0 mt-0.5" />
+                        <p className="text-xs">
+                          Hoa hồng <strong>{affiliate.commissionPercent}%</strong> tự động cộng
+                          <strong> thẳng vào số dư tài khoản</strong> ngay khi bạn bè được mời nạp tiền — không cần rút.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-[10px] text-muted-foreground">Đã cộng vào số dư</p>
+                          <p className="text-lg font-bold text-success">{formatVND(affiliate.autoCredited)}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/30">
+                          <p className="text-[10px] text-muted-foreground">Tổng kiếm được</p>
+                          <p className="text-lg font-bold">{formatVND(affiliate.totalEarned)}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/30 col-span-2 md:col-span-1">
+                          <p className="text-[10px] text-muted-foreground">Lượt giới thiệu</p>
+                          <p className="text-lg font-bold flex items-center gap-1">
+                            <UsersIcon className="h-4 w-4 text-muted-foreground" />
+                            {affiliate.referralCount}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-sm font-semibold">Lịch sử hoa hồng</h3>
+                        </div>
+                        {affiliate.commissions.length === 0 ? (
+                          <div className="p-6 rounded-lg bg-muted/20 border border-border/40 text-center text-sm text-muted-foreground">
+                            Chưa có hoa hồng nào. Chia sẻ link giới thiệu để bắt đầu nhận hoa hồng!
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {affiliate.commissions.map((c) => (
+                              <div
+                                key={c.id}
+                                className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border/40 hover:bg-muted/20"
+                              >
+                                <div className="h-7 w-7 rounded-md bg-success/10 flex items-center justify-center shrink-0">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm truncate flex items-center gap-1.5">
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 shrink-0">
+                                      {c.source_type === 'topup' ? 'Nạp tiền' : c.source_type}
+                                    </Badge>
+                                    <span className="text-muted-foreground truncate">
+                                      {c.referred_email || 'người được giới thiệu'}
+                                    </span>
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    {formatVND(Number(c.base_amount))} × {c.commission_percent}% ·
+                                    {' '}<span className="text-success font-medium">đã cộng vào số dư</span> ·
+                                    {' '}{new Date(c.created_at).toLocaleString('vi-VN')}
+                                  </p>
+                                </div>
+                                <span className="text-sm font-semibold text-success shrink-0">
+                                  +{formatVND(Number(c.commission_amount))}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {activeTab === 'settings' && (
