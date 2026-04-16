@@ -1,25 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getPayloadForApi } from '@/lib/payload'
 import { getDbPool } from '@/lib/db-pool'
 import { ensureTablesExist } from '@/lib/db-migrate'
+import { getAuthorizedUser, requirePermission } from '@/lib/authz'
+import { getClientIp, getUserAgent } from '@/lib/request-meta'
 
-async function requireAdmin(req: NextRequest) {
-  const payload = await getPayloadForApi()
-  const { user } = await payload.auth({ headers: req.headers })
-  if (!user || user.role !== 'admin') return null
-  return user
-}
-
-/** GET: List activity logs */
+/** GET: List activity logs with filters */
 export async function GET(req: NextRequest) {
+  const guard = await requirePermission(req, 'logs.view')
+  if (guard instanceof NextResponse) return guard
   try {
-    if (!(await requireAdmin(req))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     await ensureTablesExist()
-    const search = req.nextUrl.searchParams.get('search') || ''
-    const type = req.nextUrl.searchParams.get('type') || ''
+    const sp = req.nextUrl.searchParams
+    const search = sp.get('search') || ''
+    const type = sp.get('type') || ''
+    const adminEmail = sp.get('admin_email') || ''
+    const ip = sp.get('ip') || ''
+    const dateFrom = sp.get('date_from') || ''
+    const dateTo = sp.get('date_to') || ''
+    const limit = Math.min(200, Number(sp.get('limit')) || 100)
 
     const pool = getDbPool()
     let query = `SELECT * FROM activity_logs`
@@ -30,18 +28,32 @@ export async function GET(req: NextRequest) {
       params.push(type)
       conditions.push(`type = $${params.length}`)
     }
+    if (adminEmail) {
+      params.push(`%${adminEmail}%`)
+      conditions.push(`admin_email ILIKE $${params.length}`)
+    }
+    if (ip) {
+      params.push(`%${ip}%`)
+      conditions.push(`ip ILIKE $${params.length}`)
+    }
+    if (dateFrom) {
+      params.push(dateFrom)
+      conditions.push(`created_at >= $${params.length}`)
+    }
+    if (dateTo) {
+      params.push(dateTo)
+      conditions.push(`created_at <= $${params.length}`)
+    }
     if (search) {
       params.push(`%${search}%`)
       conditions.push(`(action ILIKE $${params.length} OR detail ILIKE $${params.length})`)
     }
 
-    if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`
-    }
-    query += ` ORDER BY created_at DESC LIMIT 50`
+    if (conditions.length > 0) query += ` WHERE ${conditions.join(' AND ')}`
+    params.push(limit)
+    query += ` ORDER BY created_at DESC LIMIT $${params.length}`
 
     const { rows } = await pool.query(query, params)
-
     return NextResponse.json({
       docs: rows.map((r: Record<string, unknown>) => ({
         id: r.id,
@@ -49,24 +61,22 @@ export async function GET(req: NextRequest) {
         action: r.action || '',
         detail: r.detail || '',
         adminEmail: r.admin_email || '',
+        ip: r.ip || '',
+        userAgent: r.user_agent || '',
         timestamp: r.created_at,
       })),
     })
   } catch (error) {
     console.error('[Admin activity-logs] GET error:', error)
-    // Table might not exist yet
     return NextResponse.json({ docs: [] })
   }
 }
 
-/** POST: Create a new log entry */
+/** POST: Create a new log entry (authenticated user required) */
 export async function POST(req: NextRequest) {
   try {
-    const payload = await getPayloadForApi()
-    const { user } = await payload.auth({ headers: req.headers })
-    if (!user) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
+    const user = await getAuthorizedUser(req)
+    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
     let body: { type?: string; action?: string; detail?: string }
     try { body = await req.json() } catch {
@@ -79,29 +89,26 @@ export async function POST(req: NextRequest) {
     await ensureTablesExist()
     const pool = getDbPool()
     await pool.query(
-      `INSERT INTO activity_logs (type, action, detail, admin_email) VALUES ($1, $2, $3, $4)`,
-      [body.type, body.action, body.detail || '', user.email]
+      `INSERT INTO activity_logs (type, action, detail, admin_email, ip, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [body.type, body.action, body.detail || '', user.email, getClientIp(req), getUserAgent(req)],
     )
-
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('[Admin activity-logs] POST error:', error)
-    // Silently fail if table doesn't exist
     return NextResponse.json({ success: true })
   }
 }
 
-/** DELETE: Clear all logs */
+/** DELETE: Clear all logs (permission: logs.delete) */
 export async function DELETE(req: NextRequest) {
+  const guard = await requirePermission(req, 'logs.delete')
+  if (guard instanceof NextResponse) return guard
   try {
-    if (!(await requireAdmin(req))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
     const pool = getDbPool()
     await pool.query(`DELETE FROM activity_logs`)
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('[Admin activity-logs] DELETE error:', error)
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })
   }
 }

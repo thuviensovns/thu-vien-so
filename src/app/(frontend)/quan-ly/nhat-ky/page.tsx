@@ -17,6 +17,8 @@ interface ActivityEntry {
   action: string
   detail: string
   adminEmail: string
+  ip: string
+  userAgent: string
   timestamp: string
 }
 
@@ -35,11 +37,20 @@ export default function ActivityLogPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
+  const [filterAdmin, setFilterAdmin] = useState('')
+  const [filterIp, setFilterIp] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   const fetchLogs = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (filterType !== 'all') params.set('type', filterType)
+      if (filterAdmin) params.set('admin_email', filterAdmin)
+      if (filterIp) params.set('ip', filterIp)
+      if (dateFrom) params.set('date_from', dateFrom)
+      if (dateTo) params.set('date_to', dateTo)
+      params.set('limit', '200')
       const res = await fetch(`/api/admin/activity-logs?${params}`, { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
@@ -47,7 +58,7 @@ export default function ActivityLogPage() {
       }
     } catch { /* ignore */ }
     setLoading(false)
-  }, [filterType])
+  }, [filterType, filterAdmin, filterIp, dateFrom, dateTo])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
@@ -101,13 +112,42 @@ export default function ActivityLogPage() {
       </div>
 
       {/* Filters */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <Input
+            value={filterAdmin}
+            onChange={(e) => setFilterAdmin(e.target.value)}
+            placeholder="Lọc theo admin email..."
+            className="h-9 text-sm bg-muted/50"
+          />
+          <Input
+            value={filterIp}
+            onChange={(e) => setFilterIp(e.target.value)}
+            placeholder="Lọc theo IP..."
+            className="h-9 text-sm bg-muted/50 font-mono"
+          />
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9 text-sm bg-muted/50"
+            title="Từ ngày"
+          />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9 text-sm bg-muted/50"
+            title="Đến ngày"
+          />
+        </div>
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm kiếm hoạt động..."
+            placeholder="Tìm trong action/detail..."
             className="pl-9 bg-muted/50"
           />
         </div>
@@ -141,6 +181,7 @@ export default function ActivityLogPage() {
             )
           })}
         </div>
+      </div>
       </div>
 
       {/* Log entries */}
@@ -184,6 +225,11 @@ export default function ActivityLogPage() {
                       {entry.adminEmail && (
                         <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-normal shrink-0">
                           {entry.adminEmail}
+                        </Badge>
+                      )}
+                      {entry.ip && (
+                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-mono shrink-0 hidden sm:inline-flex" title={entry.userAgent}>
+                          {entry.ip}
                         </Badge>
                       )}
                       <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
