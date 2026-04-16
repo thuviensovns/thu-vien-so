@@ -1,28 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
-import type { User } from '@/types/payload-types'
+import { getDbPool } from '@/lib/db-pool'
 
-// Balance must never be served from cache — admin credits / bank webhook
-// deposits / pay-with-balance deductions all need to be reflected on the next
-// client fetch. Next.js 15 sometimes treats auth-cookie-only routes as static.
+/** GET /api/balance
+ *
+ *  Returns the authenticated user's balance. Called every 20s by useBalance()
+ *  + on every tab focus/visibility change, so keep it as cheap as possible.
+ *
+ *  Auth resolves the user id (cookie → users SELECT). A second raw-SQL SELECT
+ *  reads just the balance column. This is faster than payload.findByID (which
+ *  hydrates the entire user doc + relations).
+ */
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-/** GET: Fetch current user balance from DB */
 export async function GET(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
-
     const { user } = await payload.auth({ headers: req.headers })
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch fresh user data to get balance
-    const freshUser = await payload.findByID({ collection: 'users', id: user.id }) as User
-    const balance = freshUser.balance || 0
+    const pool = getDbPool()
+    const { rows } = await pool.query(
+      'SELECT balance FROM users WHERE id = $1 LIMIT 1',
+      [user.id],
+    )
+    const balance = Number(rows[0]?.balance || 0)
 
-    return NextResponse.json({ balance })
+    const res = NextResponse.json({ balance })
+    // Short private cache lets rapid refocus events hit the browser cache,
+    // but admin top-ups still land in the UI within ~5s.
+    res.headers.set('Cache-Control', 'private, max-age=5, stale-while-revalidate=15')
+    return res
   } catch (error) {
     console.error('[Balance] GET error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

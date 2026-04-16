@@ -309,6 +309,27 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       label: 'Create index downloads.user_id_created_at',
       q: `CREATE INDEX IF NOT EXISTS downloads_user_created_at_idx ON downloads(user_id, created_at DESC)`,
     },
+    // === Orders + topups perf indexes (Phase 9) ===
+    // Composite indexes for the hot "WHERE <col> ORDER BY created_at DESC" pattern used by:
+    //  - /api/user/orders (user_id + created_at)
+    //  - /api/notifications admin polling (status + created_at, every 15s)
+    //  - /api/admin/topups per-user views
+    {
+      label: 'Create index orders.user_id_created_at',
+      q: `CREATE INDEX IF NOT EXISTS orders_user_created_at_idx ON orders(user_id, created_at DESC)`,
+    },
+    {
+      label: 'Create index orders.status_created_at',
+      q: `CREATE INDEX IF NOT EXISTS orders_status_created_at_idx ON orders(status, created_at DESC)`,
+    },
+    {
+      label: 'Create index topups.user_id_created_at',
+      q: `CREATE INDEX IF NOT EXISTS topups_user_created_at_idx ON topups(user_id, created_at DESC)`,
+    },
+    {
+      label: 'Create index topups.status_created_at',
+      q: `CREATE INDEX IF NOT EXISTS topups_status_created_at_idx ON topups(status, created_at DESC)`,
+    },
     // === Automations (Phase 7) ===
     {
       label: 'Create automations table',

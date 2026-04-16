@@ -55,7 +55,7 @@ export default function AccountPage() {
   const fetchOrders = useCallback(async () => {
     setLoadingOrders(true)
     try {
-      const res = await fetch('/api/orders?depth=1&sort=-createdAt&limit=20', { credentials: 'include' })
+      const res = await fetch('/api/user/orders?limit=20', { credentials: 'include' })
       if (res.ok) {
         const data = await res.json()
         setOrders(data.docs || [])
