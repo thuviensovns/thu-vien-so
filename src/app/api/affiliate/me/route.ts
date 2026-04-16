@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
 
     const [acctRes, commRes] = await Promise.all([
       pool.query(
-        `SELECT total_earned, available_balance, withdrawn, referral_count
+        `SELECT total_earned, available_balance, withdrawn, referral_count,
+                COALESCE(auto_credited, 0) AS auto_credited
          FROM affiliate_accounts WHERE user_id = $1`,
         [user.id],
       ),
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
       config: cfg,
       refCode,
       account: acctRes.rows[0] || {
-        total_earned: 0, available_balance: 0, withdrawn: 0, referral_count: 0,
+        total_earned: 0, available_balance: 0, withdrawn: 0, referral_count: 0, auto_credited: 0,
       },
       commissions: commRes.rows,
     })

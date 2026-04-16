@@ -150,14 +150,31 @@ export async function recordReferral(referredUserId: number, refCode: string): P
 }
 
 /** Accrue a commission when a referred user performs a billable action (topup/order).
- *  Returns a `reason` when the commission isn't credited so callers can surface
- *  the outcome to the admin instead of silently losing the credit. */
+ *
+ *  **Auto-credit:** commission is deposited directly into the referrer's
+ *  `users.balance` (main wallet, spendable immediately) — no withdrawal step
+ *  needed. We also insert a matching `topups` row (transferCode `COMM…`,
+ *  readByAdmin=true) so the referrer sees the credit in their topup history
+ *  and `affiliate_accounts.auto_credited` so admin stats stay accurate.
+ *
+ *  The legacy `available_balance` field is *not* touched going forward; any
+ *  balance accrued there before this change stays withdrawable via the
+ *  existing `/api/affiliate/withdraw` flow.
+ *
+ *  Returns a `reason` when the commission isn't credited so callers can
+ *  surface the outcome to the admin instead of silently losing the credit. */
 export async function accrueCommission(opts: {
   referredUserId: number
   baseAmount: number
   sourceType: 'topup' | 'order'
   sourceId?: string
-}): Promise<{ credited: boolean; amount: number; reason?: string; referrerId?: number }> {
+}): Promise<{
+  credited: boolean
+  amount: number
+  reason?: string
+  referrerId?: number
+  transferCode?: string
+}> {
   try {
     const cfg = await getAffiliateConfig()
     if (!cfg.enabled) return { credited: false, amount: 0, reason: 'affiliate_disabled' }
@@ -179,11 +196,9 @@ export async function accrueCommission(opts: {
     const commission = Math.floor(opts.baseAmount * (cfg.commissionPercent / 100))
     if (commission <= 0) return { credited: false, amount: 0, reason: 'zero_commission', referrerId }
 
-    // Belt-and-suspenders: ensure referrer has an affiliate_accounts row before
-    // the UPDATE. Normally `recordReferral` guarantees this (it looks up
-    // ref_code in the table), but a legacy row could have been deleted or the
-    // backfill could have skipped a user — in which case the UPDATE silently
-    // affects zero rows and the commission is "logged but not credited".
+    // Ensure the referrer has an affiliate_accounts row. Normally
+    // `recordReferral` guarantees this, but a legacy row could have been
+    // deleted or the backfill skipped a user.
     const { rows: referrerRow } = await pool.query(
       `SELECT 1 FROM affiliate_accounts WHERE user_id = $1`,
       [referrerId],
@@ -196,56 +211,87 @@ export async function accrueCommission(opts: {
       await ensureAffiliateAccount(referrerId, userRow[0]?.email)
     }
 
-    // Idempotent: unique index on (source_type, source_id) + ON CONFLICT DO NOTHING
-    // guarantees a retried webhook or duplicate manual topup credits commission once.
-    const insertResult = await pool.query(
-      `INSERT INTO affiliate_commissions
-         (referrer_user_id, referred_user_id, source_type, source_id, base_amount, commission_amount, commission_percent, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'credited')
-       ON CONFLICT (source_type, source_id) WHERE source_id IS NOT NULL DO NOTHING
-       RETURNING id`,
-      [
-        referrerId,
-        opts.referredUserId,
-        opts.sourceType,
-        opts.sourceId || null,
-        opts.baseAmount,
-        commission,
-        cfg.commissionPercent,
-      ],
-    )
-    if ((insertResult.rowCount ?? 0) === 0) {
-      return { credited: false, amount: 0, reason: 'already_credited', referrerId }
+    // All four writes must succeed together — otherwise we risk crediting the
+    // wallet without logging, or logging without crediting. `ON CONFLICT` on
+    // the commission insert still guarantees idempotency across retries.
+    const transferCode = `COMM${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 1000)}`
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+
+      const insertResult = await client.query(
+        `INSERT INTO affiliate_commissions
+           (referrer_user_id, referred_user_id, source_type, source_id, base_amount, commission_amount, commission_percent, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'credited')
+         ON CONFLICT (source_type, source_id) WHERE source_id IS NOT NULL DO NOTHING
+         RETURNING id`,
+        [
+          referrerId,
+          opts.referredUserId,
+          opts.sourceType,
+          opts.sourceId || null,
+          opts.baseAmount,
+          commission,
+          cfg.commissionPercent,
+        ],
+      )
+      if ((insertResult.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK')
+        return { credited: false, amount: 0, reason: 'already_credited', referrerId }
+      }
+
+      const balanceUpdate = await client.query(
+        `UPDATE users SET balance = COALESCE(balance, 0) + $1 WHERE id = $2`,
+        [commission, referrerId],
+      )
+      if ((balanceUpdate.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK')
+        return { credited: false, amount: 0, reason: 'referrer_user_missing', referrerId }
+      }
+
+      await client.query(
+        `UPDATE affiliate_accounts
+         SET total_earned = total_earned + $1,
+             auto_credited = COALESCE(auto_credited, 0) + $1
+         WHERE user_id = $2`,
+        [commission, referrerId],
+      )
+
+      // Audit topup row so the credit appears in the referrer's topup history.
+      // readByAdmin=true so it doesn't flag the admin notifications poll, and
+      // bankDescription names the referred user for quick cross-ref.
+      await client.query(
+        `INSERT INTO topups (user_id, amount, transfer_code, status, confirmed_at, bank_description, read_by_admin, created_at, updated_at)
+         VALUES ($1, $2, $3, 'completed', NOW(), $4, true, NOW(), NOW())`,
+        [
+          referrerId,
+          commission,
+          transferCode,
+          `Hoa hồng ${cfg.commissionPercent}% (${opts.sourceType}#${opts.sourceId || '?'} - user #${opts.referredUserId})`,
+        ],
+      )
+
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
     }
-    const updateResult = await pool.query(
-      `UPDATE affiliate_accounts
-       SET total_earned = total_earned + $1,
-           available_balance = available_balance + $1
-       WHERE user_id = $2`,
-      [commission, referrerId],
-    )
-    if ((updateResult.rowCount ?? 0) === 0) {
-      // Commission row exists but the referrer's balance wasn't updated —
-      // surface this so admin can investigate instead of silently losing the
-      // credit. Shouldn't be reachable after the ensureAffiliateAccount above.
-      console.error('[affiliate] commission inserted but balance UPDATE affected 0 rows', {
-        referrerId, commission, sourceType: opts.sourceType, sourceId: opts.sourceId,
-      })
-      return { credited: false, amount: 0, reason: 'referrer_account_missing', referrerId }
-    }
+
     // Activity log entry so admin sees each commission in /quan-ly/nhat-ky.
-    // Direct INSERT (not logAdminActivity) — we have no NextRequest here.
+    // Outside the transaction — non-critical if it fails.
     try {
       await pool.query(
         `INSERT INTO activity_logs (type, action, detail, admin_email)
          VALUES ('affiliate', $1, $2, 'system')`,
         [
-          `Cộng hoa hồng ${opts.sourceType}`,
-          `Referrer #${referrerId} +${commission.toLocaleString('vi-VN')}đ từ ${opts.sourceType}#${opts.sourceId || '?'} (gốc ${opts.baseAmount.toLocaleString('vi-VN')}đ)`,
+          `Cộng hoa hồng ${opts.sourceType} (auto)`,
+          `Referrer #${referrerId} +${commission.toLocaleString('vi-VN')}đ vào ví từ ${opts.sourceType}#${opts.sourceId || '?'} (gốc ${opts.baseAmount.toLocaleString('vi-VN')}đ)`,
         ],
       )
     } catch { /* non-fatal */ }
-    return { credited: true, amount: commission, referrerId }
+    return { credited: true, amount: commission, referrerId, transferCode }
   } catch (err) {
     console.error('[affiliate] accrueCommission error:', err)
     return { credited: false, amount: 0, reason: `error:${(err as Error).message}` }

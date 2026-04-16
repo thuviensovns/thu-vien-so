@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     const { rows } = await pool.query(
       `SELECT a.user_id, a.ref_code, a.total_earned, a.available_balance, a.withdrawn,
-              a.referral_count, a.created_at,
+              a.referral_count, a.created_at, COALESCE(a.auto_credited, 0) AS auto_credited,
               u.email, u.display_name
        FROM affiliate_accounts a
        LEFT JOIN users u ON u.id = a.user_id

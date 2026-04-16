@@ -22,6 +22,7 @@ interface MeResponse {
   refCode?: string
   account?: {
     total_earned: string; available_balance: string; withdrawn: string; referral_count: number
+    auto_credited: string
   }
   commissions?: Array<{
     id: number; source_type: string; base_amount: string; commission_amount: string
@@ -124,8 +125,10 @@ export default function UserAffiliatePage() {
   const refUrl = typeof window !== 'undefined' && data.refCode
     ? `${window.location.origin}/?ref=${data.refCode}`
     : ''
-  const acct = data.account || { total_earned: '0', available_balance: '0', withdrawn: '0', referral_count: 0 }
-  const canWithdraw = Number(acct.available_balance) >= data.config.minWithdrawal
+  const acct = data.account || { total_earned: '0', available_balance: '0', withdrawn: '0', referral_count: 0, auto_credited: '0' }
+  const pendingBalance = Number(acct.available_balance)
+  const canWithdraw = pendingBalance >= data.config.minWithdrawal
+  const hasLegacyPending = pendingBalance > 0
 
   return (
     <div className="container py-8 max-w-4xl space-y-6">
@@ -135,22 +138,18 @@ export default function UserAffiliatePage() {
           Giới thiệu bạn bè — Nhận {data.config.commissionPercent}%
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Chia sẻ link giới thiệu. Mỗi khi bạn bè nạp/mua, bạn nhận {data.config.commissionPercent}% hoa hồng.
+          Chia sẻ link giới thiệu. Mỗi khi bạn bè nạp tiền, bạn tự động nhận {data.config.commissionPercent}% vào số dư chính — không cần rút.
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card><CardContent className="p-3">
-          <p className="text-[10px] text-muted-foreground">Số dư khả dụng</p>
-          <p className="text-lg font-bold text-success">{fmt(acct.available_balance)}</p>
+          <p className="text-[10px] text-muted-foreground">Đã cộng vào ví</p>
+          <p className="text-lg font-bold text-success">{fmt(acct.auto_credited)}</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-[10px] text-muted-foreground">Tổng kiếm được</p>
           <p className="text-lg font-bold">{fmt(acct.total_earned)}</p>
-        </CardContent></Card>
-        <Card><CardContent className="p-3">
-          <p className="text-[10px] text-muted-foreground">Đã rút</p>
-          <p className="text-lg font-bold">{fmt(acct.withdrawn)}</p>
         </CardContent></Card>
         <Card><CardContent className="p-3">
           <p className="text-[10px] text-muted-foreground">Lượt giới thiệu</p>
@@ -159,7 +158,27 @@ export default function UserAffiliatePage() {
             {acct.referral_count}
           </p>
         </CardContent></Card>
+        {hasLegacyPending ? (
+          <Card><CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Số dư chờ rút (cũ)</p>
+            <p className="text-lg font-bold">{fmt(acct.available_balance)}</p>
+          </CardContent></Card>
+        ) : (
+          <Card><CardContent className="p-3">
+            <p className="text-[10px] text-muted-foreground">Đã rút ngân hàng</p>
+            <p className="text-lg font-bold">{fmt(acct.withdrawn)}</p>
+          </CardContent></Card>
+        )}
       </div>
+
+      <Card className="bg-success/5 border-success/20">
+        <CardContent className="p-3 flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 text-success shrink-0 mt-0.5" />
+          <p className="text-xs">
+            Hoa hồng tự động cộng vào số dư chính ngay khi bạn bè được mời nạp tiền — xem lịch sử trong mục Đơn hàng/Nạp tiền.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4 space-y-3">
@@ -187,10 +206,12 @@ export default function UserAffiliatePage() {
         </CardContent>
       </Card>
 
+      {hasLegacyPending ? (
+        <>
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold flex items-center gap-2">
           <Wallet className="h-4 w-4 text-muted-foreground" />
-          Rút tiền
+          Rút tiền (số dư cũ)
         </h2>
         <Dialog open={wdOpen} onOpenChange={setWdOpen}>
           <DialogTrigger asChild>
@@ -245,6 +266,8 @@ export default function UserAffiliatePage() {
           Cần ít nhất {fmt(data.config.minWithdrawal)} để rút.
         </p>
       )}
+        </>
+      ) : null}
 
       <div>
         <h2 className="text-base font-semibold mb-2 flex items-center gap-2">

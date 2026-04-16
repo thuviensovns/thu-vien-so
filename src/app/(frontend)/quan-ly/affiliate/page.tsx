@@ -20,6 +20,7 @@ interface Config {
 interface Account {
   user_id: number; ref_code: string; email: string | null; display_name: string | null
   total_earned: string; available_balance: string; withdrawn: string; referral_count: number
+  auto_credited: string
 }
 interface Commission {
   id: number; source_type: string; base_amount: string; commission_amount: string
@@ -221,13 +222,19 @@ export default function AffiliateAdminPage() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-xs text-muted-foreground">Số dư</p>
-                    <p className="text-sm font-semibold text-success">{fmt(a.available_balance)}</p>
+                    <p className="text-xs text-muted-foreground">Vào ví</p>
+                    <p className="text-sm font-semibold text-success">{fmt(a.auto_credited || 0)}</p>
                   </div>
                   <div className="text-right shrink-0 hidden sm:block">
                     <p className="text-xs text-muted-foreground">Tổng kiếm</p>
                     <p className="text-sm">{fmt(a.total_earned)}</p>
                   </div>
+                  {Number(a.available_balance) > 0 && (
+                    <div className="text-right shrink-0 hidden md:block">
+                      <p className="text-[10px] text-muted-foreground">Chờ rút (cũ)</p>
+                      <p className="text-xs text-warning">{fmt(a.available_balance)}</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

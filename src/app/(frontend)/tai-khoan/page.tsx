@@ -49,7 +49,7 @@ export default function AccountPage() {
   const [deletingAccount, setDeletingAccount] = useState(false)
   const [affiliate, setAffiliate] = useState<{
     refCode: string
-    availableBalance: number
+    autoCredited: number
     totalEarned: number
     referralCount: number
   } | null>(null)
@@ -118,7 +118,7 @@ export default function AccountPage() {
         if (!d?.enabled || !d.refCode) return
         setAffiliate({
           refCode: d.refCode,
-          availableBalance: Number(d.account?.available_balance || 0),
+          autoCredited: Number(d.account?.auto_credited || 0),
           totalEarned: Number(d.account?.total_earned || 0),
           referralCount: Number(d.account?.referral_count || 0),
         })
@@ -296,11 +296,11 @@ export default function AccountPage() {
                 </button>
                 <div className="grid grid-cols-2 gap-1 text-[10px]">
                   <div className="text-center">
-                    <div className="text-muted-foreground">Số dư</div>
-                    <div className="font-bold text-success">{formatVND(affiliate.availableBalance)}</div>
+                    <div className="text-muted-foreground">Vào ví</div>
+                    <div className="font-bold text-success">{formatVND(affiliate.autoCredited)}</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-muted-foreground">Đã kiếm</div>
+                    <div className="text-muted-foreground">Tổng kiếm</div>
                     <div className="font-bold">{formatVND(affiliate.totalEarned)}</div>
                   </div>
                 </div>

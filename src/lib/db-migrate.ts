@@ -268,6 +268,13 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
           ON affiliate_commissions(source_type, source_id)
           WHERE source_id IS NOT NULL`,
     },
+    {
+      // Tracks commissions that were auto-credited straight into users.balance
+      // (the new default). Legacy rows stay in available_balance until the user
+      // submits a manual withdrawal request.
+      label: 'Add affiliate_accounts.auto_credited column',
+      q: `ALTER TABLE affiliate_accounts ADD COLUMN IF NOT EXISTS auto_credited NUMERIC DEFAULT 0`,
+    },
     // === Email campaigns (Phase 6) ===
     {
       label: 'Create email_campaigns table',

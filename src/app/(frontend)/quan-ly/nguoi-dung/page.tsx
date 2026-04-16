@@ -78,7 +78,7 @@ export default function UsersPage() {
   // Affiliate info per user (ref_code, referrals, earnings) — fetched in parallel
   // with the user list so admin sees who is actively referring straight from here.
   const [affiliateMap, setAffiliateMap] = useState<Record<string, {
-    refCode: string; referralCount: number; totalEarned: number; availableBalance: number
+    refCode: string; referralCount: number; totalEarned: number; autoCredited: number
   }>>({})
   // Server-side cross-table search (email / name / topup content / order content)
   const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null)
@@ -131,13 +131,13 @@ export default function UsersPage() {
         })
         if (!res.ok) return
         const data = await res.json()
-        const map: Record<string, { refCode: string; referralCount: number; totalEarned: number; availableBalance: number }> = {}
+        const map: Record<string, { refCode: string; referralCount: number; totalEarned: number; autoCredited: number }> = {}
         for (const a of data.docs || []) {
           map[String(a.user_id)] = {
             refCode: a.ref_code,
             referralCount: Number(a.referral_count || 0),
             totalEarned: Number(a.total_earned || 0),
-            availableBalance: Number(a.available_balance || 0),
+            autoCredited: Number(a.auto_credited || 0),
           }
         }
         setAffiliateMap(map)
@@ -375,7 +375,7 @@ export default function UsersPage() {
                 refCode: a.ref_code,
                 referralCount: Number(a.referral_count || 0),
                 totalEarned: Number(a.total_earned || 0),
-                availableBalance: Number(a.available_balance || 0),
+                autoCredited: Number(a.auto_credited || 0),
               }
             }
             setAffiliateMap(map)
@@ -619,7 +619,7 @@ export default function UsersPage() {
                       {affiliateMap[user.id] && (
                         <span
                           className="flex items-center gap-1 font-mono text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded shrink-0"
-                          title={`Mã giới thiệu · ${affiliateMap[user.id].referralCount} lượt · kiếm ${formatVND(affiliateMap[user.id].totalEarned)} · dư ${formatVND(affiliateMap[user.id].availableBalance)}`}
+                          title={`Mã giới thiệu · ${affiliateMap[user.id].referralCount} lượt · tổng kiếm ${formatVND(affiliateMap[user.id].totalEarned)} · đã vào ví ${formatVND(affiliateMap[user.id].autoCredited)}`}
                         >
                           <Gift className="h-3 w-3" />
                           {affiliateMap[user.id].refCode}
