@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CreditCard, Users, ShoppingCart,
   Package, ChevronLeft, ShieldCheck, Settings,
   Wallet, Tag, ScrollText, RefreshCw, MessageCircle,
-  Mail, Keyboard, Shield, Clock, TrendingUp,
+  Mail, Keyboard, Shield, Clock, TrendingUp, Zap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { usePolling } from '@/hooks/use-polling'
@@ -32,6 +32,8 @@ const adminNav = [
   { label: 'Bảo mật', href: '/quan-ly/bao-mat', icon: Shield },
   { label: 'Cron Jobs', href: '/quan-ly/cron', icon: Clock },
   { label: 'Affiliate', href: '/quan-ly/affiliate', icon: TrendingUp },
+  { label: 'Email Campaigns', href: '/quan-ly/email', icon: Mail },
+  { label: 'Automations', href: '/quan-ly/automations', icon: Zap },
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
 ]
 
