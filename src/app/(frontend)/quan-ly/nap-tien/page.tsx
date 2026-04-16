@@ -177,14 +177,18 @@ export default function TopUpManagementPage() {
               <div>
                 <label className="text-xs font-medium mb-1 block">Số tiền (VND)</label>
                 <Input
-                  type="number"
-                  value={formAmount}
-                  onChange={(e) => setFormAmount(e.target.value)}
-                  placeholder="50000"
+                  type="text"
+                  inputMode="numeric"
+                  value={formAmount ? Number(formAmount).toLocaleString('vi-VN') : ''}
+                  onChange={(e) => setFormAmount(e.target.value.replace(/\D/g, ''))}
+                  placeholder="50.000"
                   className="bg-muted/50 font-mono"
-                  min={1000}
-                  step={1000}
                 />
+                {formAmount && Number(formAmount) > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-mono mt-1 block">
+                    = {formatVND(Number(formAmount))}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
