@@ -70,6 +70,7 @@ export type PermissionKey =
   // Cron
   | 'cron.view'
   | 'cron.edit'
+  | 'cron.run'
 
 export interface PermissionCategory {
   key: string
@@ -222,7 +223,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: 'Cron jobs',
     permissions: [
       { key: 'cron.view', label: 'Xem cron jobs' },
-      { key: 'cron.edit', label: 'Chạy cron thủ công' },
+      { key: 'cron.edit', label: 'Bật/tắt cron' },
+      { key: 'cron.run', label: 'Chạy cron thủ công' },
     ],
   },
 ]

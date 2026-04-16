@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CreditCard, Users, ShoppingCart,
   Package, ChevronLeft, ShieldCheck, Settings,
   Wallet, Tag, ScrollText, RefreshCw, MessageCircle,
-  Mail, Keyboard,
+  Mail, Keyboard, Shield, Clock,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { usePolling } from '@/hooks/use-polling'
@@ -29,6 +29,8 @@ const adminNav = [
   { label: 'Chat hỗ trợ', href: '/quan-ly/chat-support', icon: MessageCircle },
   { label: 'Nhật ký', href: '/quan-ly/nhat-ky', icon: ScrollText },
   { label: 'Vai trò', href: '/quan-ly/vai-tro', icon: ShieldCheck },
+  { label: 'Bảo mật', href: '/quan-ly/bao-mat', icon: Shield },
+  { label: 'Cron Jobs', href: '/quan-ly/cron', icon: Clock },
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
 ]
 

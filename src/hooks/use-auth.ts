@@ -58,7 +58,7 @@ export function useAuthState(): AuthContextType {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const res = await fetch('/api/users/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -77,6 +77,10 @@ export function useAuthState(): AuthContextType {
         errMsg = parsed.message || parsed.errors?.[0]?.message || errMsg
       } catch {}
 
+      if (res.status === 403) {
+        // IP-blocked or auto-blocked
+        return { ok: false, error: errMsg }
+      }
       if (res.status === 401) {
         return { ok: false, error: 'Email hoặc mật khẩu không đúng' }
       }
