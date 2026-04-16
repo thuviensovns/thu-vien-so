@@ -709,15 +709,19 @@ export default function UsersPage() {
                   <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
                     <Wallet className="h-4 w-4 text-success shrink-0" />
                     <Input
-                      type="number"
-                      value={balanceAmount}
-                      onChange={(e) => setBalanceAmount(e.target.value)}
-                      placeholder="Số tiền (VND)"
+                      type="text"
+                      inputMode="numeric"
+                      value={balanceAmount ? Number(balanceAmount).toLocaleString('vi-VN') : ''}
+                      onChange={(e) => setBalanceAmount(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Số tiền (VND) — VD: 10.000"
                       className="bg-muted/50 font-mono h-8 text-sm flex-1 min-w-[120px]"
-                      min={1000}
-                      step={1000}
                       disabled={balanceProcessing !== null}
                     />
+                    {balanceAmount && Number(balanceAmount) > 0 && (
+                      <span className="text-[10px] text-muted-foreground font-mono shrink-0">
+                        = {formatVND(Number(balanceAmount))}
+                      </span>
+                    )}
                     <Button
                       size="sm"
                       className="h-8 text-xs"
