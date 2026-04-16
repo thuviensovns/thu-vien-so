@@ -145,6 +145,17 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // 3. Accrue affiliate commission (no-op if feature disabled or user not referred)
+    try {
+      const { accrueCommission } = await import('@/lib/affiliate')
+      await accrueCommission({
+        referredUserId: Number(targetUser.id),
+        baseAmount: amount,
+        sourceType: 'topup',
+        sourceId: transferCode,
+      })
+    } catch { /* non-fatal */ }
+
     return NextResponse.json({
       success: true,
       newBalance: currentBalance + amount,

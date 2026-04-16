@@ -99,6 +99,26 @@ export function useAuthState(): AuthContextType {
         credentials: 'include',
       })
       if (res.ok) {
+        // Track affiliate referral if present in localStorage (captured earlier from ?ref=XYZ)
+        try {
+          const refCode = typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
+          if (refCode) {
+            // Log the user in first so /api/affiliate/track sees the session
+            await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: data.email, password: data.password }),
+              credentials: 'include',
+            })
+            await fetch('/api/affiliate/track', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ref_code: refCode }),
+              credentials: 'include',
+            })
+            localStorage.removeItem('affiliate_ref')
+          }
+        } catch { /* non-fatal */ }
         return { ok: true }
       }
       let errMsg = 'Đăng ký thất bại'

@@ -7,6 +7,7 @@ import { Footer } from '@/components/layout/Footer'
 import { ChatWidgetLazy } from '@/components/chat/ChatWidgetLazy'
 import { VocalJobPill } from '@/components/vocal-remover/VocalJobPill'
 import { Providers } from '@/components/providers/Providers'
+import AffiliateRefCapture from '@/components/AffiliateRefCapture'
 import SiteContentSync from '@/components/providers/SiteContentSync'
 import { SiteContentHydrator } from '@/components/providers/SiteContentHydrator'
 import { RouteProgress } from '@/components/shared/RouteProgress'
@@ -112,6 +113,7 @@ export default async function FrontendLayout({
           <Suspense fallback={null}>
             <RouteProgress />
             <ScrollToTop />
+            <AffiliateRefCapture />
           </Suspense>
           <SiteContentSync />
           {/* Skip to content — keyboard accessibility */}

@@ -215,6 +215,16 @@ export async function POST(req: NextRequest) {
             console.log(`[Sepay Webhook] Auto-credited ${amount} VND to user ${extractedUserId} via fixed code. New balance: ${currentBalance + amount}`)
             try { revalidatePath('/', 'layout') } catch {}
 
+            try {
+              const { accrueCommission } = await import('@/lib/affiliate')
+              await accrueCommission({
+                referredUserId: Number(extractedUserId),
+                baseAmount: amount,
+                sourceType: 'topup',
+                sourceId: String(newTopup.id),
+              })
+            } catch { /* non-fatal */ }
+
             return NextResponse.json({
               success: true,
               message: 'Top-up auto-created and credited via fixed code',
@@ -275,6 +285,16 @@ export async function POST(req: NextRequest) {
     console.log(`[Sepay Webhook] Credited ${creditAmount} VND to user ${userId}. New balance: ${currentBalance + creditAmount}`)
 
     try { revalidatePath('/', 'layout') } catch {}
+
+    try {
+      const { accrueCommission } = await import('@/lib/affiliate')
+      await accrueCommission({
+        referredUserId: Number(userId),
+        baseAmount: creditAmount,
+        sourceType: 'topup',
+        sourceId: String(topup.id),
+      })
+    } catch { /* non-fatal */ }
 
     return NextResponse.json({
       success: true,

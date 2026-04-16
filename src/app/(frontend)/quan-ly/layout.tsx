@@ -7,7 +7,7 @@ import {
   LayoutDashboard, CreditCard, Users, ShoppingCart,
   Package, ChevronLeft, ShieldCheck, Settings,
   Wallet, Tag, ScrollText, RefreshCw, MessageCircle,
-  Mail, Keyboard, Shield, Clock,
+  Mail, Keyboard, Shield, Clock, TrendingUp,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { usePolling } from '@/hooks/use-polling'
@@ -31,6 +31,7 @@ const adminNav = [
   { label: 'Vai trò', href: '/quan-ly/vai-tro', icon: ShieldCheck },
   { label: 'Bảo mật', href: '/quan-ly/bao-mat', icon: Shield },
   { label: 'Cron Jobs', href: '/quan-ly/cron', icon: Clock },
+  { label: 'Affiliate', href: '/quan-ly/affiliate', icon: TrendingUp },
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
 ]
 
