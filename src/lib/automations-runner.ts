@@ -72,17 +72,21 @@ async function executeRule(rule: AutomationRule): Promise<number> {
     }
 
     case 'remind_unpaid_orders': {
-      // config: { hours: 1 } — queue a reminder email for unpaid orders N hours old (needs users table with email)
+      // config: { hours: 1 } — queue a system reminder email for unpaid orders N hours old.
+      // Uses source_key = 'reminder_order_<id>' with a unique index so the same order is
+      // never reminded twice. processEmailQueue() falls back to a built-in template when
+      // campaign_id is NULL and source_key matches this pattern.
       const hours = Math.max(1, Number(cfg.hours) || 1)
       const res = await pool.query(
-        `INSERT INTO email_queue (campaign_id, user_id, recipient_email, status)
-         SELECT NULL, u.id, u.email, 'pending'
+        `INSERT INTO email_queue (campaign_id, user_id, recipient_email, source_key, status)
+         SELECT NULL, u.id, u.email, 'reminder_order_' || o.id, 'pending'
          FROM orders o
          JOIN users u ON u.id = o.user_id
          WHERE o.status = 'pending'
            AND o.created_at < NOW() - ($1 * INTERVAL '1 hour')
            AND o.created_at > NOW() - INTERVAL '7 days'
-         ON CONFLICT DO NOTHING`,
+           AND u.email IS NOT NULL
+         ON CONFLICT (source_key) WHERE source_key IS NOT NULL DO NOTHING`,
         [hours],
       )
       return res.rowCount || 0

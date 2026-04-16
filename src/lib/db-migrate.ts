@@ -244,6 +244,12 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       label: 'Create index affiliate_commissions.referrer',
       q: `CREATE INDEX IF NOT EXISTS affiliate_commissions_referrer_idx ON affiliate_commissions(referrer_user_id, created_at DESC)`,
     },
+    {
+      label: 'Create unique index affiliate_commissions.source (idempotency guard)',
+      q: `CREATE UNIQUE INDEX IF NOT EXISTS affiliate_commissions_source_unique_idx
+          ON affiliate_commissions(source_type, source_id)
+          WHERE source_id IS NOT NULL`,
+    },
     // === Email campaigns (Phase 6) ===
     {
       label: 'Create email_campaigns table',
@@ -281,6 +287,22 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
     {
       label: 'Create index email_queue.campaign_status',
       q: `CREATE INDEX IF NOT EXISTS email_queue_campaign_status_idx ON email_queue(campaign_id, status)`,
+    },
+    {
+      label: 'Create unique index email_queue.campaign_user (dedupe recipients)',
+      q: `CREATE UNIQUE INDEX IF NOT EXISTS email_queue_campaign_user_unique_idx
+          ON email_queue(campaign_id, user_id)
+          WHERE user_id IS NOT NULL`,
+    },
+    {
+      label: 'Add email_queue.source_key column (for system notifications without a campaign)',
+      q: `ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS source_key VARCHAR(128)`,
+    },
+    {
+      label: 'Create unique index email_queue.source_key (dedupe system notifications)',
+      q: `CREATE UNIQUE INDEX IF NOT EXISTS email_queue_source_key_unique_idx
+          ON email_queue(source_key)
+          WHERE source_key IS NOT NULL`,
     },
     // === Automations (Phase 7) ===
     {

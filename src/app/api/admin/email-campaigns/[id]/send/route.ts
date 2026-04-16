@@ -37,7 +37,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       queueInsert = await pool.query(
         `INSERT INTO email_queue (campaign_id, user_id, recipient_email, status)
          SELECT $1, u.id, u.email, 'pending'
-         FROM users u WHERE u.id = ANY($2::int[]) AND u.email IS NOT NULL`,
+         FROM users u WHERE u.id = ANY($2::int[]) AND u.email IS NOT NULL
+         ON CONFLICT (campaign_id, user_id) WHERE user_id IS NOT NULL DO NOTHING`,
         [c.id, ids],
       )
     } else {
@@ -45,7 +46,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       queueInsert = await pool.query(
         `INSERT INTO email_queue (campaign_id, user_id, recipient_email, status)
          SELECT $1, u.id, u.email, 'pending'
-         FROM users u WHERE u.email IS NOT NULL`,
+         FROM users u WHERE u.email IS NOT NULL
+         ON CONFLICT (campaign_id, user_id) WHERE user_id IS NOT NULL DO NOTHING`,
         [c.id],
       )
     }

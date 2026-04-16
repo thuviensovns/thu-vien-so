@@ -99,17 +99,22 @@ export async function recordReferral(referredUserId: number, refCode: string): P
   if (referrerId === referredUserId) return false // can't self-refer
 
   try {
-    await pool.query(
+    const ins = await pool.query(
       `INSERT INTO affiliate_referrals (referrer_user_id, referred_user_id, ref_code)
        VALUES ($1, $2, $3)
-       ON CONFLICT (referred_user_id) DO NOTHING`,
+       ON CONFLICT (referred_user_id) DO NOTHING
+       RETURNING id`,
       [referrerId, referredUserId, refCode.toUpperCase()],
     )
-    await pool.query(
-      `UPDATE affiliate_accounts SET referral_count = referral_count + 1 WHERE user_id = $1`,
-      [referrerId],
-    )
-    return true
+    // Only bump referral_count when a new referral was actually inserted.
+    if ((ins.rowCount ?? 0) > 0) {
+      await pool.query(
+        `UPDATE affiliate_accounts SET referral_count = referral_count + 1 WHERE user_id = $1`,
+        [referrerId],
+      )
+      return true
+    }
+    return false
   } catch {
     return false
   }
@@ -143,10 +148,14 @@ export async function accrueCommission(opts: {
     const commission = Math.floor(opts.baseAmount * (cfg.commissionPercent / 100))
     if (commission <= 0) return { credited: false, amount: 0 }
 
-    await pool.query(
+    // Idempotent: unique index on (source_type, source_id) + ON CONFLICT DO NOTHING
+    // guarantees a retried webhook or duplicate manual topup credits commission once.
+    const insertResult = await pool.query(
       `INSERT INTO affiliate_commissions
          (referrer_user_id, referred_user_id, source_type, source_id, base_amount, commission_amount, commission_percent, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'credited')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'credited')
+       ON CONFLICT (source_type, source_id) WHERE source_id IS NOT NULL DO NOTHING
+       RETURNING id`,
       [
         referrerId,
         opts.referredUserId,
@@ -157,6 +166,9 @@ export async function accrueCommission(opts: {
         cfg.commissionPercent,
       ],
     )
+    if ((insertResult.rowCount ?? 0) === 0) {
+      return { credited: false, amount: 0 } // already credited previously
+    }
     await pool.query(
       `UPDATE affiliate_accounts
        SET total_earned = total_earned + $1,

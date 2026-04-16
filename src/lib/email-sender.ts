@@ -8,22 +8,28 @@ function smtpConfigured(): boolean {
 
 /** Process pending items in email_queue, joining with email_campaigns for subject/body.
  *  Returns counts. Throws on SMTP misconfiguration so cron reports it clearly. */
-export async function processEmailQueue(batchSize = 20): Promise<{ sent: number; failed: number }> {
+export async function processEmailQueue(batchSize = 100): Promise<{ sent: number; failed: number }> {
   if (!smtpConfigured()) {
     throw new Error('SMTP chưa cấu hình (SMTP_HOST, SMTP_USER, SMTP_PASS)')
   }
 
   await ensureTablesExist()
   const pool = getDbPool()
+
+  // Recovery: rows stuck in 'sending' for >10 minutes (crashed worker) → reset to 'pending'.
+  await pool.query(
+    `UPDATE email_queue SET status = 'pending'
+     WHERE status = 'sending' AND attempted_at < NOW() - INTERVAL '10 minutes'`,
+  )
+
   const { rows } = await pool.query(
-    `SELECT q.id AS qid, q.recipient_email, q.campaign_id,
+    `SELECT q.id AS qid, q.recipient_email, q.campaign_id, q.source_key,
             c.subject, c.html_content, c.id AS cid
      FROM email_queue q
      LEFT JOIN email_campaigns c ON c.id = q.campaign_id
      WHERE q.status = 'pending'
      ORDER BY q.created_at ASC
-     LIMIT $1
-     FOR UPDATE SKIP LOCKED`,
+     LIMIT $1`,
     [batchSize],
   )
 
@@ -56,34 +62,54 @@ export async function processEmailQueue(batchSize = 20): Promise<{ sent: number;
   let sent = 0
   let failed = 0
   for (const row of rows) {
+    // Atomically claim the row so concurrent workers don't double-send.
+    const claim = await pool.query(
+      `UPDATE email_queue SET status = 'sending', attempted_at = NOW()
+       WHERE id = $1 AND status = 'pending' RETURNING id`,
+      [row.qid],
+    )
+    if ((claim.rowCount ?? 0) === 0) continue // another worker already claimed it
+
     try {
-      if (!row.subject || !row.html_content) {
-        throw new Error('Campaign thiếu subject/nội dung')
+      let subject = row.subject as string | null
+      let html = row.html_content as string | null
+      // Fallback template for system notifications (campaign_id = NULL).
+      if (!subject || !html) {
+        if (typeof row.source_key === 'string' && row.source_key.startsWith('reminder_order_')) {
+          subject = 'Đơn hàng của bạn đang chờ thanh toán'
+          html = '<p>Xin chào,</p><p>Đơn hàng của bạn trên Thư Viện Số vẫn đang chờ thanh toán. Vui lòng hoàn tất thanh toán để chúng tôi xử lý đơn hàng.</p><p>Cảm ơn bạn đã sử dụng dịch vụ!</p>'
+        } else {
+          throw new Error('Campaign thiếu subject/nội dung')
+        }
       }
       await transporter.sendMail({
         from: fromAddr,
         to: row.recipient_email,
-        subject: row.subject,
-        html: row.html_content,
+        subject,
+        html,
       })
       await pool.query(
         `UPDATE email_queue SET status = 'sent', attempted_at = NOW() WHERE id = $1`,
         [row.qid],
       )
-      await pool.query(
-        `UPDATE email_campaigns SET sent_count = COALESCE(sent_count, 0) + 1 WHERE id = $1`,
-        [row.cid],
-      )
+      if (row.cid) {
+        await pool.query(
+          `UPDATE email_campaigns SET sent_count = COALESCE(sent_count, 0) + 1 WHERE id = $1`,
+          [row.cid],
+        )
+      }
       sent++
     } catch (err) {
       await pool.query(
         `UPDATE email_queue SET status = 'failed', error = $1, attempted_at = NOW() WHERE id = $2`,
         [((err as Error).message || 'Error').slice(0, 1000), row.qid],
       )
-      await pool.query(
-        `UPDATE email_campaigns SET failed_count = COALESCE(failed_count, 0) + 1 WHERE id = $1`,
-        [row.cid],
-      )
+      if (row.cid) {
+        await pool.query(
+          `UPDATE email_campaigns SET failed_count = COALESCE(failed_count, 0) + 1 WHERE id = $1`,
+          [row.cid],
+        )
+      }
       failed++
     }
   }

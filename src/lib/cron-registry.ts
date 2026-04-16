@@ -48,7 +48,9 @@ export async function runCronJob(key: string): Promise<{ ok: boolean; message: s
   const def = jobs.get(key)
   if (!def) return { ok: false, message: `Unknown job: ${key}`, durationMs: 0 }
 
-  await ensureTablesExist()
+  // Ensure the row exists before UPDATE — otherwise first run silently no-ops on UPDATE
+  // and admin UI shows "chưa chạy" even after a successful execution.
+  await syncJobToDb(def)
   const pool = getDbPool()
   const start = Date.now()
 
