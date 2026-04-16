@@ -31,7 +31,7 @@ const adminNav = [
   { label: 'Vai trò', href: '/quan-ly/vai-tro', icon: ShieldCheck },
   { label: 'Bảo mật', href: '/quan-ly/bao-mat', icon: Shield },
   { label: 'Cron Jobs', href: '/quan-ly/cron', icon: Clock },
-  { label: 'Affiliate', href: '/quan-ly/affiliate', icon: TrendingUp },
+  { label: 'Affiliate', href: '/quan-ly/affiliate', icon: TrendingUp, badgeKey: 'withdrawals' as const },
   { label: 'Email Campaigns', href: '/quan-ly/email', icon: Mail },
   { label: 'Automations', href: '/quan-ly/automations', icon: Zap },
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
@@ -42,6 +42,7 @@ interface NotificationState {
   unreadMessages: number
   unreadTopUps: number
   unreadOrders: number
+  unreadWithdrawals: number
   recentTopUps: {
     id: number; type: 'topup'; status: string; userName: string | null; userEmail: string | null;
     amount: number; transferCode: string; confirmedAt: string | null; createdAt: string | null;
@@ -53,7 +54,8 @@ interface NotificationState {
 }
 
 const emptyNotifications: NotificationState = {
-  unreadCount: 0, unreadMessages: 0, unreadTopUps: 0, unreadOrders: 0, recentTopUps: [], recentOrders: [],
+  unreadCount: 0, unreadMessages: 0, unreadTopUps: 0, unreadOrders: 0, unreadWithdrawals: 0,
+  recentTopUps: [], recentOrders: [],
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -181,6 +183,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           unreadMessages: data.unreadMessages || 0,
           unreadTopUps: newTopUps,
           unreadOrders: newOrders,
+          unreadWithdrawals: data.unreadWithdrawals || 0,
           recentTopUps: data.recentTopUps || [],
           recentOrders: data.recentOrders || [],
         })
@@ -269,6 +272,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               const badgeCount = item.badgeKey === 'messages' ? notifications.unreadMessages
                 : item.badgeKey === 'topups' ? notifications.unreadTopUps
                 : item.badgeKey === 'orders' ? notifications.unreadOrders
+                : item.badgeKey === 'withdrawals' ? notifications.unreadWithdrawals
                 : 0
               return (
                 <Link

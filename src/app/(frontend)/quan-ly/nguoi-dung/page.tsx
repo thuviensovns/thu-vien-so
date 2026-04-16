@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Users, ShieldCheck, User, Mail, Trash2, AlertCircle,
   Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2, KeyRound, UserCog,
-  Receipt, ShoppingCart,
+  Receipt, ShoppingCart, Gift,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +75,11 @@ export default function UsersPage() {
   const [availableRoles, setAvailableRoles] = useState<{ id: number; name: string; description: string | null }[]>([])
   const [userAssignments, setUserAssignments] = useState<Record<string, { role_id: number; role_name: string } | null>>({})
   const [roleAssigning, setRoleAssigning] = useState(false)
+  // Affiliate info per user (ref_code, referrals, earnings) — fetched in parallel
+  // with the user list so admin sees who is actively referring straight from here.
+  const [affiliateMap, setAffiliateMap] = useState<Record<string, {
+    refCode: string; referralCount: number; totalEarned: number; availableBalance: number
+  }>>({})
   // Server-side cross-table search (email / name / topup content / order content)
   const [searchHits, setSearchHits] = useState<SearchHit[] | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
@@ -115,6 +120,30 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
+
+  // Fetch affiliate accounts so admin sees ref_code + earnings per user.
+  // Non-fatal if permission denied or feature off — user list still renders.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/affiliate/accounts?limit=1000', {
+          credentials: 'include',
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        const map: Record<string, { refCode: string; referralCount: number; totalEarned: number; availableBalance: number }> = {}
+        for (const a of data.docs || []) {
+          map[String(a.user_id)] = {
+            refCode: a.ref_code,
+            referralCount: Number(a.referral_count || 0),
+            totalEarned: Number(a.total_earned || 0),
+            availableBalance: Number(a.available_balance || 0),
+          }
+        }
+        setAffiliateMap(map)
+      } catch { /* ignore */ }
+    })()
+  }, [])
 
   // Fetch all roles + all assignments for quick lookup
   useEffect(() => {
@@ -557,6 +586,18 @@ export default function UsersPage() {
                       {user.role !== 'admin' && (
                         <span className="font-mono text-[10px] text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded shrink-0">
                           {getUserTransferCode(user.id)}
+                        </span>
+                      )}
+                      {affiliateMap[user.id] && (
+                        <span
+                          className="flex items-center gap-1 font-mono text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded shrink-0"
+                          title={`Mã giới thiệu · ${affiliateMap[user.id].referralCount} lượt · kiếm ${formatVND(affiliateMap[user.id].totalEarned)} · dư ${formatVND(affiliateMap[user.id].availableBalance)}`}
+                        >
+                          <Gift className="h-3 w-3" />
+                          {affiliateMap[user.id].refCode}
+                          {affiliateMap[user.id].referralCount > 0 && (
+                            <span className="ml-0.5">({affiliateMap[user.id].referralCount})</span>
+                          )}
                         </span>
                       )}
                     </div>

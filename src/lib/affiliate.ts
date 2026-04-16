@@ -205,6 +205,18 @@ export async function accrueCommission(opts: {
        WHERE user_id = $2`,
       [commission, referrerId],
     )
+    // Activity log entry so admin sees each commission in /quan-ly/nhat-ky.
+    // Direct INSERT (not logAdminActivity) — we have no NextRequest here.
+    try {
+      await pool.query(
+        `INSERT INTO activity_logs (type, action, detail, admin_email)
+         VALUES ('affiliate', $1, $2, 'system')`,
+        [
+          `Cộng hoa hồng ${opts.sourceType}`,
+          `Referrer #${referrerId} +${commission.toLocaleString('vi-VN')}đ từ ${opts.sourceType}#${opts.sourceId || '?'} (gốc ${opts.baseAmount.toLocaleString('vi-VN')}đ)`,
+        ],
+      )
+    } catch { /* non-fatal */ }
     return { credited: true, amount: commission }
   } catch {
     return { credited: false, amount: 0 }

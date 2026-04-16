@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
       { rows: recentMsgs },
       { rows: topUps },
       { rows: orders },
+      { rows: withdrawals },
     ] = await Promise.all([
       pool.query<Row>(
         `SELECT COUNT(*)::int AS c FROM contact_messages WHERE status = 'new'`,
@@ -75,17 +76,42 @@ export async function GET(req: NextRequest) {
          ORDER BY o.created_at DESC
          LIMIT 20`,
       ),
+      // Pending affiliate withdrawals — drives the admin-nav "Affiliate" badge
+      // so approvers see new requests within one poll cycle (~15s).
+      pool.query<Row>(
+        `SELECT w.id, w.user_id, w.amount, w.bank_name, w.bank_account_number,
+                w.bank_account_holder, w.created_at,
+                u.display_name, u.email
+         FROM affiliate_withdrawals w
+         LEFT JOIN users u ON u.id = w.user_id
+         WHERE w.status = 'pending'
+         ORDER BY w.created_at DESC
+         LIMIT 20`,
+      ),
     ])
 
     const unreadMessages = Number(newMsgCountRows[0]?.c || 0)
     const unreadTopUps = topUps.length
     const unreadOrders = orders.length
+    const unreadWithdrawals = withdrawals.length
 
     const res = NextResponse.json({
-      unreadCount: unreadMessages + unreadTopUps + unreadOrders,
+      unreadCount: unreadMessages + unreadTopUps + unreadOrders + unreadWithdrawals,
       unreadMessages,
       unreadTopUps,
       unreadOrders,
+      unreadWithdrawals,
+      recentWithdrawals: withdrawals.map((w: Row) => ({
+        id: w.id,
+        userId: w.user_id,
+        userName: (w.display_name as string) || null,
+        userEmail: (w.email as string) || null,
+        amount: w.amount,
+        bankName: w.bank_name,
+        bankAccountNumber: w.bank_account_number,
+        bankAccountHolder: w.bank_account_holder,
+        createdAt: w.created_at,
+      })),
       recent: recentMsgs.map((m: Row) => ({
         id: m.id,
         name: m.name,

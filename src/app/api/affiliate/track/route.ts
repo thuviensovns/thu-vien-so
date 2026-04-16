@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthorizedUser } from '@/lib/authz'
 import { recordReferral, getAffiliateConfig } from '@/lib/affiliate'
+import { logAdminActivity } from '@/lib/log-activity'
 
 /** POST: Link the current (just-registered) user to a referrer by ref_code.
  *  Called client-side immediately after successful registration + login.
@@ -21,6 +22,16 @@ export async function POST(req: NextRequest) {
     if (!code) return NextResponse.json({ tracked: false, reason: 'no_code' })
 
     const ok = await recordReferral(Number(user.id), code)
+    if (ok) {
+      // Surface new referrals in the admin activity log so admin sees who
+      // joined via which code without having to poll the affiliate page.
+      await logAdminActivity(req, {
+        type: 'affiliate',
+        action: 'Khách mới nhập mã giới thiệu',
+        detail: `${user.email} → mã ${code}`,
+        adminEmail: 'system',
+      })
+    }
     return NextResponse.json({ tracked: ok })
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 })

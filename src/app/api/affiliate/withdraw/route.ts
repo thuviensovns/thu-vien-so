@@ -3,6 +3,7 @@ import { getDbPool } from '@/lib/db-pool'
 import { ensureTablesExist } from '@/lib/db-migrate'
 import { getAuthorizedUser } from '@/lib/authz'
 import { getAffiliateConfig } from '@/lib/affiliate'
+import { logAdminActivity } from '@/lib/log-activity'
 
 /** POST: User requests a withdrawal. Body: { amount, bank_name, bank_account_number, bank_account_holder }. */
 export async function POST(req: NextRequest) {
@@ -67,6 +68,14 @@ export async function POST(req: NextRequest) {
         [user.id, amount, body.bank_name, body.bank_account_number, body.bank_account_holder],
       )
       await client.query('COMMIT')
+      // Notify admin via activity log — surfaced in /quan-ly/nhat-ky and
+      // drives the pending-withdraw badge queried in /api/notifications.
+      await logAdminActivity(req, {
+        type: 'affiliate',
+        action: 'Yêu cầu rút tiền affiliate',
+        detail: `${user.email} — ${amount.toLocaleString('vi-VN')}đ — ${body.bank_name}/${body.bank_account_number}`,
+        adminEmail: 'system',
+      })
       return NextResponse.json({ success: true, id: inserted[0].id })
     } catch (err) {
       await client.query('ROLLBACK')
