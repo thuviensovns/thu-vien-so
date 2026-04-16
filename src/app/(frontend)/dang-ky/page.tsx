@@ -45,13 +45,16 @@ export default function RegisterPage() {
     }
 
     setIsLoading(true)
-    const result = await register({ displayName, email, password })
-    if (result.ok) {
-      toast.success('Đăng ký thành công!', { description: 'Hãy đăng nhập để tiếp tục.' })
-      router.push('/dang-nhap?registered=true')
-    } else {
-      setError(result.error || 'Đăng ký thất bại')
-      toast.error('Đăng ký thất bại', { description: result.error })
+    try {
+      const result = await register({ displayName, email, password })
+      if (result.ok) {
+        toast.success('Đăng ký thành công!', { description: 'Hãy đăng nhập để tiếp tục.' })
+        router.push('/dang-nhap?registered=true')
+      } else {
+        setError(result.error || 'Đăng ký thất bại')
+        toast.error('Đăng ký thất bại', { description: result.error })
+      }
+    } finally {
       setIsLoading(false)
     }
   }

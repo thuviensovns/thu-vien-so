@@ -2,8 +2,26 @@ import { getDbPool } from './db-pool'
 import { categoryMeta } from './config'
 import { ALL_PERMISSIONS } from './permissions'
 
-/** Ensure additional tables/columns exist. Idempotent via IF NOT EXISTS. */
+/** Process-local guard so repeat callers reuse the first run's promise.
+ *  Previously this function was awaited on every login attempt (via
+ *  isIpBlocked / recordFailedAttempt / clearFailedAttempts), firing 35+ DDL
+ *  + seed queries per login and causing the UI to hang on new machines. */
+let _ensurePromise: Promise<{ executed: string[]; errors: string[] }> | null = null
+
+/** Ensure additional tables/columns exist. Idempotent via IF NOT EXISTS.
+ *  Only runs the actual migration once per process — subsequent callers get
+ *  the memoized promise. On failure the promise resets so the next call
+ *  retries (e.g. transient connection errors). */
 export async function ensureTablesExist(): Promise<{ executed: string[]; errors: string[] }> {
+  if (_ensurePromise) return _ensurePromise
+  _ensurePromise = _runEnsureTablesExist().catch((err) => {
+    _ensurePromise = null
+    throw err
+  })
+  return _ensurePromise
+}
+
+async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: string[] }> {
   const results: { executed: string[]; errors: string[] } = { executed: [], errors: [] }
 
   const pool = getDbPool()

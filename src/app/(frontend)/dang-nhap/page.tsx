@@ -37,21 +37,29 @@ export default function LoginPage() {
     setError('')
     setIsLoading(true)
 
-    const result = await login(email, password)
-    if (result.ok) {
-      toast.success('Đăng nhập thành công!')
-      // Fetch user to check role, then redirect accordingly
-      try {
-        const meRes = await fetch('/api/users/me', { credentials: 'include' })
-        const meData = await meRes.json()
-        const role = meData?.user?.role
+    try {
+      const result = await login(email, password)
+      if (result.ok) {
+        toast.success('Đăng nhập thành công!')
+        // Fetch user to check role, then redirect accordingly. Bounded so a
+        // slow /api/users/me can never freeze the form — we still navigate.
+        let role: string | undefined
+        try {
+          const meRes = await fetch('/api/users/me', {
+            credentials: 'include',
+            signal: AbortSignal.timeout(5000),
+          })
+          const meData = await meRes.json()
+          role = meData?.user?.role
+        } catch { /* fall through to default redirect */ }
         router.push(redirectTo || (role === 'admin' ? '/quan-ly' : '/tai-khoan'))
-      } catch {
-        router.push(redirectTo || '/tai-khoan')
+      } else {
+        setError(result.error || 'Đăng nhập thất bại')
+        toast.error('Đăng nhập thất bại', { description: result.error })
       }
-    } else {
-      setError(result.error || 'Đăng nhập thất bại')
-      toast.error('Đăng nhập thất bại', { description: result.error })
+    } finally {
+      // Always clear the spinner — even on navigation the component may stay
+      // mounted long enough that a stuck "Đang đăng nhập..." feels broken.
       setIsLoading(false)
     }
   }

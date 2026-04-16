@@ -99,22 +99,24 @@ export function useAuthState(): AuthContextType {
         credentials: 'include',
       })
       if (res.ok) {
-        // Track affiliate referral if present in localStorage (captured earlier from ?ref=XYZ)
+        // Track affiliate referral if present in localStorage (captured earlier from ?ref=XYZ).
+        // Bounded so a stalled affiliate endpoint can't freeze the register form.
         try {
           const refCode = typeof window !== 'undefined' ? localStorage.getItem('affiliate_ref') : null
           if (refCode) {
-            // Log the user in first so /api/affiliate/track sees the session
             await fetch('/api/auth/login', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: data.email, password: data.password }),
               credentials: 'include',
+              signal: AbortSignal.timeout(8000),
             })
             await fetch('/api/affiliate/track', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ref_code: refCode }),
               credentials: 'include',
+              signal: AbortSignal.timeout(5000),
             })
             localStorage.removeItem('affiliate_ref')
           }
