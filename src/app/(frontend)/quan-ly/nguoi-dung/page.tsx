@@ -345,8 +345,17 @@ export default function UsersPage() {
         toast.error(data.error || 'Lỗi cộng tiền')
         return
       }
+      const commission = data.commission as {
+        credited?: boolean; amount?: number; reason?: string; referrerEmail?: string
+      } | undefined
+      const baseDesc = `Số dư mới: ${formatVND(data.newBalance)}`
+      const commissionDesc = commission?.credited && commission.amount
+        ? ` · Hoa hồng ${formatVND(commission.amount)} → ${commission.referrerEmail || `referrer #${(commission as { referrerId?: number }).referrerId || '?'}`}`
+        : commission?.reason && commission.reason !== 'user_not_referred'
+          ? ` · Hoa hồng không cộng (${commission.reason})`
+          : ''
       toast.success(`Đã cộng ${formatVND(amount)} cho ${user.displayName || user.email}`, {
-        description: `Số dư mới: ${formatVND(data.newBalance)}`,
+        description: baseDesc + commissionDesc,
       })
       // Update balance locally
       setDbUsers((prev) => prev.map((u) =>
@@ -354,6 +363,25 @@ export default function UsersPage() {
       ))
       // Re-fetch from server so any concurrent change is reflected too
       fetchUsers()
+      // Refresh affiliateMap so referrer's new totals appear on their card
+      if (commission?.credited) {
+        fetch('/api/admin/affiliate/accounts?limit=1000', { credentials: 'include' })
+          .then((r) => r.ok ? r.json() : null)
+          .then((d) => {
+            if (!d?.docs) return
+            const map: typeof affiliateMap = {}
+            for (const a of d.docs) {
+              map[String(a.user_id)] = {
+                refCode: a.ref_code,
+                referralCount: Number(a.referral_count || 0),
+                totalEarned: Number(a.total_earned || 0),
+                availableBalance: Number(a.available_balance || 0),
+              }
+            }
+            setAffiliateMap(map)
+          })
+          .catch(() => {})
+      }
       setBalanceUserId(null)
       setBalanceAmount('')
     } catch {

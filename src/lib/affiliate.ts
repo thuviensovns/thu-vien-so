@@ -150,19 +150,21 @@ export async function recordReferral(referredUserId: number, refCode: string): P
 }
 
 /** Accrue a commission when a referred user performs a billable action (topup/order).
- *  Safe to call from anywhere — silently no-ops if affiliate disabled or user not referred. */
+ *  Returns a `reason` when the commission isn't credited so callers can surface
+ *  the outcome to the admin instead of silently losing the credit. */
 export async function accrueCommission(opts: {
   referredUserId: number
   baseAmount: number
   sourceType: 'topup' | 'order'
   sourceId?: string
-}): Promise<{ credited: boolean; amount: number }> {
+}): Promise<{ credited: boolean; amount: number; reason?: string; referrerId?: number }> {
   try {
     const cfg = await getAffiliateConfig()
-    if (!cfg.enabled || !cfg.creditSources.includes(opts.sourceType)) {
-      return { credited: false, amount: 0 }
+    if (!cfg.enabled) return { credited: false, amount: 0, reason: 'affiliate_disabled' }
+    if (!cfg.creditSources.includes(opts.sourceType)) {
+      return { credited: false, amount: 0, reason: `source_${opts.sourceType}_not_credited` }
     }
-    if (opts.baseAmount <= 0) return { credited: false, amount: 0 }
+    if (opts.baseAmount <= 0) return { credited: false, amount: 0, reason: 'zero_base_amount' }
 
     await ensureTablesExist()
     const pool = getDbPool()
@@ -171,11 +173,28 @@ export async function accrueCommission(opts: {
       `SELECT referrer_user_id FROM affiliate_referrals WHERE referred_user_id = $1`,
       [opts.referredUserId],
     )
-    if (rows.length === 0) return { credited: false, amount: 0 }
+    if (rows.length === 0) return { credited: false, amount: 0, reason: 'user_not_referred' }
 
     const referrerId = rows[0].referrer_user_id as number
     const commission = Math.floor(opts.baseAmount * (cfg.commissionPercent / 100))
-    if (commission <= 0) return { credited: false, amount: 0 }
+    if (commission <= 0) return { credited: false, amount: 0, reason: 'zero_commission', referrerId }
+
+    // Belt-and-suspenders: ensure referrer has an affiliate_accounts row before
+    // the UPDATE. Normally `recordReferral` guarantees this (it looks up
+    // ref_code in the table), but a legacy row could have been deleted or the
+    // backfill could have skipped a user — in which case the UPDATE silently
+    // affects zero rows and the commission is "logged but not credited".
+    const { rows: referrerRow } = await pool.query(
+      `SELECT 1 FROM affiliate_accounts WHERE user_id = $1`,
+      [referrerId],
+    )
+    if (referrerRow.length === 0) {
+      const { rows: userRow } = await pool.query(
+        `SELECT email FROM users WHERE id = $1`,
+        [referrerId],
+      )
+      await ensureAffiliateAccount(referrerId, userRow[0]?.email)
+    }
 
     // Idempotent: unique index on (source_type, source_id) + ON CONFLICT DO NOTHING
     // guarantees a retried webhook or duplicate manual topup credits commission once.
@@ -196,15 +215,24 @@ export async function accrueCommission(opts: {
       ],
     )
     if ((insertResult.rowCount ?? 0) === 0) {
-      return { credited: false, amount: 0 } // already credited previously
+      return { credited: false, amount: 0, reason: 'already_credited', referrerId }
     }
-    await pool.query(
+    const updateResult = await pool.query(
       `UPDATE affiliate_accounts
        SET total_earned = total_earned + $1,
            available_balance = available_balance + $1
        WHERE user_id = $2`,
       [commission, referrerId],
     )
+    if ((updateResult.rowCount ?? 0) === 0) {
+      // Commission row exists but the referrer's balance wasn't updated —
+      // surface this so admin can investigate instead of silently losing the
+      // credit. Shouldn't be reachable after the ensureAffiliateAccount above.
+      console.error('[affiliate] commission inserted but balance UPDATE affected 0 rows', {
+        referrerId, commission, sourceType: opts.sourceType, sourceId: opts.sourceId,
+      })
+      return { credited: false, amount: 0, reason: 'referrer_account_missing', referrerId }
+    }
     // Activity log entry so admin sees each commission in /quan-ly/nhat-ky.
     // Direct INSERT (not logAdminActivity) — we have no NextRequest here.
     try {
@@ -217,8 +245,9 @@ export async function accrueCommission(opts: {
         ],
       )
     } catch { /* non-fatal */ }
-    return { credited: true, amount: commission }
-  } catch {
-    return { credited: false, amount: 0 }
+    return { credited: true, amount: commission, referrerId }
+  } catch (err) {
+    console.error('[affiliate] accrueCommission error:', err)
+    return { credited: false, amount: 0, reason: `error:${(err as Error).message}` }
   }
 }

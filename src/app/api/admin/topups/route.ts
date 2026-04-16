@@ -168,22 +168,44 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 3. Accrue affiliate commission (no-op if feature disabled or user not referred)
+    // 3. Accrue affiliate commission — surface the outcome so admin sees whether
+    //    a referrer was credited (and why not, when applicable).
+    let commission: {
+      credited: boolean
+      amount: number
+      reason?: string
+      referrerId?: number
+      referrerEmail?: string
+    } = { credited: false, amount: 0 }
     try {
       const { accrueCommission } = await import('@/lib/affiliate')
-      await accrueCommission({
+      const result = await accrueCommission({
         referredUserId: Number(targetUser.id),
         baseAmount: amount,
         sourceType: 'topup',
         sourceId: transferCode,
       })
-    } catch { /* non-fatal */ }
+      commission = { ...result }
+      if (result.referrerId) {
+        try {
+          const pool = getDbPool()
+          const { rows } = await pool.query(
+            `SELECT email FROM users WHERE id = $1`,
+            [result.referrerId],
+          )
+          commission.referrerEmail = (rows[0]?.email as string) || undefined
+        } catch { /* ignore */ }
+      }
+    } catch (err) {
+      commission = { credited: false, amount: 0, reason: `error:${(err as Error).message}` }
+    }
 
     return NextResponse.json({
       success: true,
       newBalance: currentBalance + amount,
       transferCode,
       userName: targetUser.displayName || targetUser.email,
+      commission,
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)

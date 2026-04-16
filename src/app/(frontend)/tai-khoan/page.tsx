@@ -47,6 +47,13 @@ export default function AccountPage() {
   const [newPassword, setNewPassword] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const [affiliate, setAffiliate] = useState<{
+    refCode: string
+    availableBalance: number
+    totalEarned: number
+    referralCount: number
+  } | null>(null)
+  const [refCodeCopied, setRefCodeCopied] = useState(false)
 
   useEffect(() => {
     if (user?.displayName) setNewDisplayName(user.displayName)
@@ -100,6 +107,24 @@ export default function AccountPage() {
   useEffect(() => {
     if (activeTab === 'downloads') fetchDownloads()
   }, [activeTab, fetchDownloads])
+
+  // Pull the user's ref code + commission balance so the sidebar card can show
+  // it inline without an extra click into /gioi-thieu-ban-be.
+  useEffect(() => {
+    if (!user?.id) return
+    fetch('/api/affiliate/me', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d?.enabled || !d.refCode) return
+        setAffiliate({
+          refCode: d.refCode,
+          availableBalance: Number(d.account?.available_balance || 0),
+          totalEarned: Number(d.account?.total_earned || 0),
+          referralCount: Number(d.account?.referral_count || 0),
+        })
+      })
+      .catch(() => {})
+  }, [user?.id])
 
   async function handleUpdateName() {
     const name = newDisplayName.trim()
@@ -245,13 +270,56 @@ export default function AccountPage() {
               <span className="text-sm font-bold text-success">{formatVND(balance)}</span>
             </Link>
 
-            <Link
-              href="/gioi-thieu-ban-be"
-              className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors mb-2"
-            >
-              <Gift className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="text-xs font-medium">Giới thiệu bạn bè — nhận hoa hồng</span>
-            </Link>
+            {affiliate ? (
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 mb-2 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                  <Gift className="h-3.5 w-3.5 shrink-0" />
+                  Giới thiệu bạn bè
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(affiliate.refCode).then(() => {
+                      setRefCodeCopied(true)
+                      toast.success('Đã copy mã giới thiệu')
+                      setTimeout(() => setRefCodeCopied(false), 1500)
+                    }).catch(() => toast.error('Không copy được'))
+                  }}
+                  className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-background border border-border hover:border-primary/40 transition-colors group"
+                  title="Bấm để copy mã"
+                >
+                  <span className="text-[10px] text-muted-foreground">Mã của bạn</span>
+                  <span className="font-mono text-xs font-bold text-primary flex items-center gap-1">
+                    {affiliate.refCode}
+                    {refCodeCopied ? <Check className="h-3 w-3 text-success" /> : null}
+                  </span>
+                </button>
+                <div className="grid grid-cols-2 gap-1 text-[10px]">
+                  <div className="text-center">
+                    <div className="text-muted-foreground">Số dư</div>
+                    <div className="font-bold text-success">{formatVND(affiliate.availableBalance)}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-muted-foreground">Đã kiếm</div>
+                    <div className="font-bold">{formatVND(affiliate.totalEarned)}</div>
+                  </div>
+                </div>
+                <Link
+                  href="/gioi-thieu-ban-be"
+                  className="block text-center text-[10px] font-medium text-primary hover:underline"
+                >
+                  Xem chi tiết · {affiliate.referralCount} lượt giới thiệu →
+                </Link>
+              </div>
+            ) : (
+              <Link
+                href="/gioi-thieu-ban-be"
+                className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/10 hover:bg-primary/10 transition-colors mb-2"
+              >
+                <Gift className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span className="text-xs font-medium">Giới thiệu bạn bè — nhận hoa hồng</span>
+              </Link>
+            )}
 
             <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible scrollbar-hide">
               {tabs.map((tab) => (
