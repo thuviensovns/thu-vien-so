@@ -28,6 +28,7 @@ const adminNav = [
   { label: 'Spin nội dung', href: '/quan-ly/noi-dung', icon: RefreshCw },
   { label: 'Chat hỗ trợ', href: '/quan-ly/chat-support', icon: MessageCircle },
   { label: 'Nhật ký', href: '/quan-ly/nhat-ky', icon: ScrollText },
+  { label: 'Vai trò', href: '/quan-ly/vai-tro', icon: ShieldCheck },
   { label: 'Cài đặt', href: '/quan-ly/cai-dat', icon: Settings },
 ]
 

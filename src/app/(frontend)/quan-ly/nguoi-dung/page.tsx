@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   Users, ShieldCheck, User, Mail, Trash2, AlertCircle,
-  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2, KeyRound,
+  Search, Ban, CheckCircle2, Wallet, ArrowUpCircle, ArrowDownCircle, FileDown, Loader2, KeyRound, UserCog,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +36,10 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState('')
   const [page, setPage] = useState(1)
   const [balanceProcessing, setBalanceProcessing] = useState<null | 'add' | 'deduct'>(null)
+  const [roleAssignUserId, setRoleAssignUserId] = useState<string | null>(null)
+  const [availableRoles, setAvailableRoles] = useState<{ id: number; name: string; description: string | null }[]>([])
+  const [userAssignments, setUserAssignments] = useState<Record<string, { role_id: number; role_name: string } | null>>({})
+  const [roleAssigning, setRoleAssigning] = useState(false)
 
   // Fetch real users from Payload API
   const fetchUsers = useCallback(async () => {
@@ -72,6 +76,66 @@ export default function UsersPage() {
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
+
+  // Fetch all roles + all assignments for quick lookup
+  useEffect(() => {
+    (async () => {
+      try {
+        const [rolesRes, assignRes] = await Promise.all([
+          fetch('/api/admin/roles', { credentials: 'include' }),
+          fetch('/api/admin/roles/assignments', { credentials: 'include' }),
+        ])
+        if (rolesRes.ok) {
+          const data = await rolesRes.json()
+          setAvailableRoles((data.docs || []).map((r: { id: number; name: string; description: string | null }) => ({
+            id: r.id, name: r.name, description: r.description,
+          })))
+        }
+        if (assignRes.ok) {
+          const data = await assignRes.json()
+          const map: Record<string, { role_id: number; role_name: string }> = {}
+          for (const a of data.docs || []) {
+            map[String(a.user_id)] = { role_id: a.role_id, role_name: a.role_name }
+          }
+          setUserAssignments(map)
+        }
+      } catch { /* ignore — permission may be absent */ }
+    })()
+  }, [])
+
+  async function handleAssignRole(userId: string, roleId: number | null) {
+    if (roleAssigning) return
+    setRoleAssigning(true)
+    try {
+      const res = await fetch('/api/admin/roles/assignments', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: Number(userId), role_id: roleId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Lỗi gán vai trò')
+        return
+      }
+      if (roleId === null) {
+        setUserAssignments((prev) => ({ ...prev, [userId]: null }))
+        toast.success('Đã gỡ vai trò')
+      } else {
+        const role = availableRoles.find((r) => r.id === roleId)
+        setUserAssignments((prev) => ({
+          ...prev,
+          [userId]: { role_id: roleId, role_name: role?.name || '' },
+        }))
+        toast.success(`Đã gán vai trò: ${role?.name}`)
+      }
+      setRoleAssignUserId(null)
+    } catch {
+      toast.error('Lỗi kết nối')
+    } finally {
+      setRoleAssigning(false)
+    }
+  }
 
   // Refresh on focus
   useEffect(() => {
@@ -373,6 +437,12 @@ export default function UsersPage() {
                           Built-in
                         </Badge>
                       )}
+                      {userAssignments[user.id] && (
+                        <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] px-1.5 py-0">
+                          <UserCog className="h-2.5 w-2.5 mr-0.5" />
+                          {userAssignments[user.id]?.role_name}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1 truncate">
@@ -411,10 +481,20 @@ export default function UsersPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-primary hover:text-primary"
-                        onClick={() => { setResetPwUserId(resetPwUserId === user.id ? null : user.id); setBalanceUserId(null) }}
+                        onClick={() => { setResetPwUserId(resetPwUserId === user.id ? null : user.id); setBalanceUserId(null); setRoleAssignUserId(null) }}
                         title="Đặt lại mật khẩu"
                       >
                         <KeyRound className="h-4 w-4" />
+                      </Button>
+                      {/* Assign admin role */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-primary hover:text-primary"
+                        onClick={() => { setRoleAssignUserId(roleAssignUserId === user.id ? null : user.id); setBalanceUserId(null); setResetPwUserId(null) }}
+                        title="Gán vai trò admin"
+                      >
+                        <UserCog className="h-4 w-4" />
                       </Button>
                       {/* Role toggle */}
                       <Button
@@ -499,6 +579,33 @@ export default function UsersPage() {
                       disabled={balanceProcessing !== null}
                     >
                       Hủy
+                    </Button>
+                  </div>
+                )}
+
+                {/* Role assign form */}
+                {roleAssignUserId === user.id && (
+                  <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2 flex-wrap">
+                    <UserCog className="h-4 w-4 text-primary shrink-0" />
+                    <select
+                      className="bg-muted/50 h-8 text-sm flex-1 min-w-[160px] px-2 rounded-md border border-input"
+                      defaultValue={userAssignments[user.id]?.role_id || ''}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        if (val === '') handleAssignRole(user.id, null)
+                        else handleAssignRole(user.id, Number(val))
+                      }}
+                      disabled={roleAssigning}
+                    >
+                      <option value="">— Không có vai trò —</option>
+                      {availableRoles.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}{r.description ? ` — ${r.description}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setRoleAssignUserId(null)}>
+                      Đóng
                     </Button>
                   </div>
                 )}

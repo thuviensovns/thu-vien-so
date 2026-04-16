@@ -1,5 +1,6 @@
 import { getDbPool } from './db-pool'
 import { categoryMeta } from './config'
+import { ALL_PERMISSIONS } from './permissions'
 
 /** Ensure additional tables/columns exist. Idempotent via IF NOT EXISTS. */
 export async function ensureTablesExist(): Promise<{ executed: string[]; errors: string[] }> {
@@ -96,6 +97,219 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
       label: 'Add cai-dat-phan-mem to enum_categories_type',
       q: `ALTER TYPE enum_categories_type ADD VALUE IF NOT EXISTS 'cai-dat-phan-mem'`,
     },
+    // === Roles & Permissions (Phase 1) ===
+    {
+      label: 'Create admin_roles table',
+      q: `CREATE TABLE IF NOT EXISTS admin_roles (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        description VARCHAR(500),
+        permissions TEXT[] NOT NULL DEFAULT '{}',
+        is_system BOOLEAN DEFAULT false,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create user_role_assignments table',
+      q: `CREATE TABLE IF NOT EXISTS user_role_assignments (
+        user_id INT PRIMARY KEY,
+        role_id INT NOT NULL REFERENCES admin_roles(id) ON DELETE CASCADE,
+        assigned_by VARCHAR(255),
+        assigned_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    // === Enhanced admin activity logs (Phase 2) ===
+    {
+      label: 'Add admin_logs.ip column',
+      q: `ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS ip VARCHAR(45)`,
+    },
+    {
+      label: 'Add admin_logs.user_agent column',
+      q: `ALTER TABLE activity_logs ADD COLUMN IF NOT EXISTS user_agent VARCHAR(500)`,
+    },
+    {
+      label: 'Create index activity_logs.admin_email',
+      q: `CREATE INDEX IF NOT EXISTS activity_logs_admin_email_idx ON activity_logs(admin_email)`,
+    },
+    {
+      label: 'Create index activity_logs.created_at',
+      q: `CREATE INDEX IF NOT EXISTS activity_logs_created_at_idx ON activity_logs(created_at DESC)`,
+    },
+    // === Failed login + IP block (Phase 3) ===
+    {
+      label: 'Create failed_login_attempts table',
+      q: `CREATE TABLE IF NOT EXISTS failed_login_attempts (
+        id SERIAL PRIMARY KEY,
+        ip VARCHAR(45) NOT NULL,
+        email VARCHAR(255),
+        type VARCHAR(32) NOT NULL DEFAULT 'login',
+        reason VARCHAR(255),
+        user_agent VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create index failed_login_attempts.ip',
+      q: `CREATE INDEX IF NOT EXISTS failed_login_attempts_ip_idx ON failed_login_attempts(ip, created_at DESC)`,
+    },
+    {
+      label: 'Create blocked_ips table',
+      q: `CREATE TABLE IF NOT EXISTS blocked_ips (
+        id SERIAL PRIMARY KEY,
+        ip VARCHAR(45) UNIQUE NOT NULL,
+        reason VARCHAR(500),
+        attempts_count INT DEFAULT 0,
+        blocked_until TIMESTAMPTZ,
+        is_permanent BOOLEAN DEFAULT false,
+        blocked_by VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    // === Cron jobs registry (Phase 4) ===
+    {
+      label: 'Create cron_jobs table',
+      q: `CREATE TABLE IF NOT EXISTS cron_jobs (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(100) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description VARCHAR(500),
+        recommended_interval VARCHAR(32),
+        last_run_at TIMESTAMPTZ,
+        last_status VARCHAR(32),
+        last_duration_ms INT,
+        last_error VARCHAR(1000),
+        run_count INT DEFAULT 0,
+        enabled BOOLEAN DEFAULT true,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    // === Affiliate (Phase 5) ===
+    {
+      label: 'Create affiliate_accounts table',
+      q: `CREATE TABLE IF NOT EXISTS affiliate_accounts (
+        user_id INT PRIMARY KEY,
+        ref_code VARCHAR(32) UNIQUE NOT NULL,
+        total_earned NUMERIC DEFAULT 0,
+        available_balance NUMERIC DEFAULT 0,
+        withdrawn NUMERIC DEFAULT 0,
+        referral_count INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create affiliate_referrals table',
+      q: `CREATE TABLE IF NOT EXISTS affiliate_referrals (
+        id SERIAL PRIMARY KEY,
+        referrer_user_id INT NOT NULL,
+        referred_user_id INT UNIQUE NOT NULL,
+        ref_code VARCHAR(32) NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create affiliate_commissions table',
+      q: `CREATE TABLE IF NOT EXISTS affiliate_commissions (
+        id SERIAL PRIMARY KEY,
+        referrer_user_id INT NOT NULL,
+        referred_user_id INT NOT NULL,
+        source_type VARCHAR(32) NOT NULL,
+        source_id VARCHAR(64),
+        base_amount NUMERIC NOT NULL,
+        commission_amount NUMERIC NOT NULL,
+        commission_percent NUMERIC NOT NULL,
+        status VARCHAR(32) DEFAULT 'pending',
+        note VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create affiliate_withdrawals table',
+      q: `CREATE TABLE IF NOT EXISTS affiliate_withdrawals (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        amount NUMERIC NOT NULL,
+        bank_name VARCHAR(255),
+        bank_account_number VARCHAR(64),
+        bank_account_holder VARCHAR(255),
+        status VARCHAR(32) DEFAULT 'pending',
+        admin_note VARCHAR(500),
+        processed_by VARCHAR(255),
+        processed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create index affiliate_commissions.referrer',
+      q: `CREATE INDEX IF NOT EXISTS affiliate_commissions_referrer_idx ON affiliate_commissions(referrer_user_id, created_at DESC)`,
+    },
+    // === Email campaigns (Phase 6) ===
+    {
+      label: 'Create email_campaigns table',
+      q: `CREATE TABLE IF NOT EXISTS email_campaigns (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        subject VARCHAR(500) NOT NULL,
+        html_content TEXT NOT NULL,
+        recipient_mode VARCHAR(32) NOT NULL DEFAULT 'all',
+        recipient_ids TEXT,
+        status VARCHAR(32) DEFAULT 'draft',
+        total_recipients INT DEFAULT 0,
+        sent_count INT DEFAULT 0,
+        failed_count INT DEFAULT 0,
+        created_by VARCHAR(255),
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create email_queue table',
+      q: `CREATE TABLE IF NOT EXISTS email_queue (
+        id SERIAL PRIMARY KEY,
+        campaign_id INT REFERENCES email_campaigns(id) ON DELETE CASCADE,
+        user_id INT,
+        recipient_email VARCHAR(255) NOT NULL,
+        status VARCHAR(32) DEFAULT 'pending',
+        error VARCHAR(1000),
+        attempted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    {
+      label: 'Create index email_queue.campaign_status',
+      q: `CREATE INDEX IF NOT EXISTS email_queue_campaign_status_idx ON email_queue(campaign_id, status)`,
+    },
+    // === Automations (Phase 7) ===
+    {
+      label: 'Create automations table',
+      q: `CREATE TABLE IF NOT EXISTS automations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(64) NOT NULL,
+        config JSONB DEFAULT '{}',
+        enabled BOOLEAN DEFAULT true,
+        last_run_at TIMESTAMPTZ,
+        last_status VARCHAR(32),
+        last_affected_count INT,
+        last_error VARCHAR(1000),
+        run_count INT DEFAULT 0,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
+    // === Site settings generic KV (used by affiliate config, email SMTP, etc.) ===
+    {
+      label: 'Create admin_settings table',
+      q: `CREATE TABLE IF NOT EXISTS admin_settings (
+        key VARCHAR(100) PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_by VARCHAR(255),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+    },
   ]
 
   for (const { label, q } of queries) {
@@ -105,6 +319,33 @@ export async function ensureTablesExist(): Promise<{ executed: string[]; errors:
     } catch (err) {
       results.errors.push(`${label}: ${(err as Error).message}`)
     }
+  }
+
+  // Seed default system roles (super_admin + moderator)
+  try {
+    const allPerms = [...ALL_PERMISSIONS]
+    const moderatorPerms = allPerms.filter(
+      (p) =>
+        p.endsWith('.view') ||
+        p === 'messages.reply' ||
+        p === 'orders.edit' ||
+        p === 'topups.approve',
+    )
+    await pool.query(
+      `INSERT INTO admin_roles (name, description, permissions, is_system)
+       VALUES ($1, $2, $3, true)
+       ON CONFLICT (name) DO UPDATE SET permissions = $3, updated_at = NOW()`,
+      ['super_admin', 'Toàn quyền hệ thống (system)', allPerms],
+    )
+    await pool.query(
+      `INSERT INTO admin_roles (name, description, permissions, is_system)
+       VALUES ($1, $2, $3, true)
+       ON CONFLICT (name) DO NOTHING`,
+      ['moderator', 'Chỉ xem + trả lời tin nhắn + duyệt đơn/nạp tiền', moderatorPerms],
+    )
+    results.executed.push('Seeded system roles')
+  } catch (err) {
+    results.errors.push(`Seed roles: ${(err as Error).message}`)
   }
 
   // Auto-create missing categories from categoryMeta
