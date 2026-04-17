@@ -335,7 +335,16 @@ export default function ProductsPage() {
             const presign = await presignRes.json()
 
             // Step 2: upload bytes
-            if (presign.mode === 'presign') {
+            let videoStorageKey: string = presign.r2Key
+            if (presign.mode === 'blob') {
+              const { upload } = await import('@vercel/blob/client')
+              const blob = await upload(presign.pathname, videoFile, {
+                access: 'public',
+                handleUploadUrl: presign.handshakeUrl,
+                contentType: presign.contentType || videoFile.type || 'video/mp4',
+              })
+              videoStorageKey = blob.url
+            } else if (presign.mode === 'presign') {
               const putRes = await fetch(presign.url, {
                 method: 'PUT',
                 headers: { 'Content-Type': presign.contentType || 'video/mp4' },
@@ -367,7 +376,7 @@ export default function ProductsPage() {
 
             toast.dismiss('video-upload')
             uploadedVideo = {
-              r2Key: presign.r2Key,
+              r2Key: videoStorageKey,
               fileName: presign.fileName,
               fileSize: presign.fileSize,
               mimeType: presign.mimeType,

@@ -55,6 +55,9 @@ export async function generateDownloadUrl(
   r2Key: string,
   expiresIn = 172800,
 ): Promise<string> {
+  // Vercel Blob (and any other) public URLs are stored verbatim in r2Key
+  // and need no signing — pass them through unchanged.
+  if (/^https?:\/\//i.test(r2Key)) return r2Key
   if (!isR2Configured()) {
     return getLocalPublicUrl(r2Key)
   }
@@ -124,6 +127,14 @@ export async function getPresignedUploadUrl(
  * @param r2Key - Object key to delete
  */
 export async function deleteFromR2(r2Key: string): Promise<void> {
+  // Vercel Blob URLs are stored verbatim in r2Key. Route them to the Blob
+  // delete API instead of S3 — otherwise S3 silently no-ops and the file
+  // leaks forever in Blob storage.
+  if (/^https?:\/\//i.test(r2Key)) {
+    const { del } = await import('@vercel/blob')
+    await del(r2Key)
+    return
+  }
   if (!isR2Configured()) {
     try {
       await unlink(getLocalPath(r2Key))

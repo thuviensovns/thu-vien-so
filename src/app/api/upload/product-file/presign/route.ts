@@ -46,6 +46,20 @@ export async function POST(req: NextRequest) {
     const r2Key = `products/${safeSlug}/${timestamp}-${safeFileName}`
     const safeContentType = contentType && typeof contentType === 'string' ? contentType : 'application/octet-stream'
 
+    // Storage selection priority: Vercel Blob (production default) → R2 → local
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      console.log(`[Presign] Admin ${user.email} → blob handshake for products/${safeSlug}/${safeFileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`)
+      return NextResponse.json({
+        mode: 'blob',
+        handshakeUrl: '/api/upload/product-file/blob-handshake',
+        pathname: `products/${safeSlug}/${safeFileName}`,
+        fileName,
+        fileSize,
+        fileFormat: ext,
+        contentType: safeContentType,
+      })
+    }
+
     if (isR2Configured()) {
       const url = await getPresignedUploadUrl(r2Key, safeContentType, 600)
       console.log(`[Presign] Admin ${user.email} → ${r2Key} (${(fileSize / 1024 / 1024).toFixed(1)}MB, ${safeContentType})`)
@@ -60,7 +74,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // R2 unconfigured (local dev) — tell client to POST through the existing endpoint,
+    // No storage configured — tell client to POST through the existing endpoint,
     // which routes to the local filesystem fallback in lib/r2.
     return NextResponse.json({
       mode: 'direct',

@@ -128,7 +128,19 @@ export default function ProductForm({
       const presign = await presignRes.json()
 
       // Step 2: upload bytes via the route the server picked
-      if (presign.mode === 'presign') {
+      let storageKey: string = presign.r2Key
+
+      if (presign.mode === 'blob') {
+        // Vercel Blob client upload — streams directly to Blob storage,
+        // bypassing the Vercel 4.5MB function body limit.
+        const { upload } = await import('@vercel/blob/client')
+        const blob = await upload(presign.pathname, file, {
+          access: 'public',
+          handleUploadUrl: presign.handshakeUrl,
+          contentType: presign.contentType || file.type || 'application/octet-stream',
+        })
+        storageKey = blob.url
+      } else if (presign.mode === 'presign') {
         // Direct PUT to R2 — bypasses the Vercel 4.5MB function body limit
         const putRes = await fetch(presign.url, {
           method: 'PUT',
@@ -159,7 +171,7 @@ export default function ProductForm({
       setForm(prev => ({
         ...prev,
         file: {
-          r2Key: presign.r2Key,
+          r2Key: storageKey,
           fileName: presign.fileName,
           fileSize: presign.fileSize,
           fileFormat: presign.fileFormat,

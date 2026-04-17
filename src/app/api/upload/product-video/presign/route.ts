@@ -52,6 +52,20 @@ export async function POST(req: NextRequest) {
     const r2Key = `products/${safeSlug}/video-${timestamp}-${safeFileName}`
     const safeContentType = (contentType && typeof contentType === 'string' && contentType) || DEFAULT_CONTENT_TYPE[ext] || 'video/mp4'
 
+    // Storage selection priority: Vercel Blob (production default) → R2 → local
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      console.log(`[Presign video] Admin ${user.email} → blob handshake for products/${safeSlug}/video-${safeFileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`)
+      return NextResponse.json({
+        mode: 'blob',
+        handshakeUrl: '/api/upload/product-video/blob-handshake',
+        pathname: `products/${safeSlug}/video-${safeFileName}`,
+        fileName,
+        fileSize,
+        mimeType: safeContentType,
+        contentType: safeContentType,
+      })
+    }
+
     if (isR2Configured()) {
       const url = await getPresignedUploadUrl(r2Key, safeContentType, 600)
       console.log(`[Presign video] Admin ${user.email} → ${r2Key} (${(fileSize / 1024 / 1024).toFixed(1)}MB, ${safeContentType})`)
