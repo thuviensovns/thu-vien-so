@@ -342,6 +342,11 @@ export default function ProductsPage() {
                 access: 'public',
                 handleUploadUrl: presign.handshakeUrl,
                 contentType: presign.contentType || videoFile.type || 'video/mp4',
+                multipart: true,
+                onUploadProgress: ({ loaded, total }) => {
+                  const pct = total ? Math.round((loaded / total) * 100) : 0
+                  toast.loading(`Upload video ${pct}%...`, { id: 'video-upload' })
+                },
               })
               videoStorageKey = blob.url
             } else if (presign.mode === 'presign') {

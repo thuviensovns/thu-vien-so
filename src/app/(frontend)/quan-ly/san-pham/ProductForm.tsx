@@ -138,6 +138,11 @@ export default function ProductForm({
           access: 'public',
           handleUploadUrl: presign.handshakeUrl,
           contentType: presign.contentType || file.type || 'application/octet-stream',
+          multipart: true,
+          onUploadProgress: ({ loaded, total }) => {
+            const pct = total ? Math.round((loaded / total) * 100) : 0
+            setUploadProgress(`Đang upload ${file.name} — ${pct}% (${formatFileSize(loaded)}/${formatFileSize(total || file.size)})`)
+          },
         })
         storageKey = blob.url
       } else if (presign.mode === 'presign') {
