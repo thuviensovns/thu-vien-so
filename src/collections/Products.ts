@@ -104,6 +104,27 @@ export const Products: CollectionConfig = {
       ],
     },
 
+    // Video Demo (MP4 or external URL: YouTube/Vimeo/direct mp4)
+    {
+      name: 'video',
+      type: 'group',
+      label: 'Video demo sản phẩm',
+      fields: [
+        {
+          name: 'url',
+          type: 'text',
+          label: 'URL video (YouTube/Vimeo/MP4 link)',
+          admin: {
+            description: 'Dán link YouTube, Vimeo hoặc link MP4 trực tiếp. Ưu tiên dùng trước R2. Để trống nếu upload qua R2.',
+          },
+        },
+        { name: 'r2Key', type: 'text', label: 'R2 Key', admin: { description: 'Cloudflare R2 object key (nếu upload qua R2)' } },
+        { name: 'fileName', type: 'text', label: 'Tên file' },
+        { name: 'fileSize', type: 'number', label: 'Dung lượng (bytes)' },
+        { name: 'mimeType', type: 'text', label: 'MIME type (video/mp4...)' },
+      ],
+    },
+
     // Images
     { name: 'thumbnail', type: 'upload', relationTo: 'media', label: 'Ảnh đại diện (Payload Media)' },
     {

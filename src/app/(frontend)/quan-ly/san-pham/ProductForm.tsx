@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2,
+  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2, Video,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +21,13 @@ export interface FileData {
   fileFormat: string
 }
 
+export interface VideoData {
+  r2Key: string
+  fileName: string
+  fileSize: number
+  mimeType: string
+}
+
 export interface ProductFormData {
   name: string
   slug: string
@@ -31,6 +38,13 @@ export interface ProductFormData {
   featured: boolean
   file: FileData | null
   downloadUrl: string
+  video: VideoData | null
+  videoUrl: string
+  /** In-memory File waiting to be uploaded on save (matches image upload flow).
+   *  Not persisted — reset after save completes. */
+  videoPendingFile?: File | null
+  /** Object URL (blob:) for local video preview before upload */
+  videoPreviewUrl?: string
 }
 
 export const defaultForm: ProductFormData = {
@@ -43,6 +57,10 @@ export const defaultForm: ProductFormData = {
   featured: false,
   file: null,
   downloadUrl: '',
+  video: null,
+  videoUrl: '',
+  videoPendingFile: null,
+  videoPreviewUrl: '',
 }
 
 export function autoSlug(name: string) {
@@ -70,6 +88,7 @@ export default function ProductForm({
 }: ProductFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const productFileRef = useRef<HTMLInputElement>(null)
+  const videoFileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
@@ -140,6 +159,62 @@ export default function ProductForm({
     } catch {}
     setForm(prev => ({ ...prev, file: null }))
     toast.success('Đã xóa file sản phẩm')
+  }
+
+  function handleVideoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate by extension — Windows often leaves file.type empty for videos
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const allowedExts = ['mp4', 'webm', 'mov']
+    const isVideoType = file.type.startsWith('video/') || allowedExts.includes(ext)
+    if (!isVideoType) {
+      toast.error('Chỉ chấp nhận file video (MP4, WebM, MOV)')
+      return
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('File video quá lớn (tối đa 50MB). Hãy dùng link YouTube/Vimeo hoặc URL trực tiếp.')
+      return
+    }
+    if (file.size > 4.5 * 1024 * 1024) {
+      toast.warning('Video lớn hơn 4.5MB — trên Vercel Hobby có thể upload thất bại. Khuyến nghị dùng link YouTube/URL trực tiếp.')
+    }
+
+    // Revoke previous object URL to avoid memory leaks
+    if (form.videoPreviewUrl) URL.revokeObjectURL(form.videoPreviewUrl)
+
+    const previewUrl = URL.createObjectURL(file)
+    setForm(prev => ({
+      ...prev,
+      videoPendingFile: file,
+      videoPreviewUrl: previewUrl,
+      // Clear any stored R2 video — the new pending file will replace it on save
+      video: null,
+    }))
+    if (videoFileRef.current) videoFileRef.current.value = ''
+  }
+
+  async function handleRemoveVideo() {
+    // Delete from R2 if already uploaded; local pending file needs no API call
+    if (form.video?.r2Key) {
+      try {
+        await fetch('/api/upload/product-video', {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ r2Key: form.video.r2Key }),
+        })
+      } catch {}
+    }
+    if (form.videoPreviewUrl) URL.revokeObjectURL(form.videoPreviewUrl)
+    setForm(prev => ({
+      ...prev,
+      video: null,
+      videoPendingFile: null,
+      videoPreviewUrl: '',
+    }))
+    toast.success('Đã xóa video demo')
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -335,6 +410,100 @@ export default function ProductForm({
             <p className="text-[10px] text-muted-foreground mt-1">
               Ưu tiên dùng link tải trực tiếp. Nếu để trống, hệ thống sẽ dùng file upload R2 bên dưới.
             </p>
+          </div>
+
+          {/* Demo video URL */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium mb-1.5 block flex items-center gap-1">
+              <Video className="h-3.5 w-3.5 text-primary" />
+              Link video demo (YouTube, Vimeo, hoặc MP4 URL)
+            </label>
+            <Input
+              value={form.videoUrl}
+              onChange={(e) => setForm((p) => ({ ...p, videoUrl: e.target.value }))}
+              placeholder="https://youtu.be/... hoặc https://cdn.../demo.mp4"
+              className="bg-muted/50 font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Ưu tiên dùng link YouTube/Vimeo/MP4 URL. Nếu để trống, hệ thống sẽ dùng video upload R2 bên dưới.
+            </p>
+          </div>
+
+          {/* Demo video upload — local preview, uploads on save (same flow as image) */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium mb-1.5 block">Video demo (MP4/WebM/MOV — tùy chọn, dùng khi không có link)</label>
+            <div className="flex items-start gap-4">
+              {/* Local preview player (blob: for pending file, API stream for already-uploaded) */}
+              <div className="relative h-24 w-40 shrink-0 rounded-lg overflow-hidden bg-black border border-border flex items-center justify-center">
+                {form.videoPreviewUrl ? (
+                  <video
+                    src={form.videoPreviewUrl}
+                    controls
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                ) : form.video?.r2Key ? (
+                  <div className="text-center">
+                    <Video className="h-8 w-8 text-primary mx-auto mb-1" />
+                    <p className="text-[10px] text-muted-foreground">Đã lưu R2</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Video className="h-8 w-8 text-muted-foreground/50 mx-auto mb-1" />
+                    <p className="text-[10px] text-muted-foreground">Chưa có video</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={videoFileRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"
+                  onChange={handleVideoSelect}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => videoFileRef.current?.click()}
+                    disabled={saving}
+                  >
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    Chọn file video
+                  </Button>
+                  {(form.videoPendingFile || form.video?.r2Key) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveVideo}
+                      disabled={saving}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" /> Xóa
+                    </Button>
+                  )}
+                </div>
+
+                {form.videoPendingFile && (
+                  <p className="text-[11px] text-warning truncate">
+                    <strong>Sẵn sàng upload:</strong> {form.videoPendingFile.name} ({formatFileSize(form.videoPendingFile.size)}) — bấm <strong>Lưu</strong> để đẩy lên R2.
+                  </p>
+                )}
+
+                {!form.videoPendingFile && form.video?.r2Key && (
+                  <p className="text-[11px] text-success truncate">
+                    <strong>Đã lưu:</strong> {form.video.fileName} ({formatFileSize(form.video.fileSize)})
+                  </p>
+                )}
+
+                <p className="text-[10px] text-muted-foreground">
+                  MP4, WebM, MOV — khuyến nghị ≤ 4.5MB trên Vercel Hobby. Với video lớn, dùng link YouTube/URL trực tiếp.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Product file upload */}

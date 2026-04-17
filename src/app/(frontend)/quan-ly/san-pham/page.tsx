@@ -217,6 +217,13 @@ export default function ProductsPage() {
       fileSize: file.fileSize || 0,
       fileFormat: file.fileFormat || '',
     } : null
+    const video = 'video' in product ? product.video : undefined
+    const videoData = video?.r2Key ? {
+      r2Key: video.r2Key,
+      fileName: video.fileName || '',
+      fileSize: video.fileSize || 0,
+      mimeType: video.mimeType || 'video/mp4',
+    } : null
     setForm({
       name: product.name,
       slug: product.slug,
@@ -227,6 +234,8 @@ export default function ProductsPage() {
       featured: product.featured || false,
       file: fileData,
       downloadUrl: file?.downloadUrl || '',
+      video: videoData,
+      videoUrl: video?.url || '',
     })
     setShowForm(true)
   }
@@ -296,6 +305,52 @@ export default function ProductsPage() {
           filePayload.downloadUrl = form.downloadUrl.trim()
         }
 
+        // Upload pending video file (if any) — matches image flow: pick on
+        // select, push on save. Failures abort the whole save so user sees why.
+        let uploadedVideo = form.video
+        if (form.videoPendingFile) {
+          toast.loading('Đang upload video...', { id: 'video-upload' })
+          try {
+            const fd = new FormData()
+            fd.append('file', form.videoPendingFile)
+            fd.append('productSlug', productData.slug)
+            const res = await fetch('/api/upload/product-video', {
+              method: 'POST',
+              credentials: 'include',
+              body: fd,
+            })
+            toast.dismiss('video-upload')
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}))
+              toast.error(err.error || `Upload video thất bại (${res.status})`)
+              setSaving(false)
+              return
+            }
+            const data = await res.json()
+            uploadedVideo = {
+              r2Key: data.r2Key,
+              fileName: data.fileName,
+              fileSize: data.fileSize,
+              mimeType: data.mimeType,
+            }
+          } catch (err) {
+            toast.dismiss('video-upload')
+            toast.error('Lỗi kết nối khi upload video: ' + (err instanceof Error ? err.message : 'Unknown'))
+            setSaving(false)
+            return
+          }
+        }
+
+        // Build video group payload — always send (even empty) so clearing the
+        // fields persists; Payload will overwrite existing values.
+        const videoPayload: Record<string, unknown> = {
+          url: form.videoUrl.trim() || null,
+          r2Key: uploadedVideo?.r2Key || null,
+          fileName: uploadedVideo?.fileName || null,
+          fileSize: uploadedVideo?.fileSize || null,
+          mimeType: uploadedVideo?.mimeType || null,
+        }
+
         if (editingId) {
           // --- UPDATE existing product ---
           const payload: Record<string, unknown> = {
@@ -305,6 +360,7 @@ export default function ProductsPage() {
             pricing: productData.pricing,
             featured: productData.featured,
             category: categoryId,
+            video: videoPayload,
           }
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
@@ -320,6 +376,7 @@ export default function ProductsPage() {
             pricing: productData.pricing,
             featured: productData.featured,
             category: categoryId,
+            video: videoPayload,
           }
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
@@ -407,6 +464,10 @@ export default function ProductsPage() {
   }
 
   function handleCancel() {
+    // Release the blob: object URL from video preview to avoid memory leaks
+    if (form.videoPreviewUrl) {
+      try { URL.revokeObjectURL(form.videoPreviewUrl) } catch {}
+    }
     setShowForm(false)
     setEditingId(null)
     setEditingDemoId(null)

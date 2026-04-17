@@ -11,6 +11,7 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
   const preview = (doc.preview as Record<string, unknown>) || {}
   const category = (doc.category as Record<string, unknown>) || {}
   const fileGroup = (doc.file as Record<string, unknown>) || {}
+  const videoGroup = (doc.video as Record<string, unknown>) || {}
   const thumbnail = doc.thumbnail
   let thumbUrl = '/images/placeholder.jpg'
   // Prefer thumbnailUrl (R2/external) over Payload media thumbnail
@@ -41,6 +42,13 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
       fileSize: fileGroup.fileSize ? Number(fileGroup.fileSize) : undefined,
       fileFormat: fileGroup.fileFormat ? String(fileGroup.fileFormat) : undefined,
       downloadUrl: fileGroup.downloadUrl ? String(fileGroup.downloadUrl) : undefined,
+    },
+    video: {
+      url: videoGroup.url ? String(videoGroup.url) : undefined,
+      r2Key: videoGroup.r2Key ? String(videoGroup.r2Key) : undefined,
+      fileName: videoGroup.fileName ? String(videoGroup.fileName) : undefined,
+      fileSize: videoGroup.fileSize ? Number(videoGroup.fileSize) : undefined,
+      mimeType: videoGroup.mimeType ? String(videoGroup.mimeType) : undefined,
     },
     downloadCount: Number(doc.downloadCount || 0),
     featured: Boolean(doc.featured),

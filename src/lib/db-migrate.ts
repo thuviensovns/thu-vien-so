@@ -383,6 +383,35 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
         updated_at TIMESTAMPTZ DEFAULT NOW()
       )`,
     },
+    // Users.banned (commit 5fd91a7) — push:false means Payload won't auto-create
+    // the column; without it every login fails because Payload's SELECT includes it.
+    {
+      label: 'Add users.banned',
+      q: `ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT false`,
+    },
+    // === Product video demo (MP4 upload / external URL) ===
+    // Payload "video" group field — same push:false constraint means we must
+    // create the columns manually so Payload's SELECT includes them.
+    {
+      label: 'Add products.video_url',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_url VARCHAR`,
+    },
+    {
+      label: 'Add products.video_r2_key',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_r2_key VARCHAR`,
+    },
+    {
+      label: 'Add products.video_file_name',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_file_name VARCHAR`,
+    },
+    {
+      label: 'Add products.video_file_size',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_file_size NUMERIC`,
+    },
+    {
+      label: 'Add products.video_mime_type',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_mime_type VARCHAR`,
+    },
   ]
 
   for (const { label, q } of queries) {

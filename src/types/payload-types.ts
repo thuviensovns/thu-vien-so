@@ -87,6 +87,13 @@ export interface Product extends PayloadBase {
     musicalKey?: string | null
     duration?: number | null
   } | null
+  video?: {
+    url?: string | null
+    r2Key?: string | null
+    fileName?: string | null
+    fileSize?: number | null
+    mimeType?: string | null
+  } | null
   thumbnail?: number | Media | null
   thumbnailUrl?: string | null
   gallery?: Array<{ image?: number | Media | null; id?: string }> | null

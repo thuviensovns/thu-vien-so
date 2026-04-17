@@ -20,6 +20,10 @@ const AudioPreview = dynamic(
   () => import('@/components/audio/AudioPreview').then((mod) => mod.AudioPreview),
   { ssr: false }
 )
+const VideoPreview = dynamic(
+  () => import('@/components/product/VideoPreview').then((mod) => mod.VideoPreview),
+  { ssr: false }
+)
 import { typeLabels } from '@/lib/config'
 import { formatFileSize } from '@/lib/format'
 const categoryIcons: Record<string, typeof Music> = {
@@ -162,6 +166,17 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
                 </div>
               ) : null
             })()}
+
+            {/* Video Demo Preview */}
+            {(p.video?.url || p.video?.r2Key) && (
+              <VideoPreview
+                slug={slug}
+                url={p.video?.url}
+                r2Key={p.video?.r2Key}
+                mimeType={p.video?.mimeType}
+                title={p.name}
+              />
+            )}
 
             {/* Description */}
             <div className="mt-6">
