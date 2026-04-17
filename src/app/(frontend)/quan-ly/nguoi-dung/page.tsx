@@ -24,6 +24,7 @@ interface PayloadUser {
   displayName?: string
   role?: string
   balance?: number
+  banned?: boolean
   createdAt?: string
 }
 
@@ -106,6 +107,7 @@ export default function UsersPage() {
         displayName: u.displayName || '',
         role: (u.role as 'admin' | 'customer') || 'customer',
         balance: Number(u.balance || 0),
+        banned: Boolean(u.banned),
       }))
       setDbUsers(users)
     } catch (err) {
@@ -296,10 +298,20 @@ export default function UsersPage() {
     const user = allUsers.find((u) => u.id === userId)
     if (!user) return
     const newBanned = !user.banned
-    // Note: Payload Users collection may not have a 'banned' field — update locally for now
-    setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, banned: newBanned } : u))
-    logActivity('user', newBanned ? 'Khóa tài khoản' : 'Mở khóa tài khoản', user.email)
-    toast.success(newBanned ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản')
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ banned: newBanned }),
+      })
+      if (!res.ok) throw new Error('API error')
+      setDbUsers((prev) => prev.map((u) => u.id === userId ? { ...u, banned: newBanned } : u))
+      logActivity('user', newBanned ? 'Khóa tài khoản' : 'Mở khóa tài khoản', user.email)
+      toast.success(newBanned ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản')
+    } catch {
+      toast.error('Không thể cập nhật trạng thái tài khoản')
+    }
   }
 
   async function handleRoleChange(userId: string) {

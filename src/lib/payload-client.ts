@@ -120,7 +120,12 @@ export async function createProduct(data: Record<string, unknown>) {
   if (!res.ok) {
     const text = await res.text()
     console.error('[createProduct] HTTP', res.status, text.slice(0, 300))
-    try { return JSON.parse(text) } catch { return { message: `HTTP ${res.status}: ${text.slice(0, 200)}` } }
+    let errMsg = `HTTP ${res.status}`
+    try {
+      const parsed = JSON.parse(text)
+      errMsg = parsed.errors?.[0]?.message || parsed.message || errMsg
+    } catch { /* ignore */ }
+    throw new Error(errMsg)
   }
   return res.json()
 }
@@ -135,7 +140,12 @@ export async function updateProduct(id: string | number, data: Record<string, un
   if (!res.ok) {
     const text = await res.text()
     console.error('[updateProduct] HTTP', res.status, text.slice(0, 300))
-    try { return JSON.parse(text) } catch { return { message: `HTTP ${res.status}: ${text.slice(0, 200)}` } }
+    let errMsg = `HTTP ${res.status}`
+    try {
+      const parsed = JSON.parse(text)
+      errMsg = parsed.errors?.[0]?.message || parsed.message || errMsg
+    } catch { /* ignore */ }
+    throw new Error(errMsg)
   }
   return res.json()
 }
@@ -148,7 +158,12 @@ export async function deleteProduct(id: string | number) {
   })
   if (!res.ok) {
     const text = await res.text()
-    try { return JSON.parse(text) } catch { return { message: `HTTP ${res.status}: ${text.slice(0, 200)}` } }
+    let errMsg = `HTTP ${res.status}`
+    try {
+      const parsed = JSON.parse(text)
+      errMsg = parsed.errors?.[0]?.message || parsed.message || errMsg
+    } catch { /* ignore */ }
+    throw new Error(errMsg)
   }
   return res.json()
 }

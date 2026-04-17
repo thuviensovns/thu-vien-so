@@ -309,12 +309,7 @@ export default function ProductsPage() {
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
           if (Object.keys(filePayload).length > 0) payload.file = filePayload
-          const res = await updateProduct(editingId, payload)
-          if (!res.doc && !res.id) {
-            toast.error('Lỗi cập nhật: ' + (res.errors?.[0]?.message || res.message || 'Unknown'))
-            setSaving(false)
-            return
-          }
+          await updateProduct(editingId, payload)
           toast.success('Đã cập nhật sản phẩm')
         } else {
           // --- CREATE new product ---
@@ -329,25 +324,20 @@ export default function ProductsPage() {
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
           if (Object.keys(filePayload).length > 0) payload.file = filePayload
-          const res = await createProduct(payload)
-          if (!res.doc && !res.id) {
-            toast.error('Lỗi tạo: ' + (res.errors?.[0]?.message || res.message || 'Unknown'))
-            setSaving(false)
-            return
-          }
+          await createProduct(payload)
           toast.success('Đã thêm sản phẩm mới')
         }
 
         // Close form & reload products from DB
         handleCancel()
         await reloadDb()
-        setSaving(false)
       } catch (err) {
         console.error('[Save] Exception:', err)
-        toast.error('Lỗi kết nối database')
+        toast.error(err instanceof Error ? err.message : 'Lỗi kết nối database')
+      } finally {
         setSaving(false)
-        return
       }
+      return
     } else {
       // localStorage fallback mode
       if (editingDemoId) {
@@ -385,8 +375,8 @@ export default function ProductsPage() {
         await deletePayloadProduct(product.id)
         toast.success('Đã xóa sản phẩm')
         await reloadDb()
-      } catch {
-        toast.error('Lỗi xóa sản phẩm')
+      } catch (err) {
+        toast.error('Lỗi xóa sản phẩm: ' + (err instanceof Error ? err.message : 'Unknown'))
       }
       return
     }

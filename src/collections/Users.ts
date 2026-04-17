@@ -58,6 +58,15 @@ export const Users: CollectionConfig = {
         ],
       },
     },
+    {
+      name: 'banned',
+      type: 'checkbox',
+      defaultValue: false,
+      label: 'Bị khóa',
+      access: {
+        update: ({ req: { user } }) => user?.role === 'admin',
+      },
+    },
     { name: 'avatar', type: 'upload', relationTo: 'media' },
     {
       name: 'balance',
@@ -78,6 +87,13 @@ export const Users: CollectionConfig = {
     },
   ],
   hooks: {
+    afterLogin: [
+      ({ user }) => {
+        if (user.banned) {
+          throw new Error('Tài khoản của bạn đã bị khóa.')
+        }
+      },
+    ],
     afterChange: [
       async ({ doc, operation }) => {
         // On new user creation, provision an affiliate_accounts row with an

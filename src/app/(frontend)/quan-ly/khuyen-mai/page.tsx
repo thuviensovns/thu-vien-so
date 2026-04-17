@@ -100,12 +100,13 @@ export default function CouponPage() {
 
   async function handleToggle(id: number, currentActive: boolean) {
     try {
-      await fetch('/api/admin/coupons', {
+      const res = await fetch('/api/admin/coupons', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ id, active: !currentActive }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setCoupons((prev) => prev.map((c) => c.id === id ? { ...c, active: !currentActive } : c))
     } catch {
       toast.error('Lỗi cập nhật')
