@@ -100,51 +100,80 @@ export default function ProductForm({
       toast.error('File quá lớn (tối đa 50MB). Hãy dùng link tải trực tiếp cho file lớn hơn.')
       return
     }
-    if (file.size > 4.5 * 1024 * 1024) {
-      toast.warning('File lớn hơn 4.5MB — trên Vercel Hobby có thể upload thất bại. Khuyến nghị dùng link tải trực tiếp.')
-    }
 
     const slug = form.slug || autoSlug(form.name) || 'untitled'
     setUploading(true)
     setUploadProgress(`Đang upload ${file.name} (${formatFileSize(file.size)})...`)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('productSlug', slug)
-
-      const res = await fetch('/api/upload/product-file', {
+      // Step 1: ask server how to upload (presigned PUT vs direct POST)
+      const presignRes = await fetch('/api/upload/product-file/presign', {
         method: 'POST',
         credentials: 'include',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type || 'application/octet-stream',
+          productSlug: slug,
+        }),
       })
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        toast.error(data.error || `Upload thất bại (${res.status})`)
-        setUploading(false)
-        setUploadProgress('')
+      if (!presignRes.ok) {
+        const data = await presignRes.json().catch(() => ({}))
+        toast.error(data.error || `Lỗi xác nhận upload (${presignRes.status})`)
         return
       }
 
-      const data = await res.json()
+      const presign = await presignRes.json()
+
+      // Step 2: upload bytes via the route the server picked
+      if (presign.mode === 'presign') {
+        // Direct PUT to R2 — bypasses the Vercel 4.5MB function body limit
+        const putRes = await fetch(presign.url, {
+          method: 'PUT',
+          headers: { 'Content-Type': presign.contentType || 'application/octet-stream' },
+          body: file,
+        })
+        if (!putRes.ok) {
+          toast.error(`Upload R2 thất bại (${putRes.status}). Kiểm tra CORS bucket nếu chạy production.`)
+          return
+        }
+      } else {
+        // Local dev fallback: server proxies to local filesystem
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('productSlug', slug)
+        const res = await fetch('/api/upload/product-file', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          toast.error(data.error || `Upload thất bại (${res.status})`)
+          return
+        }
+      }
+
       setForm(prev => ({
         ...prev,
         file: {
-          r2Key: data.r2Key,
-          fileName: data.fileName,
-          fileSize: data.fileSize,
-          fileFormat: data.fileFormat,
+          r2Key: presign.r2Key,
+          fileName: presign.fileName,
+          fileSize: presign.fileSize,
+          fileFormat: presign.fileFormat,
         },
       }))
-      toast.success(`Đã upload: ${data.fileName}`)
-    } catch {
-      toast.error('Lỗi kết nối khi upload file')
+      toast.success(`Đã upload: ${presign.fileName}`)
+    } catch (err) {
+      toast.error('Lỗi kết nối khi upload file: ' + (err instanceof Error ? err.message : 'unknown'))
+    } finally {
+      setUploading(false)
+      setUploadProgress('')
+      // Reset input so same file can be re-selected
+      if (productFileRef.current) productFileRef.current.value = ''
     }
-    setUploading(false)
-    setUploadProgress('')
-    // Reset input so same file can be re-selected
-    if (productFileRef.current) productFileRef.current.value = ''
   }
 
   async function handleRemoveFile() {
@@ -503,7 +532,7 @@ export default function ProductForm({
                 )}
 
                 <p className="text-[10px] text-muted-foreground">
-                  MP4, WebM, MOV — khuyến nghị ≤ 4.5MB trên Vercel Hobby. Với video lớn, dùng link YouTube/URL trực tiếp.
+                  MP4, WebM, MOV — tối đa 50MB. Upload trực tiếp lên R2 (bypass giới hạn Vercel). Video dài nên dùng link YouTube/URL.
                 </p>
               </div>
             </div>
@@ -554,7 +583,7 @@ export default function ProductForm({
                   )}
                 </Button>
                 <p className="text-[10px] text-muted-foreground">
-                  ZIP, RAR, 7Z, FLP, WAV, MP3, MP4, FLAC, VST... — tối đa 50MB. Trên Vercel Hobby thực tế chỉ ~4.5MB, file lớn hơn nên dùng link tải bên trên.
+                  ZIP, RAR, 7Z, FLP, WAV, MP3, MP4, FLAC, VST... — tối đa 50MB. Upload trực tiếp lên R2 (bypass giới hạn Vercel 4.5MB).
                 </p>
               </div>
             )}

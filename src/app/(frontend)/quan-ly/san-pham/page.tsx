@@ -307,31 +307,70 @@ export default function ProductsPage() {
 
         // Upload pending video file (if any) — matches image flow: pick on
         // select, push on save. Failures abort the whole save so user sees why.
+        // Uses presigned PUT to bypass Vercel's 4.5MB serverless body limit.
         let uploadedVideo = form.video
         if (form.videoPendingFile) {
+          const videoFile = form.videoPendingFile
           toast.loading('Đang upload video...', { id: 'video-upload' })
           try {
-            const fd = new FormData()
-            fd.append('file', form.videoPendingFile)
-            fd.append('productSlug', productData.slug)
-            const res = await fetch('/api/upload/product-video', {
+            // Step 1: ask server how to upload (presigned vs direct)
+            const presignRes = await fetch('/api/upload/product-video/presign', {
               method: 'POST',
               credentials: 'include',
-              body: fd,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileName: videoFile.name,
+                fileSize: videoFile.size,
+                contentType: videoFile.type || 'video/mp4',
+                productSlug: productData.slug,
+              }),
             })
-            toast.dismiss('video-upload')
-            if (!res.ok) {
-              const err = await res.json().catch(() => ({}))
-              toast.error(err.error || `Upload video thất bại (${res.status})`)
+            if (!presignRes.ok) {
+              toast.dismiss('video-upload')
+              const err = await presignRes.json().catch(() => ({}))
+              toast.error(err.error || `Lỗi xác nhận upload video (${presignRes.status})`)
               setSaving(false)
               return
             }
-            const data = await res.json()
+            const presign = await presignRes.json()
+
+            // Step 2: upload bytes
+            if (presign.mode === 'presign') {
+              const putRes = await fetch(presign.url, {
+                method: 'PUT',
+                headers: { 'Content-Type': presign.contentType || 'video/mp4' },
+                body: videoFile,
+              })
+              if (!putRes.ok) {
+                toast.dismiss('video-upload')
+                toast.error(`Upload R2 video thất bại (${putRes.status}). Kiểm tra CORS bucket nếu chạy production.`)
+                setSaving(false)
+                return
+              }
+            } else {
+              const fd = new FormData()
+              fd.append('file', videoFile)
+              fd.append('productSlug', productData.slug)
+              const res = await fetch('/api/upload/product-video', {
+                method: 'POST',
+                credentials: 'include',
+                body: fd,
+              })
+              if (!res.ok) {
+                toast.dismiss('video-upload')
+                const err = await res.json().catch(() => ({}))
+                toast.error(err.error || `Upload video thất bại (${res.status})`)
+                setSaving(false)
+                return
+              }
+            }
+
+            toast.dismiss('video-upload')
             uploadedVideo = {
-              r2Key: data.r2Key,
-              fileName: data.fileName,
-              fileSize: data.fileSize,
-              mimeType: data.mimeType,
+              r2Key: presign.r2Key,
+              fileName: presign.fileName,
+              fileSize: presign.fileSize,
+              mimeType: presign.mimeType,
             }
           } catch (err) {
             toast.dismiss('video-upload')

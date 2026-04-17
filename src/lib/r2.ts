@@ -6,7 +6,7 @@ import path from 'node:path'
 // When R2 env vars are missing (typical for local dev), uploads/downloads/deletes
 // fall back to the local filesystem under public/uploads. Production always
 // configures R2, so this branch never runs there.
-function isR2Configured(): boolean {
+export function isR2Configured(): boolean {
   return !!(
     process.env.R2_ENDPOINT &&
     process.env.R2_ACCESS_KEY_ID &&
@@ -91,6 +91,32 @@ export async function uploadToR2(
     Body: body,
     ContentType: contentType,
   }))
+}
+
+/**
+ * Generate a presigned PUT URL so the browser can upload directly to R2 —
+ * required because Vercel serverless functions cap request body at 4.5MB.
+ * The signature locks the bucket+key+contentType; client must send matching
+ * Content-Type header on PUT.
+ * @param r2Key - Object key (path) in R2 bucket
+ * @param contentType - MIME the client will send (use 'application/octet-stream' if unknown)
+ * @param expiresIn - URL validity in seconds (default 600 = 10 min)
+ */
+export async function getPresignedUploadUrl(
+  r2Key: string,
+  contentType: string,
+  expiresIn = 600,
+): Promise<string> {
+  if (!isR2Configured()) {
+    throw new Error('R2 is not configured — presigned upload requires R2.')
+  }
+  const client = getR2Client()
+  const command = new PutObjectCommand({
+    Bucket: getBucketName(),
+    Key: r2Key,
+    ContentType: contentType,
+  })
+  return getSignedUrl(client, command, { expiresIn })
 }
 
 /**
