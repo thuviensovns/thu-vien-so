@@ -3,7 +3,7 @@ import { getPayloadForApi } from '@/lib/payload'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
-const ALLOWED_EXTENSIONS = ['zip', 'rar', '7z', 'flp', 'wav', 'mp3', 'flac', 'aif', 'aiff', 'mid', 'midi', 'fxp', 'fxb', 'nki', 'dll', 'vst3', 'au', 'component']
+const ALLOWED_EXTENSIONS = ['zip', 'rar', '7z', 'flp', 'wav', 'mp3', 'mp4', 'flac', 'aif', 'aiff', 'mid', 'midi', 'fxp', 'fxb', 'nki', 'dll', 'vst3', 'au', 'component']
 
 // Map extensions to allowed MIME types (prevents extension spoofing)
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
@@ -12,7 +12,8 @@ const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   '7z': ['application/x-7z-compressed'],
   flp: ['application/octet-stream'],
   wav: ['audio/wav', 'audio/x-wav', 'audio/wave'],
-  mp3: ['audio/mpeg', 'audio/mp3'],
+  mp3: ['audio/mpeg', 'audio/mp3', 'audio/x-mpeg', 'audio/mpeg3', 'audio/x-mp3'],
+  mp4: ['video/mp4', 'audio/mp4', 'application/mp4'],
   flac: ['audio/flac', 'audio/x-flac'],
   aif: ['audio/aiff', 'audio/x-aiff'],
   aiff: ['audio/aiff', 'audio/x-aiff'],
@@ -86,7 +87,8 @@ export async function POST(req: NextRequest) {
     })
   } catch (error) {
     console.error('[Upload] Error:', error)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    const msg = error instanceof Error ? error.message : 'Upload failed'
+    return NextResponse.json({ error: `Upload thất bại: ${msg}` }, { status: 500 })
   }
 }
 

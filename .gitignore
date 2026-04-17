@@ -52,6 +52,9 @@ desktop.ini
 src/types/payload-types.ts
 media/
 
+# Local upload fallback (dev only — when R2 not configured)
+public/uploads/
+
 # Vercel
 .vercel
 

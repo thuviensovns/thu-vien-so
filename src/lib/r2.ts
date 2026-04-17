@@ -1,5 +1,19 @@
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { mkdir, writeFile, unlink } from 'node:fs/promises'
+import path from 'node:path'
+
+// When R2 env vars are missing (typical for local dev), uploads/downloads/deletes
+// fall back to the local filesystem under public/uploads. Production always
+// configures R2, so this branch never runs there.
+function isR2Configured(): boolean {
+  return !!(
+    process.env.R2_ENDPOINT &&
+    process.env.R2_ACCESS_KEY_ID &&
+    process.env.R2_SECRET_ACCESS_KEY &&
+    process.env.R2_BUCKET_NAME
+  )
+}
 
 function getR2Client() {
   const endpoint = process.env.R2_ENDPOINT
@@ -21,6 +35,17 @@ function getBucketName(): string {
   return bucket
 }
 
+function getLocalPath(r2Key: string): string {
+  // Sanitize: prevent path traversal (../) escapes from public/uploads/
+  const safe = r2Key.replace(/\\/g, '/').split('/').filter(p => p && p !== '..' && p !== '.').join('/')
+  return path.join(process.cwd(), 'public', 'uploads', safe)
+}
+
+function getLocalPublicUrl(r2Key: string): string {
+  const safe = r2Key.replace(/\\/g, '/').split('/').filter(p => p && p !== '..' && p !== '.').join('/')
+  return `/uploads/${safe}`
+}
+
 /**
  * Generate a signed download URL for a file in R2
  * @param r2Key - Object key in R2 bucket
@@ -30,6 +55,9 @@ export async function generateDownloadUrl(
   r2Key: string,
   expiresIn = 172800,
 ): Promise<string> {
+  if (!isR2Configured()) {
+    return getLocalPublicUrl(r2Key)
+  }
   const client = getR2Client()
   const command = new GetObjectCommand({
     Bucket: getBucketName(),
@@ -49,6 +77,13 @@ export async function uploadToR2(
   body: Buffer,
   contentType: string,
 ): Promise<void> {
+  if (!isR2Configured()) {
+    const target = getLocalPath(r2Key)
+    await mkdir(path.dirname(target), { recursive: true })
+    await writeFile(target, body)
+    console.log(`[Storage] R2 not configured — wrote ${(body.length / 1024 / 1024).toFixed(1)}MB to local: ${target}`)
+    return
+  }
   const client = getR2Client()
   await client.send(new PutObjectCommand({
     Bucket: getBucketName(),
@@ -63,6 +98,15 @@ export async function uploadToR2(
  * @param r2Key - Object key to delete
  */
 export async function deleteFromR2(r2Key: string): Promise<void> {
+  if (!isR2Configured()) {
+    try {
+      await unlink(getLocalPath(r2Key))
+    } catch (e: unknown) {
+      // Ignore "file not found" — idempotent delete
+      if ((e as NodeJS.ErrnoException)?.code !== 'ENOENT') throw e
+    }
+    return
+  }
   const client = getR2Client()
   await client.send(new DeleteObjectCommand({
     Bucket: getBucketName(),

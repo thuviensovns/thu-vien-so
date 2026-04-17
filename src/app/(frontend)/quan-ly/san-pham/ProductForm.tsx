@@ -96,9 +96,12 @@ export default function ProductForm({
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (file.size > 4.5 * 1024 * 1024) {
-      toast.error('File quá lớn (tối đa 4.5MB trên Vercel Hobby). Hãy dùng link tải trực tiếp.')
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('File quá lớn (tối đa 50MB). Hãy dùng link tải trực tiếp cho file lớn hơn.')
       return
+    }
+    if (file.size > 4.5 * 1024 * 1024) {
+      toast.warning('File lớn hơn 4.5MB — trên Vercel Hobby có thể upload thất bại. Khuyến nghị dùng link tải trực tiếp.')
     }
 
     const slug = form.slug || autoSlug(form.name) || 'untitled'
@@ -533,7 +536,7 @@ export default function ProductForm({
                 <input
                   ref={productFileRef}
                   type="file"
-                  accept=".zip,.rar,.7z,.flp,.wav,.mp3,.flac,.aif,.aiff,.mid,.midi,.fxp,.fxb,.nki,.dll,.vst3,.au,.component"
+                  accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/flac,audio/aiff,audio/midi,video/mp4,application/zip,application/x-rar-compressed,application/x-7z-compressed,.zip,.rar,.7z,.flp,.wav,.mp3,.mp4,.flac,.aif,.aiff,.mid,.midi,.fxp,.fxb,.nki,.dll,.vst3,.au,.component"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -551,7 +554,7 @@ export default function ProductForm({
                   )}
                 </Button>
                 <p className="text-[10px] text-muted-foreground">
-                  ZIP, RAR, 7Z, FLP, WAV, MP3, FLAC, VST... — tối đa 4.5MB (Vercel Hobby). Dùng link tải bên trên cho file lớn.
+                  ZIP, RAR, 7Z, FLP, WAV, MP3, MP4, FLAC, VST... — tối đa 50MB. Trên Vercel Hobby thực tế chỉ ~4.5MB, file lớn hơn nên dùng link tải bên trên.
                 </p>
               </div>
             )}
