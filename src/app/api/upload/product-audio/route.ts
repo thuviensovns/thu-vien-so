@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 // Vercel Hobby caps request body at 4.5MB. For larger audio files, admins
 // should use Vercel Blob (client-upload) or R2 presigned PUT.
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB (self-hosted ceiling)

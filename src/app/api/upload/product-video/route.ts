@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 // Vercel Hobby caps request body at 4.5MB. Keep admins on external URLs for
 // larger demo clips — the UI warns before the file hits the API.
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB (self-hosted ceiling)

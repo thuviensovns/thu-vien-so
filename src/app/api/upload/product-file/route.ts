@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 
+export const maxDuration = 60
+export const dynamic = 'force-dynamic'
+
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500MB
 const ALLOWED_EXTENSIONS = ['zip', 'rar', '7z', 'flp', 'wav', 'mp3', 'mp4', 'flac', 'aif', 'aiff', 'mid', 'midi', 'fxp', 'fxb', 'nki', 'dll', 'vst3', 'au', 'component']
 

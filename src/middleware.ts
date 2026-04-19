@@ -8,6 +8,11 @@ export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname
   const isApi = pathname.startsWith('/api/')
 
+  // Skip middleware entirely for file-upload routes. Middleware's client body
+  // limit (1MB default in Next.js 15) silently truncates larger bodies, which
+  // causes req.formData() in the route handler to hang on MP3/MP4 uploads.
+  if (pathname.startsWith('/api/upload/')) return NextResponse.next()
+
   cleanupStaleEntries()
 
   // Skip ALL middleware processing for Payload REST API routes

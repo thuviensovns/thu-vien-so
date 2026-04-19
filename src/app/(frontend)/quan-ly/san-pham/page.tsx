@@ -396,6 +396,11 @@ export default function ProductsPage() {
                 setSaving(false)
                 return
               }
+              // Server generates its own r2Key with a fresh timestamp; must
+              // use that, not presign.r2Key, or the saved record points at a
+              // non-existent file.
+              const saved = await res.json().catch(() => null) as { r2Key?: string } | null
+              if (saved?.r2Key) videoStorageKey = saved.r2Key
             }
 
             toast.dismiss('video-upload')
@@ -491,6 +496,8 @@ export default function ProductsPage() {
                 setSaving(false)
                 return
               }
+              const saved = await res.json().catch(() => null) as { r2Key?: string } | null
+              if (saved?.r2Key) audioStorageKey = saved.r2Key
             }
 
             toast.dismiss('audio-upload')

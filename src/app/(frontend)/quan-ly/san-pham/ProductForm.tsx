@@ -192,6 +192,10 @@ export default function ProductForm({
           toast.error(data.error || `Upload thất bại (${res.status})`)
           return
         }
+        // Use the server's actual r2Key (it generates its own timestamp)
+        // so the stored path matches where the file landed on disk.
+        const saved = await res.json().catch(() => null) as { r2Key?: string } | null
+        if (saved?.r2Key) storageKey = saved.r2Key
       }
 
       setForm(prev => ({
