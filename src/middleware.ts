@@ -93,9 +93,14 @@ export function middleware(req: NextRequest) {
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ''}${isAIToolPage ? ' https://cdn.jsdelivr.net blob:' : ''}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com",
+      "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.public.blob.vercel-storage.com https://i.ytimg.com",
       "font-src 'self' data:",
-      `connect-src 'self' https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.trycloudflare.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
+      // @vercel/blob client-upload POSTs file bytes to https://vercel.com/api/blob
+      // (the ingest endpoint); without it in connect-src the browser silently
+      // blocks the request and upload hangs forever at 0%.
+      `connect-src 'self' https://vercel.com https://blob.vercel-storage.com https://*.public.blob.vercel-storage.com https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.trycloudflare.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
+      // Local file previews use blob: URLs; served media streams from R2/Blob
+      "media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.public.blob.vercel-storage.com",
       `worker-src 'self'${isAIToolPage ? ' blob:' : ''}`,
       "frame-src 'self' https://www.youtube.com",
       "object-src 'none'",
