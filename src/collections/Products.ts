@@ -97,7 +97,19 @@ export const Products: CollectionConfig = {
       type: 'group',
       label: 'Preview âm thanh',
       fields: [
-        { name: 'audioFile', type: 'upload', relationTo: 'media', label: 'File audio preview' },
+        { name: 'audioFile', type: 'upload', relationTo: 'media', label: 'File audio preview (Payload Media — legacy)' },
+        {
+          name: 'audioUrl',
+          type: 'text',
+          label: 'URL audio demo (R2/Blob/External)',
+          admin: {
+            description: 'Dán link audio trực tiếp (mp3/wav/flac...). Ưu tiên dùng trước audioFile. Để trống nếu upload qua R2/Blob.',
+          },
+        },
+        { name: 'audioR2Key', type: 'text', label: 'R2/Blob Key', admin: { description: 'Storage key khi upload qua R2/Vercel Blob' } },
+        { name: 'audioFileName', type: 'text', label: 'Tên file audio' },
+        { name: 'audioFileSize', type: 'number', label: 'Dung lượng audio (bytes)' },
+        { name: 'audioMimeType', type: 'text', label: 'MIME type (audio/mpeg...)' },
         { name: 'bpm', type: 'number', label: 'BPM' },
         { name: 'musicalKey', type: 'text', label: 'Key (Am, C#...)' },
         { name: 'duration', type: 'number', label: 'Thời lượng (giây)' },

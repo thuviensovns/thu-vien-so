@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2, Video,
+  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2, Video, Music,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,13 @@ export interface VideoData {
   mimeType: string
 }
 
+export interface AudioData {
+  r2Key: string
+  fileName: string
+  fileSize: number
+  mimeType: string
+}
+
 export interface ProductFormData {
   name: string
   slug: string
@@ -45,6 +52,13 @@ export interface ProductFormData {
   videoPendingFile?: File | null
   /** Object URL (blob:) for local video preview before upload */
   videoPreviewUrl?: string
+  /** Audio demo — direct URL (YouTube-free; any mp3/wav host) */
+  audio: AudioData | null
+  audioUrl: string
+  audioPendingFile?: File | null
+  audioPreviewUrl?: string
+  bpm: string
+  musicalKey: string
 }
 
 export const defaultForm: ProductFormData = {
@@ -61,6 +75,12 @@ export const defaultForm: ProductFormData = {
   videoUrl: '',
   videoPendingFile: null,
   videoPreviewUrl: '',
+  audio: null,
+  audioUrl: '',
+  audioPendingFile: null,
+  audioPreviewUrl: '',
+  bpm: '',
+  musicalKey: '',
 }
 
 export function autoSlug(name: string) {
@@ -89,6 +109,7 @@ export default function ProductForm({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const productFileRef = useRef<HTMLInputElement>(null)
   const videoFileRef = useRef<HTMLInputElement>(null)
+  const audioFileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState('')
 
@@ -264,6 +285,58 @@ export default function ProductForm({
       videoPreviewUrl: '',
     }))
     toast.success('Đã xóa video demo')
+  }
+
+  function handleAudioSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || ''
+    const allowedExts = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'oga', 'webm']
+    const isAudioType = file.type.startsWith('audio/') || allowedExts.includes(ext)
+    if (!isAudioType) {
+      toast.error('Chỉ chấp nhận file audio (MP3, WAV, FLAC, AAC, M4A, OGG)')
+      return
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('File audio quá lớn (tối đa 50MB). Hãy dùng link URL trực tiếp.')
+      return
+    }
+    if (file.size > 4.5 * 1024 * 1024) {
+      toast.warning('Audio lớn hơn 4.5MB — sẽ upload qua Vercel Blob (bypass giới hạn 4.5MB của Vercel).')
+    }
+
+    if (form.audioPreviewUrl) URL.revokeObjectURL(form.audioPreviewUrl)
+
+    const previewUrl = URL.createObjectURL(file)
+    setForm(prev => ({
+      ...prev,
+      audioPendingFile: file,
+      audioPreviewUrl: previewUrl,
+      audio: null,
+    }))
+    if (audioFileRef.current) audioFileRef.current.value = ''
+  }
+
+  async function handleRemoveAudio() {
+    if (form.audio?.r2Key) {
+      try {
+        await fetch('/api/upload/product-audio', {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ r2Key: form.audio.r2Key }),
+        })
+      } catch {}
+    }
+    if (form.audioPreviewUrl) URL.revokeObjectURL(form.audioPreviewUrl)
+    setForm(prev => ({
+      ...prev,
+      audio: null,
+      audioPendingFile: null,
+      audioPreviewUrl: '',
+    }))
+    toast.success('Đã xóa audio demo')
   }
 
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -551,6 +624,124 @@ export default function ProductForm({
                 <p className="text-[10px] text-muted-foreground">
                   MP4, WebM, MOV — tối đa 50MB. Upload trực tiếp lên R2 (bypass giới hạn Vercel). Video dài nên dùng link YouTube/URL.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Demo audio URL */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium mb-1.5 block flex items-center gap-1">
+              <Music className="h-3.5 w-3.5 text-primary" />
+              Link audio demo (MP3 / WAV / FLAC URL)
+            </label>
+            <Input
+              value={form.audioUrl}
+              onChange={(e) => setForm((p) => ({ ...p, audioUrl: e.target.value }))}
+              placeholder="https://cdn.../preview.mp3"
+              className="bg-muted/50 font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Ưu tiên dùng link audio trực tiếp. Nếu để trống, hệ thống sẽ dùng file audio upload bên dưới.
+            </p>
+          </div>
+
+          {/* Demo audio upload — local preview, uploads on save (same flow as video) */}
+          <div className="sm:col-span-2">
+            <label className="text-xs font-medium mb-1.5 block">Audio demo (MP3/WAV/FLAC — tùy chọn, dùng khi không có link)</label>
+            <div className="flex items-start gap-4">
+              {/* Local preview player (blob: for pending file, audio URL for already-uploaded) */}
+              <div className="relative h-24 w-40 shrink-0 rounded-lg overflow-hidden bg-black border border-border flex items-center justify-center p-2">
+                {form.audioPreviewUrl ? (
+                  <audio
+                    src={form.audioPreviewUrl}
+                    controls
+                    className="w-full"
+                  />
+                ) : form.audio?.r2Key ? (
+                  <div className="text-center">
+                    <Music className="h-8 w-8 text-primary mx-auto mb-1" />
+                    <p className="text-[10px] text-muted-foreground">Đã lưu</p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Music className="h-8 w-8 text-muted-foreground/50 mx-auto mb-1" />
+                    <p className="text-[10px] text-muted-foreground">Chưa có audio</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={audioFileRef}
+                  type="file"
+                  accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/flac,audio/aac,audio/mp4,audio/ogg,audio/webm,.mp3,.wav,.flac,.aac,.m4a,.ogg,.oga,.webm"
+                  onChange={handleAudioSelect}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => audioFileRef.current?.click()}
+                    disabled={saving}
+                  >
+                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                    Chọn file audio
+                  </Button>
+                  {(form.audioPendingFile || form.audio?.r2Key) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveAudio}
+                      disabled={saving}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" /> Xóa
+                    </Button>
+                  )}
+                </div>
+
+                {form.audioPendingFile && (
+                  <p className="text-[11px] text-warning truncate">
+                    <strong>Sẵn sàng upload:</strong> {form.audioPendingFile.name} ({formatFileSize(form.audioPendingFile.size)}) — bấm <strong>Lưu</strong> để đẩy lên.
+                  </p>
+                )}
+
+                {!form.audioPendingFile && form.audio?.r2Key && (
+                  <p className="text-[11px] text-success truncate">
+                    <strong>Đã lưu:</strong> {form.audio.fileName} ({formatFileSize(form.audio.fileSize)})
+                  </p>
+                )}
+
+                <p className="text-[10px] text-muted-foreground">
+                  MP3, WAV, FLAC, AAC, M4A, OGG — tối đa 50MB. Upload trực tiếp lên Vercel Blob (bypass giới hạn 4.5MB).
+                </p>
+              </div>
+            </div>
+
+            {/* BPM / Key quick metadata */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">BPM (tùy chọn)</label>
+                <Input
+                  type="number"
+                  value={form.bpm}
+                  onChange={(e) => setForm((p) => ({ ...p, bpm: e.target.value }))}
+                  placeholder="VD: 128"
+                  className="bg-muted/50 font-mono text-xs h-8"
+                  min={0}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-1 block">Key (tùy chọn)</label>
+                <Input
+                  value={form.musicalKey}
+                  onChange={(e) => setForm((p) => ({ ...p, musicalKey: e.target.value }))}
+                  placeholder="VD: Am, C#"
+                  className="bg-muted/50 font-mono text-xs h-8"
+                />
               </div>
             </div>
           </div>

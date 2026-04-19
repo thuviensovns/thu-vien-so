@@ -35,6 +35,11 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
     preview: {
       bpm: preview.bpm ? Number(preview.bpm) : null,
       musicalKey: preview.musicalKey ? String(preview.musicalKey) : null,
+      audioUrl: preview.audioUrl ? String(preview.audioUrl) : undefined,
+      audioR2Key: preview.audioR2Key ? String(preview.audioR2Key) : undefined,
+      audioFileName: preview.audioFileName ? String(preview.audioFileName) : undefined,
+      audioFileSize: preview.audioFileSize ? Number(preview.audioFileSize) : undefined,
+      audioMimeType: preview.audioMimeType ? String(preview.audioMimeType) : undefined,
     },
     file: {
       r2Key: fileGroup.r2Key ? String(fileGroup.r2Key) : undefined,

@@ -224,6 +224,17 @@ export default function ProductsPage() {
       fileSize: video.fileSize || 0,
       mimeType: video.mimeType || 'video/mp4',
     } : null
+    const preview = 'preview' in product ? product.preview : undefined
+    const audioR2Key = preview?.audioR2Key || ''
+    const audioData = audioR2Key ? {
+      r2Key: audioR2Key,
+      fileName: preview?.audioFileName || '',
+      fileSize: preview?.audioFileSize || 0,
+      mimeType: preview?.audioMimeType || 'audio/mpeg',
+    } : null
+    const audioUrlValue = preview?.audioUrl || ''
+    const bpmValue = preview?.bpm != null ? String(preview.bpm) : ''
+    const keyValue = preview?.musicalKey || ''
     setForm({
       name: product.name,
       slug: product.slug,
@@ -236,6 +247,14 @@ export default function ProductsPage() {
       downloadUrl: file?.downloadUrl || '',
       video: videoData,
       videoUrl: video?.url || '',
+      videoPendingFile: null,
+      videoPreviewUrl: '',
+      audio: audioData,
+      audioUrl: audioUrlValue,
+      audioPendingFile: null,
+      audioPreviewUrl: '',
+      bpm: bpmValue,
+      musicalKey: keyValue,
     })
     setShowForm(true)
   }
@@ -404,6 +423,103 @@ export default function ProductsPage() {
           mimeType: uploadedVideo?.mimeType || null,
         }
 
+        // Upload pending audio file (mirrors video flow). Failures abort save.
+        let uploadedAudio = form.audio
+        if (form.audioPendingFile) {
+          const audioFile = form.audioPendingFile
+          toast.loading('Đang upload audio...', { id: 'audio-upload' })
+          try {
+            const presignRes = await fetch('/api/upload/product-audio/presign', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                fileName: audioFile.name,
+                fileSize: audioFile.size,
+                contentType: audioFile.type || 'audio/mpeg',
+                productSlug: productData.slug,
+              }),
+            })
+            if (!presignRes.ok) {
+              toast.dismiss('audio-upload')
+              const err = await presignRes.json().catch(() => ({}))
+              toast.error(err.error || `Lỗi xác nhận upload audio (${presignRes.status})`)
+              setSaving(false)
+              return
+            }
+            const presign = await presignRes.json()
+
+            let audioStorageKey: string = presign.r2Key
+            if (presign.mode === 'blob') {
+              const { upload } = await import('@vercel/blob/client')
+              const blob = await upload(presign.pathname, audioFile, {
+                access: 'public',
+                handleUploadUrl: presign.handshakeUrl,
+                contentType: presign.contentType || audioFile.type || 'audio/mpeg',
+                multipart: true,
+                onUploadProgress: ({ loaded, total }) => {
+                  const pct = total ? Math.round((loaded / total) * 100) : 0
+                  toast.loading(`Upload audio ${pct}%...`, { id: 'audio-upload' })
+                },
+              })
+              audioStorageKey = blob.url
+            } else if (presign.mode === 'presign') {
+              const putRes = await fetch(presign.url, {
+                method: 'PUT',
+                headers: { 'Content-Type': presign.contentType || 'audio/mpeg' },
+                body: audioFile,
+              })
+              if (!putRes.ok) {
+                toast.dismiss('audio-upload')
+                toast.error(`Upload R2 audio thất bại (${putRes.status}). Kiểm tra CORS bucket nếu chạy production.`)
+                setSaving(false)
+                return
+              }
+            } else {
+              const fd = new FormData()
+              fd.append('file', audioFile)
+              fd.append('productSlug', productData.slug)
+              const res = await fetch('/api/upload/product-audio', {
+                method: 'POST',
+                credentials: 'include',
+                body: fd,
+              })
+              if (!res.ok) {
+                toast.dismiss('audio-upload')
+                const err = await res.json().catch(() => ({}))
+                toast.error(err.error || `Upload audio thất bại (${res.status})`)
+                setSaving(false)
+                return
+              }
+            }
+
+            toast.dismiss('audio-upload')
+            uploadedAudio = {
+              r2Key: audioStorageKey,
+              fileName: presign.fileName,
+              fileSize: presign.fileSize,
+              mimeType: presign.mimeType,
+            }
+          } catch (err) {
+            toast.dismiss('audio-upload')
+            toast.error('Lỗi kết nối khi upload audio: ' + (err instanceof Error ? err.message : 'Unknown'))
+            setSaving(false)
+            return
+          }
+        }
+
+        // Build preview group payload — always send so clearing persists.
+        const bpmValue = form.bpm.trim() ? Number(form.bpm) : null
+        const previewPayload: Record<string, unknown> = {
+          audioUrl: form.audioUrl.trim() || null,
+          audioR2Key: uploadedAudio?.r2Key || null,
+          audioFileName: uploadedAudio?.fileName || null,
+          audioFileSize: uploadedAudio?.fileSize || null,
+          audioMimeType: uploadedAudio?.mimeType || null,
+          bpm: Number.isFinite(bpmValue) ? bpmValue : null,
+          musicalKey: form.musicalKey.trim() || null,
+        }
+
         if (editingId) {
           // --- UPDATE existing product ---
           const payload: Record<string, unknown> = {
@@ -414,6 +530,7 @@ export default function ProductsPage() {
             featured: productData.featured,
             category: categoryId,
             video: videoPayload,
+            preview: previewPayload,
           }
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
@@ -430,6 +547,7 @@ export default function ProductsPage() {
             featured: productData.featured,
             category: categoryId,
             video: videoPayload,
+            preview: previewPayload,
           }
           if (typeof thumbnailResult === 'number') payload.thumbnail = thumbnailResult
           if (typeof thumbnailResult === 'string') payload.thumbnailUrl = thumbnailResult
@@ -517,9 +635,12 @@ export default function ProductsPage() {
   }
 
   function handleCancel() {
-    // Release the blob: object URL from video preview to avoid memory leaks
+    // Release the blob: object URL from video/audio previews to avoid memory leaks
     if (form.videoPreviewUrl) {
       try { URL.revokeObjectURL(form.videoPreviewUrl) } catch {}
+    }
+    if (form.audioPreviewUrl) {
+      try { URL.revokeObjectURL(form.audioPreviewUrl) } catch {}
     }
     setShowForm(false)
     setEditingId(null)

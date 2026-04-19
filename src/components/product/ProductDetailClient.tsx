@@ -155,11 +155,16 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
               </div>
             </div>
 
-            {/* Audio Preview */}
-            {p.preview?.audioFile && (() => {
-              const audioUrl =
-                typeof p.preview.audioFile === 'object' && p.preview.audioFile?.url
-                  ? p.preview.audioFile.url : null
+            {/* Audio Preview — prefer direct URL (audioUrl/audioR2Key) over legacy Media relation */}
+            {(() => {
+              const directUrl =
+                (typeof p.preview?.audioUrl === 'string' && p.preview.audioUrl) ||
+                (typeof p.preview?.audioR2Key === 'string' && p.preview.audioR2Key) ||
+                ''
+              const mediaUrl =
+                typeof p.preview?.audioFile === 'object' && p.preview.audioFile?.url
+                  ? p.preview.audioFile.url : ''
+              const audioUrl = directUrl || mediaUrl
               return audioUrl ? (
                 <div className="mt-4">
                   <AudioPreview src={audioUrl} bpm={p.preview?.bpm} musicalKey={p.preview?.musicalKey} duration={p.preview?.duration} />

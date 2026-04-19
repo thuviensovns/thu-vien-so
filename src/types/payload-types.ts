@@ -83,6 +83,11 @@ export interface Product extends PayloadBase {
   } | null
   preview?: {
     audioFile?: number | Media | null
+    audioUrl?: string | null
+    audioR2Key?: string | null
+    audioFileName?: string | null
+    audioFileSize?: number | null
+    audioMimeType?: string | null
     bpm?: number | null
     musicalKey?: string | null
     duration?: number | null

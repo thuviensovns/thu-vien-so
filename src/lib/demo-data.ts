@@ -9,7 +9,10 @@ export interface DemoProduct {
   thumbnail: { url: string }
   thumbnailUrl?: string
   pricing: { price: number; originalPrice?: number | null; isFree?: boolean }
-  preview?: { bpm?: number | null; musicalKey?: string | null; audioFile?: { url: string } | null; duration?: number | null }
+  preview?: {
+    bpm?: number | null; musicalKey?: string | null; audioFile?: { url: string } | null; duration?: number | null;
+    audioUrl?: string; audioR2Key?: string; audioFileName?: string; audioFileSize?: number; audioMimeType?: string;
+  }
   downloadCount: number
   featured?: boolean
   category?: { slug: string; name: string }
