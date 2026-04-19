@@ -808,11 +808,16 @@ export default function ProductForm({
         <Separator />
 
         <div className="flex gap-2">
-          <Button size="sm" onClick={onSave} disabled={saving}>
+          <Button size="sm" onClick={onSave} disabled={saving || uploading}>
             {saving ? (
               <span className="flex items-center gap-1.5">
                 <span className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Đang lưu...
+              </span>
+            ) : uploading ? (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Đang upload file sản phẩm...
               </span>
             ) : (
               <>
@@ -822,12 +827,12 @@ export default function ProductForm({
             )}
           </Button>
           {editingDemoId && onRestoreOriginal && (
-            <Button size="sm" variant="outline" onClick={() => { onRestoreOriginal(editingDemoId); onCancel() }}>
+            <Button size="sm" variant="outline" onClick={() => { onRestoreOriginal(editingDemoId); onCancel() }} disabled={saving || uploading}>
               <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
               Khôi phục gốc
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={onCancel}>
+          <Button size="sm" variant="outline" onClick={onCancel} disabled={saving || uploading}>
             Hủy
           </Button>
         </div>
