@@ -357,11 +357,15 @@ export default function ProductsPage() {
             let videoStorageKey: string = presign.r2Key
             if (presign.mode === 'blob') {
               const { upload } = await import('@vercel/blob/client')
+              // Multipart requires parts ≥5MB (S3 rule). Enable only for files
+              // above that threshold — smaller ones hang when the single part
+              // is rejected as undersized.
+              const useMultipart = videoFile.size > 5 * 1024 * 1024
               const blob = await upload(presign.pathname, videoFile, {
                 access: 'public',
                 handleUploadUrl: presign.handshakeUrl,
                 contentType: presign.contentType || videoFile.type || 'video/mp4',
-                multipart: true,
+                multipart: useMultipart,
                 onUploadProgress: ({ loaded, total }) => {
                   const pct = total ? Math.round((loaded / total) * 100) : 0
                   toast.loading(`Upload video ${pct}%...`, { id: 'video-upload' })
@@ -457,11 +461,12 @@ export default function ProductsPage() {
             let audioStorageKey: string = presign.r2Key
             if (presign.mode === 'blob') {
               const { upload } = await import('@vercel/blob/client')
+              const useMultipart = audioFile.size > 5 * 1024 * 1024
               const blob = await upload(presign.pathname, audioFile, {
                 access: 'public',
                 handleUploadUrl: presign.handshakeUrl,
                 contentType: presign.contentType || audioFile.type || 'audio/mpeg',
-                multipart: true,
+                multipart: useMultipart,
                 onUploadProgress: ({ loaded, total }) => {
                   const pct = total ? Math.round((loaded / total) * 100) : 0
                   toast.loading(`Upload audio ${pct}%...`, { id: 'audio-upload' })

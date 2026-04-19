@@ -155,11 +155,14 @@ export default function ProductForm({
         // Vercel Blob client upload — streams directly to Blob storage,
         // bypassing the Vercel 4.5MB function body limit.
         const { upload } = await import('@vercel/blob/client')
+        // Multipart parts must be ≥5MB (S3 rule); smaller files hang
+        // because the single chunk is rejected as undersized.
+        const useMultipart = file.size > 5 * 1024 * 1024
         const blob = await upload(presign.pathname, file, {
           access: 'public',
           handleUploadUrl: presign.handshakeUrl,
           contentType: presign.contentType || file.type || 'application/octet-stream',
-          multipart: true,
+          multipart: useMultipart,
           onUploadProgress: ({ loaded, total }) => {
             const pct = total ? Math.round((loaded / total) * 100) : 0
             setUploadProgress(`Đang upload ${file.name} — ${pct}% (${formatFileSize(loaded)}/${formatFileSize(total || file.size)})`)
