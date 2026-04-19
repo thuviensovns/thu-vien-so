@@ -49,7 +49,19 @@ export async function GET() {
     })
   } catch (error) {
     result.status = 'error'
-    result.error = (error as Error).message
+    const err = error as Error & { code?: string; cause?: unknown }
+    result.error = err.message
+    if (err.code) result.errorCode = err.code
+    if (err.cause) {
+      const cause = err.cause as Error & { code?: string; errno?: number; address?: string; port?: number }
+      result.cause = {
+        message: cause.message,
+        code: cause.code,
+        errno: cause.errno,
+        address: cause.address,
+        port: cause.port,
+      }
+    }
     result.ms = Date.now() - start
 
     return NextResponse.json(result, {

@@ -37,11 +37,21 @@ export async function GET(req: NextRequest) {
               p.type AS product_type,
               p.thumbnail_url AS product_thumbnail_url,
               m.url           AS product_thumbnail_media_url,
+              p.preview_audio_url   AS preview_audio_url,
+              p.preview_audio_r2_key AS preview_audio_r2_key,
+              am.url                AS preview_audio_media_url,
+              p.preview_bpm         AS preview_bpm,
+              p.preview_musical_key AS preview_musical_key,
+              p.preview_duration    AS preview_duration,
+              p.video_url           AS video_url,
+              p.video_r2_key        AS video_r2_key,
+              p.video_mime_type     AS video_mime_type,
               o.id           AS order_id,
               o.order_number AS order_number
        FROM downloads d
        LEFT JOIN products p ON p.id = d.product_id
        LEFT JOIN media    m ON m.id = p.thumbnail_id
+       LEFT JOIN media    am ON am.id = p.preview_audio_file_id
        LEFT JOIN orders   o ON o.id = d.order_id
        WHERE d.user_id = $1
        ORDER BY d.created_at DESC
@@ -54,6 +64,13 @@ export async function GET(req: NextRequest) {
         (r.product_thumbnail_url as string | null) ||
         (r.product_thumbnail_media_url as string | null) ||
         ''
+      const audioUrl =
+        (r.preview_audio_url as string | null) ||
+        (r.preview_audio_r2_key as string | null) ||
+        (r.preview_audio_media_url as string | null) ||
+        ''
+      const videoUrl = (r.video_url as string | null) || ''
+      const videoR2Key = (r.video_r2_key as string | null) || ''
       return {
         id: String(r.id),
         downloadCount: Number(r.download_count || 0),
@@ -67,6 +84,17 @@ export async function GET(req: NextRequest) {
               slug: String(r.product_slug || ''),
               type: String(r.product_type || ''),
               thumbnailUrl: thumbUrl,
+              preview: {
+                audioUrl,
+                bpm: r.preview_bpm != null ? Number(r.preview_bpm) : null,
+                musicalKey: r.preview_musical_key ? String(r.preview_musical_key) : null,
+                duration: r.preview_duration != null ? Number(r.preview_duration) : null,
+              },
+              video: {
+                url: videoUrl,
+                r2Key: videoR2Key,
+                mimeType: r.video_mime_type ? String(r.video_mime_type) : '',
+              },
             }
           : null,
         order: r.order_id

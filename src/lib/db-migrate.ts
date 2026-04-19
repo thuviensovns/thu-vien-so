@@ -412,6 +412,30 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add products.video_mime_type',
       q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS video_mime_type VARCHAR`,
     },
+    // === Product audio demo (direct upload mirroring video pattern) ===
+    // Payload "preview" group gained audioUrl + audioR2Key + audio metadata
+    // — push:false means these columns must be created manually so Payload's
+    // SELECT includes them (otherwise every product query 500s).
+    {
+      label: 'Add products.preview_audio_url',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_url VARCHAR`,
+    },
+    {
+      label: 'Add products.preview_audio_r2_key',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_r2_key VARCHAR`,
+    },
+    {
+      label: 'Add products.preview_audio_file_name',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_file_name VARCHAR`,
+    },
+    {
+      label: 'Add products.preview_audio_file_size',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_file_size NUMERIC`,
+    },
+    {
+      label: 'Add products.preview_audio_mime_type',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_mime_type VARCHAR`,
+    },
   ]
 
   for (const { label, q } of queries) {
