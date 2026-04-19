@@ -1,6 +1,88 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isRateLimited, cleanupStaleEntries } from '@/lib/rate-limit'
 
+// --- CSP ---
+// Single source of truth for Content-Security-Policy. Applied uniformly to
+// every page + custom API route; Payload admin (`/admin/*`) is skipped because
+// it ships its own inline bootstrap.
+//
+// Legend:
+//   self         — same-origin
+//   data:        — small inline resources (fonts, tiny images)
+//   blob:        — URL.createObjectURL() previews, client-generated files
+//   *.r2.*       — Cloudflare R2 (product files, demos)
+//   *.blob.v-s.c — Vercel Blob (admin uploads)
+//   vercel.com   — @vercel/blob client-upload ingest endpoint
+//   img.vietqr.io — bank transfer QR
+//   *.supabase.co — legacy media
+//   *.ngrok/*.trycloudflare — YouTube-downloader home-PC proxy
+//   www.youtube/player.vimeo — video embeds
+//   cdn.jsdelivr/huggingface — AI vocal-remover page only
+function buildCsp(opts: { isDev: boolean; isAIToolPage: boolean }): string {
+  const { isDev, isAIToolPage } = opts
+
+  const scriptSrc = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]
+  if (isDev) scriptSrc.push("'unsafe-eval'")
+  if (isAIToolPage) scriptSrc.push('https://cdn.jsdelivr.net', 'blob:')
+
+  const imgSrc = [
+    "'self'", 'data:', 'blob:',
+    'https://img.vietqr.io',
+    'https://*.supabase.co',
+    'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev',
+    'https://*.public.blob.vercel-storage.com',
+    'https://i.ytimg.com',
+  ]
+
+  const connectSrc = [
+    "'self'",
+    // Vercel Blob client-upload — browser PUTs bytes to https://vercel.com/api/blob;
+    // without this, client-upload hangs silently at 0%.
+    'https://vercel.com',
+    'https://blob.vercel-storage.com',
+    'https://*.public.blob.vercel-storage.com',
+    // Media fetches (WaveSurfer pre-loads audio, Next/Image, etc.)
+    'https://*.supabase.co',
+    'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev',
+    // Bank QR + home-PC YouTube proxy
+    'https://img.vietqr.io',
+    'https://*.ngrok-free.dev', 'https://*.ngrok-free.app',
+    'https://*.trycloudflare.com',
+  ]
+  if (isAIToolPage) {
+    connectSrc.push('https://cdn.jsdelivr.net', 'https://huggingface.co', 'https://*.hf.co')
+  }
+
+  const mediaSrc = [
+    "'self'", 'blob:',
+    'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev',
+    'https://*.public.blob.vercel-storage.com',
+  ]
+
+  const frameSrc = [
+    "'self'",
+    'https://www.youtube.com',
+    'https://player.vimeo.com',
+  ]
+
+  return [
+    "default-src 'self'",
+    `script-src ${scriptSrc.join(' ')}`,
+    "style-src 'self' 'unsafe-inline'",
+    `img-src ${imgSrc.join(' ')}`,
+    "font-src 'self' data:",
+    `connect-src ${connectSrc.join(' ')}`,
+    `media-src ${mediaSrc.join(' ')}`,
+    `worker-src 'self'${isAIToolPage ? ' blob:' : ''}`,
+    `frame-src ${frameSrc.join(' ')}`,
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    ...(isDev ? [] : ['upgrade-insecure-requests']),
+  ].join('; ')
+}
+
 // --- Middleware ---
 export function middleware(req: NextRequest) {
   const res = NextResponse.next()
@@ -84,32 +166,10 @@ export function middleware(req: NextRequest) {
   res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(self)')
   res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
 
-  // CSP — include R2/Cloudflare domains for product images
+  // CSP — centralized in buildCsp() for a single source of truth
   const isDev = process.env.NODE_ENV !== 'production'
   const isAIToolPage = pathname.startsWith('/cong-cu/xoa-giong-ai')
-  res.headers.set(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ''}${isAIToolPage ? ' https://cdn.jsdelivr.net blob:' : ''}`,
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.public.blob.vercel-storage.com https://i.ytimg.com",
-      "font-src 'self' data:",
-      // @vercel/blob client-upload POSTs file bytes to https://vercel.com/api/blob
-      // (the ingest endpoint); without it in connect-src the browser silently
-      // blocks the request and upload hangs forever at 0%.
-      `connect-src 'self' https://vercel.com https://blob.vercel-storage.com https://*.public.blob.vercel-storage.com https://img.vietqr.io https://*.supabase.co https://*.r2.cloudflarestorage.com https://*.r2.dev https://i.ytimg.com https://*.ngrok-free.dev https://*.ngrok-free.app https://*.trycloudflare.com${isAIToolPage ? ' https://cdn.jsdelivr.net https://huggingface.co https://*.hf.co' : ''}`,
-      // Local file previews use blob: URLs; served media streams from R2/Blob
-      "media-src 'self' blob: https://*.r2.cloudflarestorage.com https://*.r2.dev https://*.public.blob.vercel-storage.com",
-      `worker-src 'self'${isAIToolPage ? ' blob:' : ''}`,
-      "frame-src 'self' https://www.youtube.com",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "frame-ancestors 'none'",
-      ...(process.env.NODE_ENV === 'production' ? ["upgrade-insecure-requests"] : []),
-    ].join('; ')
-  )
+  res.headers.set('Content-Security-Policy', buildCsp({ isDev, isAIToolPage }))
 
   // Cross-Origin policies — only for page routes, not API
   if (!isApi) {
