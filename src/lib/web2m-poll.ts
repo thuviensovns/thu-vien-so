@@ -1,4 +1,5 @@
 import { getPayloadForApi } from '@/lib/payload'
+import { getDbPool } from '@/lib/db-pool'
 import { fetchWeb2mHistory, Web2mConfigError, Web2mFetchError, Web2mApiError } from '@/lib/web2m-client'
 import { processBankStatementBatch } from '@/lib/bank-statement-processor'
 import { revalidatePath } from 'next/cache'
@@ -33,12 +34,24 @@ export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> 
     return { ok: true, message: 'Web2M chưa bật — bỏ qua' }
   }
 
+  // Atomic throttle claim: a single UPDATE...WHERE sets web2m_last_poll_at to
+  // NOW only if it's older than the throttle window. If no row returns, another
+  // concurrent invocation already claimed this window → throttle. This avoids
+  // the TOCTOU race where two callers both read "last poll was 5 min ago"
+  // before either has written NOW back.
   const minInterval = options.minIntervalMs ?? 0
-  if (minInterval > 0 && cfg.web2mLastPollAt) {
-    const last = new Date(cfg.web2mLastPollAt as string).getTime()
-    const age = Date.now() - last
-    if (!Number.isNaN(last) && age < minInterval) {
-      return { ok: true, message: `throttled: last poll ${age}ms ago`, throttled: true }
+  if (minInterval > 0) {
+    const pool = getDbPool()
+    const claim = await pool.query(
+      `UPDATE bank_config
+         SET web2m_last_poll_at = NOW()
+       WHERE web2m_last_poll_at IS NULL
+          OR web2m_last_poll_at < NOW() - ($1::int || ' milliseconds')::interval
+       RETURNING id, web2m_last_poll_at`,
+      [minInterval],
+    )
+    if (claim.rowCount === 0) {
+      return { ok: true, message: `throttled: within ${minInterval}ms window`, throttled: true }
     }
   }
 
