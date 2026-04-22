@@ -1,27 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCronJob } from '@/lib/cron-registry'
+import { getDbPool } from '@/lib/db-pool'
 import '@/lib/cron-jobs' // side-effect: register jobs
 
 /**
- * Dedicated Vercel Cron target for poll_web2m.
+ * Dedicated cron target for poll_web2m.
  *
- * Vercel Cron sends GET with `Authorization: Bearer $CRON_SECRET`.
- * External schedulers (cron-job.org, UptimeRobot) can use `?token=` query.
+ * Auth: Bearer $CRON_SECRET (GitHub Actions) or ?token=$CRON_SECRET (external).
  *
- * Behavior: within a single invocation we loop ~every 5 seconds for up to ~55s,
- * so one cron trigger per minute still gives the user near-realtime auto-credit
- * (≤ MIN_INTERVAL_MS from bank-credit to balance-update). Web2M's poll_web2m
- * runner is idempotent (uniques on bank_transaction_id + creditedAt guard on
- * topups), so overlapping polls don't double-credit.
+ * Self-loop: within a single 55s invocation we poll every ~5s. GitHub Actions
+ * fires this every 5 min as a baseline. To close the 5-min gap when users are
+ * actively waiting, the loop self-chains: at the end of its 55s window, if any
+ * topup is still pending, it fire-and-forget fetches itself to start another
+ * window. Chain terminates when no pending topups remain (user credited /
+ * topup expired). A depth counter caps the chain so a pathological state
+ * cannot spin indefinitely — GH cron picks back up after depletion.
  *
- * vercel.json entry:
- *   { "path": "/api/cron/poll-web2m", "schedule": "* * * * *" }
+ * Idempotency: processBankStatementBatch uses unique(bank_transaction_id) and
+ * a creditedAt guard, so overlapping polls never double-credit.
  */
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
 const MAX_RUNTIME_MS = 55_000 // stay under the 60s function cap
 const MIN_INTERVAL_MS = 5_000 // poll every 5s when iterations are faster than that
+// Chain cap: 11 hops × 55s ≈ 10 minutes max of continuous coverage from a single
+// trigger, comfortably bridging GH Actions' 5-min schedule. Rationale for 11:
+// pending topups are capped at expiresAt = 30 min from creation, so even an
+// always-pending scenario naturally terminates within ~3 chains' worth; 11 is
+// a safety ceiling, not a target.
+const CHAIN_MAX = 11
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET || ''
@@ -56,6 +64,33 @@ export async function GET(req: NextRequest) {
       credited: r.credited ?? 0,
       total: r.total ?? 0,
     })
+  }
+
+  // Self-loop lease: only one 55s self-loop instance runs at a time across
+  // the whole fleet. Without this, chained invocations can overlap (chain
+  // from loop A fires while loop A's response is still in-flight, runner B
+  // picks it up, chain from B fires, etc.). The atomic UPDATE here grants
+  // exactly one claimant for the 60s window — others bail early. Lease
+  // expires naturally so a crashed loop can't deadlock polling.
+  //
+  // `once=1` single-shot calls skip the lease entirely: they're meant for
+  // admin / scripted quick-checks and should never block the regular chain.
+  const loopPool = getDbPool()
+  if (!once) {
+    const lease = await loopPool.query(
+      `UPDATE bank_config
+          SET web2m_loop_lease_until = NOW() + INTERVAL '60 seconds'
+        WHERE web2m_loop_lease_until IS NULL
+           OR web2m_loop_lease_until < NOW()
+        RETURNING id`,
+    )
+    if (lease.rowCount === 0) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        message: 'another self-loop is active — skipping to avoid parallel polling',
+      })
+    }
   }
 
   // Piggy-back stale-topup cleanup on every cron cycle — one SQL, fire-and-forget.
@@ -116,12 +151,47 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Self-chain: if any topup is still pending, fire-and-forget another
+  // invocation so polling continues seamlessly past this 55s window. The
+  // new invocation runs in its own function container — this one returns
+  // immediately. chain=N decrements per hop; GH Actions initiates chains
+  // with chain=CHAIN_MAX, admin once=1 never chains.
+  //
+  // Release our lease first so the next hop's atomic claim succeeds without
+  // waiting up to 60s for the old lease to expire. If we're not chaining,
+  // releasing is still correct — a fresh GH cron trigger or admin dispatch
+  // should be able to start immediately.
+  let chained = false
+  const chainIn = Number(req.nextUrl.searchParams.get('chain') || String(CHAIN_MAX))
+  if (!once) {
+    try {
+      if (chainIn > 0) {
+        const pending = await loopPool.query(
+          `SELECT 1 FROM topups
+            WHERE status = 'pending' AND expires_at > NOW()
+            LIMIT 1`,
+        )
+        if ((pending.rowCount ?? 0) > 0) {
+          await loopPool.query(`UPDATE bank_config SET web2m_loop_lease_until = NULL`)
+          const nextUrl = `${req.nextUrl.origin}/api/cron/poll-web2m?token=${secret}&chain=${chainIn - 1}`
+          fetch(nextUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+          chained = true
+        }
+      }
+      if (!chained) {
+        await loopPool.query(`UPDATE bank_config SET web2m_loop_lease_until = NULL`)
+      }
+    } catch { /* non-fatal */ }
+  }
+
   return NextResponse.json({
     ok: true,
     iterations: iterations.length,
     totalTx,
     totalCredited,
     elapsedMs: Date.now() - overallStart,
+    chained,
+    chainRemaining: chained ? chainIn - 1 : 0,
     last: iterations[iterations.length - 1],
   })
 }

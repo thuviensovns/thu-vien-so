@@ -481,6 +481,10 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add topups.credited_at',
       q: `ALTER TABLE topups ADD COLUMN IF NOT EXISTS credited_at TIMESTAMPTZ`,
     },
+    {
+      label: 'Add bank_config.web2m_loop_lease_until',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_loop_lease_until TIMESTAMPTZ`,
+    },
   ]
 
   for (const { label, q } of queries) {
