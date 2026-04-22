@@ -46,6 +46,25 @@ export interface SepayWebhookBody {
   transactionDate?: string
 }
 
+export interface BankStatementTransaction {
+  id: string | number
+  arrangementId?: string
+  reference?: string
+  description?: string
+  bookingDate?: string
+  valueDate?: string
+  amount: string | number
+  currency?: string
+  creditDebitIndicator: 'CRDT' | 'DBIT'
+  runningBalance?: string | number
+}
+
+export interface BankStatementBody {
+  transactionInfos: BankStatementTransaction[]
+  error?: boolean
+  total?: number
+}
+
 export interface VNPayReturnParams {
   vnp_TxnRef: string
   vnp_Amount: string

@@ -436,6 +436,43 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add products.preview_audio_mime_type',
       q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_mime_type VARCHAR`,
     },
+    // === Web2M auto-polling fields on bank_config global ===
+    {
+      label: 'Add bank_config.web2m_enabled',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_enabled BOOLEAN DEFAULT false`,
+    },
+    {
+      label: 'Add bank_config.web2m_bank',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_bank VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_api_version',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_api_version VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_account_number',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_account_number VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_password',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_password VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_token',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_token VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_api_url',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_api_url VARCHAR`,
+    },
+    {
+      label: 'Add bank_config.web2m_last_poll_at',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_last_poll_at TIMESTAMPTZ`,
+    },
+    {
+      label: 'Add bank_config.web2m_last_status',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_last_status VARCHAR`,
+    },
   ]
 
   for (const { label, q } of queries) {

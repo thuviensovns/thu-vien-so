@@ -68,6 +68,19 @@ registerCron({
   },
 })
 
+// Web2M bank polling — fetch transaction history and auto-credit users
+registerCron({
+  key: 'poll_web2m',
+  name: 'Tự động cộng tiền qua Web2M',
+  description: 'Gọi api.web2m.com, lọc giao dịch CRDT, khớp mã NAP/MUS rồi cộng tiền cho khách',
+  recommendedInterval: '2m',
+  handler: async () => {
+    const { pollWeb2m } = await import('./web2m-poll')
+    const result = await pollWeb2m()
+    return { message: result.message }
+  },
+})
+
 // Automations runner (placeholder — implemented fully in Phase 7)
 registerCron({
   key: 'run_automations',
