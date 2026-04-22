@@ -29,7 +29,11 @@ export async function POST(req: NextRequest) {
       ? clientCode
       : `NAPKH${String(user.id).padStart(4, '0')}`
 
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    // 3-hour window absorbs Web2M's worst-case API lag (observed up to ~70 min
+    // between bank-recorded time and Web2M serving the tx). Previously 30 min,
+    // which caused topups to expire mid-cron-lag and forced the auto-create
+    // fallback path — leaving the UI polling on a stale transferCode.
+    const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
 
     // Upsert: if a pending topup with this fixed code exists, update its amount
     const existing = await payload.find({

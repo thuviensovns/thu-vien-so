@@ -111,15 +111,30 @@ export async function processBankTransaction(
     // with the same fixed transferCode + user. This is the /nap-tien flow:
     // user opens page → pending topup created with NAPKH{userId} → bank transfer
     // arrives with same code. Without this match we'd double-record the topup.
+    //
+    // Also match recently-expired topups (within 24h): Web2M's API can lag the
+    // bank by 30-70 min, which can push the tx past our expiry window. When
+    // that happens, resurrect the original row instead of spawning a new one —
+    // that way the /nap-tien poll (which queries by exact transferCode) still
+    // sees `status: completed` and shows the success toast.
+    const expiredCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const pendingMatch = await payload.find({
       collection: 'topups',
       where: {
         transferCode: { equals: transferCode },
         user: { equals: extractedUserId },
-        status: { equals: 'pending' },
+        or: [
+          { status: { equals: 'pending' } },
+          {
+            and: [
+              { status: { equals: 'expired' } },
+              { updatedAt: { greater_than: expiredCutoff } },
+            ],
+          },
+        ],
       },
       limit: 1,
-      sort: 'createdAt',
+      sort: '-createdAt',
       depth: 0,
     })
 
@@ -131,7 +146,7 @@ export async function processBankTransaction(
       }
 
       const fresh = await payload.findByID({ collection: 'topups', id: topup.id }) as TopUp
-      if (fresh.status !== 'pending') return { id: bankTxId, status: 'duplicate' }
+      if (fresh.status !== 'pending' && fresh.status !== 'expired') return { id: bankTxId, status: 'duplicate' }
 
       await payload.update({
         collection: 'topups',
