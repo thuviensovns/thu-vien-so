@@ -6,5 +6,11 @@
     "src/app/api/**": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/poll-web2m",
+      "schedule": "* * * * *"
+    }
+  ]
 }
