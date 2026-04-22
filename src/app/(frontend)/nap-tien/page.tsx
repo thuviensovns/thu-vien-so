@@ -74,6 +74,23 @@ export default function TopUpPage() {
     [finalAmount, transferCode, isValidAmount, bank],
   )
 
+  // Drive server-side Web2M polling while the user is on this page with a
+  // valid amount (QR visible). Many users transfer money BEFORE clicking
+  // "Xác nhận đã chuyển" — without this ping loop, no pending topup row
+  // exists so the self-chain never starts and credit is delayed until the
+  // next GH Actions cron. Ping only when tab is visible to avoid burning
+  // function time on backgrounded tabs.
+  useEffect(() => {
+    if (!user || !isValidAmount || confirmed) return
+    const ping = () => {
+      if (typeof document !== 'undefined' && document.hidden) return
+      fetch('/api/topup/ping', { cache: 'no-store' }).catch(() => {})
+    }
+    ping()
+    const id = setInterval(ping, 5000)
+    return () => clearInterval(id)
+  }, [user, isValidAmount, confirmed])
+
   async function copyText(text: string, key: string) {
     try {
       await navigator.clipboard.writeText(text)

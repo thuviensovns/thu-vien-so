@@ -166,12 +166,26 @@ export async function GET(req: NextRequest) {
   if (!once) {
     try {
       if (chainIn > 0) {
-        const pending = await loopPool.query(
-          `SELECT 1 FROM topups
-            WHERE status = 'pending' AND expires_at > NOW()
-            LIMIT 1`,
+        // Keep the chain alive whenever there's any signal of active use:
+        //   (a) a pending topup awaiting credit, or
+        //   (b) a recent credit (last 2 min) — users often queue multiple
+        //       transfers back-to-back, and we'd rather overspend a few
+        //       chain hops than drop the next one on the floor.
+        // Not using web2m_last_poll_at as a signal: the chain's own polls
+        // bump it, so (c) "recent poll" would self-perpetuate. Users
+        // actively watching /nap-tien drive polling directly via the
+        // /api/topup/ping loop (fires pollWeb2m via after() every ~5s).
+        const activity = await loopPool.query(
+          `SELECT
+             EXISTS(SELECT 1 FROM topups
+                     WHERE status = 'pending' AND expires_at > NOW()) AS has_pending,
+             EXISTS(SELECT 1 FROM topups
+                     WHERE status = 'completed'
+                       AND confirmed_at > NOW() - INTERVAL '2 minutes') AS recent_credit`,
         )
-        if ((pending.rowCount ?? 0) > 0) {
+        const row = activity.rows[0] as { has_pending: boolean; recent_credit: boolean }
+        const keepAlive = row?.has_pending || row?.recent_credit
+        if (keepAlive) {
           await loopPool.query(`UPDATE bank_config SET web2m_loop_lease_until = NULL`)
           const nextUrl = `${req.nextUrl.origin}/api/cron/poll-web2m?token=${secret}&chain=${chainIn - 1}`
           fetch(nextUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
