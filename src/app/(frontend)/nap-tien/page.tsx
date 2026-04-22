@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import {
   Wallet, ChevronRight, QrCode, Copy, Check, Shield,
-  AlertCircle, Sparkles, CheckCircle2, Loader2, Gift,
+  AlertCircle, Sparkles, CheckCircle2, Loader2, Gift, Megaphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -242,6 +242,58 @@ export default function TopUpPage() {
               để xác nhận nạp tiền tự động.
             </span>
           </div>
+        )}
+
+        {/* Reassurance notice — appears while user is setting up / waiting.
+            Hides after a successful top-up so it doesn't compete with the
+            success card. */}
+        {!confirmed && (
+          <Card className="border-success/30 bg-gradient-to-br from-success/10 via-primary/5 to-success/5 mb-6 overflow-hidden">
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-start gap-4">
+                <div className="hidden sm:flex h-14 w-14 rounded-2xl bg-success/15 items-center justify-center shrink-0">
+                  <Megaphone className="h-7 w-7 text-success" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success text-white text-[10px] font-bold mb-2.5 tracking-wider uppercase shadow-sm">
+                    <Sparkles className="h-3 w-3" />
+                    Thông báo
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-foreground mb-3 leading-snug">
+                    Tiền sẽ tự động vào tài khoản trong 1–2 phút sau khi chuyển khoản
+                  </h3>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-start gap-2.5">
+                      <div className="h-5 w-5 rounded-full bg-success/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check className="h-3 w-3 text-success" />
+                      </div>
+                      <span>
+                        Sau khi chuyển khoản, vui lòng <b className="text-foreground">chờ 1–2 phút</b>. Hệ thống tự động xác nhận và cộng tiền — bạn không cần thao tác gì thêm.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <div className="h-5 w-5 rounded-full bg-success/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check className="h-3 w-3 text-success" />
+                      </div>
+                      <span>
+                        Vui lòng <b className="text-foreground">giữ nguyên nội dung chuyển khoản</b> (NAPKH…) để hệ thống khớp đúng giao dịch của bạn.
+                      </span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <div className="h-5 w-5 rounded-full bg-success/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Check className="h-3 w-3 text-success" />
+                      </div>
+                      <span>
+                        Nếu quá 5 phút chưa thấy tiền vào tài khoản, vui lòng{' '}
+                        <Link href="/lien-he" className="text-primary hover:underline font-medium">liên hệ hỗ trợ</Link>
+                        {' '}để được xử lý nhanh.
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Success state */}
