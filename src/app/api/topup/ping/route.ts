@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { after } from 'next/server'
 
 /**
  * Public topup-poll ping — no auth. Called from the /nap-tien page every ~5s
@@ -9,8 +8,14 @@ import { after } from 'next/server'
  * Cheap by design:
  *   - in-process per-IP rate limit drops floods before any DB work
  *   - actual Web2M fetch is coalesced by pollWeb2m's atomic 3s throttle
- *     (N concurrent pings → 1 bank fetch)
- *   - after() runs the poll post-response so the client sees ~50ms RTT
+ *     (N concurrent pings → 1 bank fetch). The throttle-claim query is
+ *     a single atomic UPDATE, so the "throttled" case returns in <100ms.
+ *
+ * We run pollWeb2m inline (not via after()). after() has proven flaky on
+ * this deployment — the poll frequently didn't execute for fast responses.
+ * Inline awaiting is safer: the client fires this as fire-and-forget so
+ * waiting for a ~7s Web2M fetch on the lead ping costs the browser nothing,
+ * and the throttle keeps the next 4 pings cheap (<100ms each).
  *
  * Not a cron replacement; meant to bridge the gap when users are actively
  * waiting on the page.
@@ -48,17 +53,18 @@ export async function GET(req: NextRequest) {
     'anon'
 
   if (rateLimited(ip)) {
-    return NextResponse.json({ ok: true, throttled: true })
+    return NextResponse.json({ ok: true, throttled: 'rate-limit' })
   }
 
-  after(async () => {
-    try {
-      const { pollWeb2m } = await import('@/lib/web2m-poll')
-      await pollWeb2m({ minIntervalMs: 3000 })
-    } catch {
-      /* non-fatal */
-    }
-  })
-
-  return NextResponse.json({ ok: true })
+  try {
+    const { pollWeb2m } = await import('@/lib/web2m-poll')
+    const r = await pollWeb2m({ minIntervalMs: 3000 })
+    return NextResponse.json({
+      ok: true,
+      throttled: r.throttled ? 'window' : false,
+      credited: r.credited ?? 0,
+    })
+  } catch {
+    return NextResponse.json({ ok: true, error: true })
+  }
 }
