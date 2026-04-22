@@ -8,6 +8,9 @@ export interface Web2mConfig {
   password?: string | null
   token?: string | null
   apiUrl?: string | null
+  /** 'openapi' uses the sPayment OpenAPI endpoint (token only), 'rpa' uses the legacy
+   *  IB-scraping endpoint (password + account + token). Defaults to 'openapi'. */
+  apiType?: 'openapi' | 'rpa' | null
 }
 
 export class Web2mConfigError extends Error {
@@ -34,11 +37,11 @@ export class Web2mApiError extends Error {
 }
 
 /**
- * Default URL templates per bank. Confirmed from Web2M docs:
- *   ACB → historyapiacb/{password}/{account}/{token}
- * Other banks follow similar naming convention; user can override via `apiUrl`.
+ * URL templates per bank for each API type.
+ *   RPA     → historyapi{bank}/{password}/{account}/{token}
+ *   OpenAPI → historyapiopen{bank}/{token}   (no password / account needed)
  */
-const BANK_URL_TEMPLATES: Record<string, string> = {
+const RPA_URL_TEMPLATES: Record<string, string> = {
   acb: 'https://api.web2m.com/historyapiacb/{password}/{account}/{token}',
   bidv: 'https://api.web2m.com/historyapibidv/{password}/{account}/{token}',
   mbbank: 'https://api.web2m.com/historyapimbbank/{password}/{account}/{token}',
@@ -48,24 +51,50 @@ const BANK_URL_TEMPLATES: Record<string, string> = {
   vietinbank: 'https://api.web2m.com/historyapivietin/{password}/{account}/{token}',
 }
 
+const OPENAPI_URL_TEMPLATES: Record<string, string> = {
+  acb: 'https://api.web2m.com/historyapiopenacb/{token}',
+  bidv: 'https://api.web2m.com/historyapiopenbidv/{token}',
+  mbbank: 'https://api.web2m.com/historyapiopenmbbank/{token}',
+  tpbank: 'https://api.web2m.com/historyapiopentpbank/{token}',
+  vietcombank: 'https://api.web2m.com/historyapiopenvcb/{token}',
+  techcombank: 'https://api.web2m.com/historyapiopentcb/{token}',
+  vietinbank: 'https://api.web2m.com/historyapiopenvietin/{token}',
+}
+
 /**
  * Build the Web2M history API URL from config.
- * Uses per-bank default template; user can override with a custom `apiUrl`
- * containing `{account}`, `{password}`, `{token}` placeholders.
+ * - OpenAPI mode: only needs `token`; endpoint is bank-specific but account/password
+ *   are managed on the sPayment side after OpenBanking OAuth linking.
+ * - RPA mode: legacy IB-scraping; needs account + password + token.
+ * User can override with a custom `apiUrl` containing {account}/{password}/{token}.
  */
 export function buildWeb2mUrl(cfg: Web2mConfig): string {
-  const account = cfg.accountNumber?.trim()
-  const password = cfg.password?.trim()
   const token = cfg.token?.trim()
-
-  if (!account) throw new Web2mConfigError('Thiếu số tài khoản')
-  if (!password) throw new Web2mConfigError('Thiếu mật khẩu ngân hàng')
   if (!token) throw new Web2mConfigError('Thiếu token Web2M')
 
-  const template = cfg.apiUrl?.trim()
-    || BANK_URL_TEMPLATES[cfg.bank?.trim() || 'acb']
-    || BANK_URL_TEMPLATES.acb
+  const apiType = (cfg.apiType || 'openapi').trim() as 'openapi' | 'rpa'
+  const bank = (cfg.bank?.trim() || 'acb')
 
+  if (cfg.apiUrl?.trim()) {
+    // Custom override — expand all placeholders it may contain.
+    return cfg.apiUrl.trim()
+      .replace(/\{account\}/g, encodeURIComponent(cfg.accountNumber?.trim() || ''))
+      .replace(/\{password\}/g, encodeURIComponent(cfg.password?.trim() || ''))
+      .replace(/\{token\}/g, encodeURIComponent(token))
+  }
+
+  if (apiType === 'openapi') {
+    const template = OPENAPI_URL_TEMPLATES[bank] || OPENAPI_URL_TEMPLATES.acb
+    return template.replace(/\{token\}/g, encodeURIComponent(token))
+  }
+
+  // RPA
+  const account = cfg.accountNumber?.trim()
+  const password = cfg.password?.trim()
+  if (!account) throw new Web2mConfigError('RPA mode: thiếu số tài khoản')
+  if (!password) throw new Web2mConfigError('RPA mode: thiếu mật khẩu ngân hàng')
+
+  const template = RPA_URL_TEMPLATES[bank] || RPA_URL_TEMPLATES.acb
   return template
     .replace(/\{account\}/g, encodeURIComponent(account))
     .replace(/\{password\}/g, encodeURIComponent(password))

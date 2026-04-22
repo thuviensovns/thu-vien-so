@@ -31,6 +31,7 @@ export async function pollWeb2m(): Promise<PollResult> {
     const body = await fetchWeb2mHistory({
       bank: cfg.web2mBank as string | null,
       apiVersion: cfg.web2mApiVersion as string | null,
+      apiType: (cfg.web2mApiType as 'openapi' | 'rpa' | null) || 'openapi',
       accountNumber: cfg.web2mAccountNumber as string | null,
       password: cfg.web2mPassword as string | null,
       token: cfg.web2mToken as string | null,

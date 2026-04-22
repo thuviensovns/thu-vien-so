@@ -65,6 +65,19 @@ export const BankConfig: GlobalConfig = {
               admin: { description: 'Khi bật, cron poll_web2m sẽ gọi API mỗi khi được kích hoạt.' },
             },
             {
+              name: 'web2mApiType',
+              type: 'select',
+              label: 'Loại API',
+              defaultValue: 'openapi',
+              options: [
+                { label: 'OpenAPI (khuyến nghị — chỉ cần token)', value: 'openapi' },
+                { label: 'RPA (cần account + password IB)', value: 'rpa' },
+              ],
+              admin: {
+                description: 'OpenAPI dùng cho gói sPayment ACB OpenAPI — endpoint: /historyapiopen{bank}/{token}. RPA dùng cho gói scrape Internet Banking cũ.',
+              },
+            },
+            {
               name: 'web2mBank',
               type: 'select',
               label: 'Chọn ngân hàng',
@@ -94,19 +107,19 @@ export const BankConfig: GlobalConfig = {
               name: 'web2mAccountNumber',
               type: 'text',
               label: 'Số tài khoản đăng nhập IB',
-              admin: { description: 'Số tài khoản Internet Banking dùng để đăng nhập Web2M.' },
+              admin: { description: 'Chỉ cần khi dùng RPA. OpenAPI không dùng field này.' },
             },
             {
               name: 'web2mPassword',
               type: 'text',
               label: 'Mật khẩu Internet Banking',
-              admin: { description: 'Lưu trữ tĩnh trong Payload — đảm bảo quyền truy cập admin.' },
+              admin: { description: 'Chỉ cần khi dùng RPA. OpenAPI không dùng field này.' },
             },
             {
               name: 'web2mToken',
               type: 'text',
               label: 'Token Web2M',
-              admin: { description: 'Token Web2M gửi qua email sau khi mua gói (ứng với ngân hàng).' },
+              admin: { description: 'Token Web2M/sPayment gửi qua email sau khi mua gói. Với OpenAPI đây là token duy nhất cần điền.' },
             },
             {
               name: 'web2mApiUrl',

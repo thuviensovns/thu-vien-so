@@ -442,6 +442,10 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_enabled BOOLEAN DEFAULT false`,
     },
     {
+      label: 'Add bank_config.web2m_api_type',
+      q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_api_type VARCHAR DEFAULT 'openapi'`,
+    },
+    {
       label: 'Add bank_config.web2m_bank',
       q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_bank VARCHAR`,
     },
