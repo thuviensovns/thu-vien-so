@@ -9,13 +9,21 @@ export interface PollResult {
   total?: number
   credited?: number
   summary?: Record<string, number>
+  throttled?: boolean
+}
+
+export interface PollOptions {
+  /** If last poll was within this many ms, skip and return immediately.
+   *  Pass 0 (default) to always poll. Use >0 to coalesce concurrent triggers
+   *  (e.g. multiple /topup/status fire-and-forget calls landing at once). */
+  minIntervalMs?: number
 }
 
 /**
  * Read bank-config, call Web2M, process batch, update poll metadata.
  * Never throws — returns a result object the cron registry persists.
  */
-export async function pollWeb2m(): Promise<PollResult> {
+export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> {
   const payload = await getPayloadForApi()
 
   // findGlobal returns unknown-shaped until payload-types regen; access fields loosely.
@@ -23,6 +31,15 @@ export async function pollWeb2m(): Promise<PollResult> {
 
   if (!cfg?.web2mEnabled) {
     return { ok: true, message: 'Web2M chưa bật — bỏ qua' }
+  }
+
+  const minInterval = options.minIntervalMs ?? 0
+  if (minInterval > 0 && cfg.web2mLastPollAt) {
+    const last = new Date(cfg.web2mLastPollAt as string).getTime()
+    const age = Date.now() - last
+    if (!Number.isNaN(last) && age < minInterval) {
+      return { ok: true, message: `throttled: last poll ${age}ms ago`, throttled: true }
+    }
   }
 
   const timestamp = new Date().toISOString()

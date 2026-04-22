@@ -107,6 +107,68 @@ export async function processBankTransaction(
       }
     }
 
+    // Before auto-creating a new topup, try to match an existing pending topup
+    // with the same fixed transferCode + user. This is the /nap-tien flow:
+    // user opens page → pending topup created with NAPKH{userId} → bank transfer
+    // arrives with same code. Without this match we'd double-record the topup.
+    const pendingMatch = await payload.find({
+      collection: 'topups',
+      where: {
+        transferCode: { equals: transferCode },
+        user: { equals: extractedUserId },
+        status: { equals: 'pending' },
+      },
+      limit: 1,
+      sort: 'createdAt',
+      depth: 0,
+    })
+
+    if (pendingMatch.totalDocs > 0) {
+      const topup = pendingMatch.docs[0] as TopUp
+      const tolerance = Math.min(5000, topup.amount * 0.1)
+      if (amount < topup.amount - tolerance) {
+        return { id: bankTxId, status: 'error', error: `Amount ${amount} too low for pending topup ${topup.amount}` }
+      }
+
+      const fresh = await payload.findByID({ collection: 'topups', id: topup.id }) as TopUp
+      if (fresh.status !== 'pending') return { id: bankTxId, status: 'duplicate' }
+
+      await payload.update({
+        collection: 'topups',
+        id: topup.id,
+        data: {
+          status: 'completed',
+          amount,
+          bankTransactionId: bankTxId,
+          bankDescription: content,
+          confirmedAt: new Date().toISOString(),
+          creditedAt: new Date().toISOString(),
+        },
+        context: { skipAutoCredit: true },
+      })
+
+      const userId = typeof topup.user === 'object' ? topup.user.id : topup.user
+      const cur = await payload.findByID({ collection: 'users', id: userId }) as User
+      await payload.update({
+        collection: 'users',
+        id: userId,
+        data: { balance: (cur.balance || 0) + amount },
+        overrideAccess: true,
+      })
+
+      try {
+        const { accrueCommission } = await import('@/lib/affiliate')
+        await accrueCommission({
+          referredUserId: Number(userId),
+          baseAmount: amount,
+          sourceType: 'topup',
+          sourceId: String(topup.id),
+        })
+      } catch { /* non-fatal */ }
+
+      return { id: bankTxId, status: 'topup-completed', topupId: topup.id, credited: amount }
+    }
+
     try {
       const targetUser = await payload.findByID({ collection: 'users', id: extractedUserId }) as User
       if (!targetUser) return { id: bankTxId, status: 'no-match', reason: `User ${extractedUserId} not found` }

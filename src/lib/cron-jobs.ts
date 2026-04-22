@@ -81,6 +81,26 @@ registerCron({
   },
 })
 
+// Expire stale pending topups so they stop cluttering the admin queue.
+// /nap-tien uses NAPKH{userId} as a fixed code; when a user opens the page
+// but never transfers (or transfers a different amount), the pending row
+// sits there forever unless we expire it past expiresAt.
+registerCron({
+  key: 'expire_pending_topups',
+  name: 'Đóng các yêu cầu nạp tiền hết hạn',
+  description: 'Đánh dấu topups pending đã qua expiresAt là expired',
+  recommendedInterval: '10m',
+  handler: async () => {
+    const pool = getDbPool()
+    const res = await pool.query(
+      `UPDATE topups SET status = 'expired', updated_at = NOW()
+       WHERE status = 'pending' AND expires_at IS NOT NULL AND expires_at < NOW()
+       RETURNING id`,
+    )
+    return { message: `Hết hạn ${res.rowCount} yêu cầu nạp tiền` }
+  },
+})
+
 // Automations runner (placeholder — implemented fully in Phase 7)
 registerCron({
   key: 'run_automations',

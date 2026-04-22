@@ -41,6 +41,26 @@ export async function GET(req: NextRequest) {
   // so we don't waste 55s when all we want is "check right now".
   const once = req.nextUrl.searchParams.get('once') === '1'
 
+  // Throttle mode (?throttle=3000) — when fire-and-forget triggers from topup
+  // flows pile up, skip polls that would duplicate a very recent one.
+  // Implies once=1 (single check, not 55s loop).
+  const throttleMs = Number(req.nextUrl.searchParams.get('throttle') || '0')
+  const throttledMode = throttleMs > 0
+  if (throttledMode) {
+    const { pollWeb2m } = await import('@/lib/web2m-poll')
+    const r = await pollWeb2m({ minIntervalMs: throttleMs })
+    return NextResponse.json({
+      ok: r.ok,
+      message: r.message,
+      throttled: !!r.throttled,
+      credited: r.credited ?? 0,
+      total: r.total ?? 0,
+    })
+  }
+
+  // Piggy-back stale-topup cleanup on every cron cycle — one SQL, fire-and-forget.
+  runCronJob('expire_pending_topups').catch(() => { /* non-fatal */ })
+
   const overallStart = Date.now()
   const iterations: Array<{
     iter: number
