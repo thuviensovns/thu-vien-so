@@ -122,7 +122,9 @@ export default function TopUpPage() {
           setAuthError(true)
           toast.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.')
         } else {
-          toast.error(data.error || 'Không thể tạo yêu cầu nạp tiền')
+          const baseMsg = data.error || 'Không thể tạo yêu cầu nạp tiền'
+          const detail = [data.stage, data.detail].filter(Boolean).join(' · ')
+          toast.error(baseMsg, detail ? { description: detail } : undefined)
         }
         setConfirming(false)
         return

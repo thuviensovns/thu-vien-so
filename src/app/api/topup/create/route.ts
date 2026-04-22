@@ -4,14 +4,18 @@ import { getPayloadForApi } from '@/lib/payload'
 
 /** Create a pending top-up request */
 export async function POST(req: NextRequest) {
+  let stage = 'init'
   try {
+    stage = 'getPayload'
     const payload = await getPayloadForApi()
 
+    stage = 'auth'
     const { user } = await payload.auth({ headers: req.headers })
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    stage = 'parseBody'
     let body: { amount?: number; transferCode?: string }
     try { body = await req.json() } catch {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
@@ -36,6 +40,7 @@ export async function POST(req: NextRequest) {
     const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
 
     // Upsert: if a pending topup with this fixed code exists, update its amount
+    stage = 'findExisting'
     const existing = await payload.find({
       collection: 'topups',
       where: {
@@ -48,6 +53,7 @@ export async function POST(req: NextRequest) {
     let topup
     if (existing.totalDocs > 0) {
       // Update existing pending topup with new amount and extend expiry
+      stage = 'updateExisting'
       topup = await payload.update({
         collection: 'topups',
         id: existing.docs[0].id,
@@ -55,6 +61,7 @@ export async function POST(req: NextRequest) {
       })
     } else {
       // Create new pending topup
+      stage = 'createNew'
       try {
         topup = await payload.create({
           collection: 'topups',
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest) {
           // A completed topup with this code exists — find and update the existing pending one
           // or the code was already used. Expire old completed ones won't help (unique constraint).
           // Generate a one-time fallback code for this specific transaction.
+          stage = 'createFallback'
           const fallbackCode = `${transferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`
           topup = await payload.create({
             collection: 'topups',
@@ -87,12 +95,21 @@ export async function POST(req: NextRequest) {
     // via Next 15 `after()`. If the bank callback landed between the user
     // clicking "đã chuyển khoản" and reaching this line, the credit is
     // applied within ~1s without spawning an extra function invocation.
-    after(async () => {
-      try {
-        const { pollWeb2m } = await import('@/lib/web2m-poll')
-        await pollWeb2m({ minIntervalMs: 3000 })
-      } catch { /* non-fatal */ }
-    })
+    // Wrapped in try/catch: `after()` itself can throw at module/runtime
+    // level on some Vercel builds and must not block the happy-path response.
+    stage = 'after'
+    try {
+      after(async () => {
+        try {
+          const { pollWeb2m } = await import('@/lib/web2m-poll')
+          await pollWeb2m({ minIntervalMs: 3000 })
+        } catch (e) {
+          console.warn('[TopUp] after() pollWeb2m failed:', (e as Error)?.message)
+        }
+      })
+    } catch (e) {
+      console.warn('[TopUp] after() register failed:', (e as Error)?.message)
+    }
 
     // Kickstart the self-loop chain so polling runs every ~5s until this
     // topup is credited (or expires), without waiting for the next GH Actions
@@ -100,10 +117,15 @@ export async function POST(req: NextRequest) {
     // if a chain is already running, this request bails at the lease check
     // without starting a duplicate. No await: the chain runs in its own
     // function container, this response returns immediately.
+    stage = 'kickCron'
     if (process.env.CRON_SECRET) {
-      const host = req.nextUrl.origin
-      const kickUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}`
-      fetch(kickUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+      try {
+        const host = req.nextUrl.origin
+        const kickUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}`
+        fetch(kickUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+      } catch (e) {
+        console.warn('[TopUp] kickCron failed:', (e as Error)?.message)
+      }
     }
 
     return NextResponse.json({
@@ -114,11 +136,18 @@ export async function POST(req: NextRequest) {
       expiresAt,
     })
   } catch (error) {
-    console.error('[TopUp] Create error:', error)
-    const msg = (error as Error).message
+    const msg = (error as Error)?.message || String(error)
+    const stack = (error as Error)?.stack || ''
+    console.error(`[TopUp] Create error at stage=${stage}:`, msg, '\n', stack)
     if (msg === 'timeout' || msg.includes('ECONNREFUSED')) {
-      return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
+      return NextResponse.json({ error: 'Service unavailable', stage }, { status: 503 })
     }
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    // Expose stage + truncated message so the UI/user can report which step
+    // failed. Full stack still only in server logs.
+    return NextResponse.json({
+      error: 'Internal server error',
+      stage,
+      detail: msg.slice(0, 300),
+    }, { status: 500 })
   }
 }
