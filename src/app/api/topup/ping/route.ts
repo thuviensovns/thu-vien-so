@@ -5,24 +5,18 @@ import { NextRequest, NextResponse } from 'next/server'
  * while the QR is visible, so polling runs even before the user clicks
  * "Xác nhận đã chuyển" (many transfer first, click later — or never).
  *
- * Cheap by design:
- *   - in-process per-IP rate limit drops floods before any DB work
- *   - actual Web2M fetch is coalesced by pollWeb2m's atomic 3s throttle
- *     (N concurrent pings → 1 bank fetch). The throttle-claim query is
- *     a single atomic UPDATE, so the "throttled" case returns in <100ms.
- *
- * We run pollWeb2m inline (not via after()). after() has proven flaky on
- * this deployment — the poll frequently didn't execute for fast responses.
- * Inline awaiting is safer: the client fires this as fire-and-forget so
- * waiting for a ~7s Web2M fetch on the lead ping costs the browser nothing,
- * and the throttle keeps the next 4 pings cheap (<100ms each).
+ * Design: fast-return the client in <100ms, then fire-and-forget kickstart
+ * the cron self-chain at /api/cron/poll-web2m. The chain has a 60s
+ * maxDuration (vs. this endpoint's 10s Hobby default) so Web2M slow-fetches
+ * don't cause FUNCTION_INVOCATION_TIMEOUT on the user-facing ping. The
+ * chain's own lease ensures only one is running at a time, and recent
+ * activity (pending topup OR credit in last 2min) keeps it alive.
  *
  * Not a cron replacement; meant to bridge the gap when users are actively
  * waiting on the page.
  */
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 15
 
 // Per-IP window: at most 10 pings / 10s. Matches a 1 ping/s ceiling even if
 // the client timer drifts or fires bursts after tab-wake.
@@ -56,15 +50,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, throttled: 'rate-limit' })
   }
 
-  try {
-    const { pollWeb2m } = await import('@/lib/web2m-poll')
-    const r = await pollWeb2m({ minIntervalMs: 3000 })
-    return NextResponse.json({
-      ok: true,
-      throttled: r.throttled ? 'window' : false,
-      credited: r.credited ?? 0,
-    })
-  } catch {
-    return NextResponse.json({ ok: true, error: true })
+  // Fire-and-forget kickstart of the cron chain. The chain's DB lease
+  // dedupes concurrent kickstarts (only one 55s loop runs at a time), so
+  // even 100 pings/min land on the same running loop without stacking.
+  const secret = process.env.CRON_SECRET
+  if (secret) {
+    const kick = `${req.nextUrl.origin}/api/cron/poll-web2m?token=${secret}`
+    fetch(kick, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
   }
+
+  return NextResponse.json({ ok: true })
 }
