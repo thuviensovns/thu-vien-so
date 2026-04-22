@@ -90,6 +90,18 @@ export async function POST(req: NextRequest) {
       } catch { /* non-fatal */ }
     })
 
+    // Kickstart the self-loop chain so polling runs every ~5s until this
+    // topup is credited (or expires), without waiting for the next GH Actions
+    // cron (≤ 5 min). The fetch is rate-limited by the self-loop's lease —
+    // if a chain is already running, this request bails at the lease check
+    // without starting a duplicate. No await: the chain runs in its own
+    // function container, this response returns immediately.
+    if (process.env.CRON_SECRET) {
+      const host = req.nextUrl.origin
+      const kickUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}`
+      fetch(kickUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+    }
+
     return NextResponse.json({
       id: topup.id,
       transferCode,
