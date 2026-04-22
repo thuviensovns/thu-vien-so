@@ -55,7 +55,22 @@ export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> 
     }
   }
 
-  const timestamp = new Date().toISOString()
+  // `web2mLastPollAt` is always stored as the moment polling FINISHES (NOW() at
+  // the end), never the start. Rationale: if we wrote the start-time, the value
+  // persisted to DB would be ~7s older than actual last-poll, and the atomic
+  // throttle claim above — which compares against this column — would start
+  // letting duplicate polls through within the throttle window. Using NOW() via
+  // bumpPollTimestamp keeps the column accurate for both "last poll" display
+  // and throttle math.
+  const bumpPollTimestamp = async (status: string) => {
+    const pool = getDbPool()
+    try {
+      await pool.query(
+        `UPDATE bank_config SET web2m_last_poll_at = NOW(), web2m_last_status = $1`,
+        [status],
+      )
+    } catch { /* non-fatal */ }
+  }
 
   try {
     const body = await fetchWeb2mHistory({
@@ -70,10 +85,7 @@ export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> 
 
     if (body.error) {
       const status = `error: Web2M trả về error=true`
-      await payload.updateGlobal({
-        slug: 'bank-config',
-        data: { web2mLastPollAt: timestamp, web2mLastStatus: status },
-      })
+      await bumpPollTimestamp(status)
       return { ok: false, message: status }
     }
 
@@ -86,10 +98,7 @@ export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> 
     const summaryStr = Object.entries(batch.summary).map(([k, v]) => `${k}=${v}`).join(', ') || '0'
     const status = `ok: ${batch.total} tx, credited ${batch.credited} [${summaryStr}]`
 
-    await payload.updateGlobal({
-      slug: 'bank-config',
-      data: { web2mLastPollAt: timestamp, web2mLastStatus: status },
-    })
+    await bumpPollTimestamp(status)
 
     return {
       ok: true,
@@ -107,12 +116,7 @@ export async function pollWeb2m(options: PollOptions = {}): Promise<PollResult> 
           ? `fetch: ${err.message}`
           : `error: ${(err as Error).message}`
 
-    try {
-      await payload.updateGlobal({
-        slug: 'bank-config',
-        data: { web2mLastPollAt: timestamp, web2mLastStatus: msg },
-      })
-    } catch { /* non-fatal */ }
+    await bumpPollTimestamp(msg)
 
     return { ok: false, message: msg }
   }

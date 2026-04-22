@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 
 /** Create a pending top-up request */
@@ -78,15 +79,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Fire a background Web2M poll (throttled, non-blocking) so that if the
-    // bank notification arrived between the user clicking "đã chuyển khoản"
-    // and reaching this line, the credit lands in the next ~5s of polling
-    // rather than waiting for the scheduled cron.
-    if (process.env.CRON_SECRET) {
-      const host = req.nextUrl.origin
-      const triggerUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}&throttle=3000`
-      fetch(triggerUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
-    }
+    // Piggy-back a throttled Web2M poll on this same serverless invocation
+    // via Next 15 `after()`. If the bank callback landed between the user
+    // clicking "đã chuyển khoản" and reaching this line, the credit is
+    // applied within ~1s without spawning an extra function invocation.
+    after(async () => {
+      try {
+        const { pollWeb2m } = await import('@/lib/web2m-poll')
+        await pollWeb2m({ minIntervalMs: 3000 })
+      } catch { /* non-fatal */ }
+    })
 
     return NextResponse.json({
       id: topup.id,

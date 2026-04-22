@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 
 /** Check top-up status by transferCode */
@@ -31,15 +32,20 @@ export async function GET(req: NextRequest) {
 
     const topup = result.docs[0]
 
-    // While a top-up is still pending the user is actively waiting.
-    // Fire a background Web2M poll (throttled single iteration, no await) so
-    // auto-credit keeps up with the bank in near-realtime — independent of
-    // the scheduled cron. throttle=3000 coalesces concurrent polls from
-    // multiple users watching different pending topups.
-    if (topup.status === 'pending' && process.env.CRON_SECRET) {
-      const host = req.nextUrl.origin
-      const triggerUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}&throttle=3000`
-      fetch(triggerUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+    // While a topup is pending the user is actively waiting. Piggy-back a
+    // Web2M poll on this request using Next 15 `after()` — the handler
+    // returns immediately to the client, then the poll runs in the SAME
+    // serverless invocation before container freeze. This avoids the extra
+    // fetch-to-self function call that would double our Vercel invocation
+    // count (the client polls /status every 5s; on Hobby plan that adds up
+    // fast). The atomic throttle inside pollWeb2m coalesces concurrent users.
+    if (topup.status === 'pending') {
+      after(async () => {
+        try {
+          const { pollWeb2m } = await import('@/lib/web2m-poll')
+          await pollWeb2m({ minIntervalMs: 3000 })
+        } catch { /* non-fatal */ }
+      })
     }
 
     return NextResponse.json({
