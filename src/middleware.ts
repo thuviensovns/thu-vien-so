@@ -84,7 +84,19 @@ function buildCsp(opts: { isDev: boolean; isAIToolPage: boolean }): string {
 }
 
 // --- Middleware ---
-export function middleware(req: NextRequest) {
+// Wrapped: any uncaught edge-runtime error here was surfacing to the client as
+// a generic 500 with empty logs (observed on POST /api/topup/create). Catching
+// lets the route handler run and emits the real error so we can diagnose.
+export function middleware(req: NextRequest): NextResponse {
+  try {
+    return runMiddleware(req)
+  } catch (err) {
+    console.error('[middleware] crashed:', (err as Error)?.stack || err)
+    return NextResponse.next()
+  }
+}
+
+function runMiddleware(req: NextRequest): NextResponse {
   const res = NextResponse.next()
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
   const pathname = req.nextUrl.pathname
@@ -139,7 +151,11 @@ export function middleware(req: NextRequest) {
       return NextResponse.json({ error: 'Too many revalidation requests.' }, { status: 429, headers: { 'Retry-After': '60' } })
     }
   } else if (pathname.startsWith('/api/topup')) {
-    if (isRateLimited(`topup:${ip}`, 10, 60_000)) {
+    // /nap-tien fires /api/topup/ping every 5s (12/min) + /api/topup/status
+    // every 5s (12/min) while the QR is visible. Limit needs headroom above
+    // ~24/min per IP. Raised from 10/60s → 120/60s (2/s). Per-endpoint ping
+    // has its own stricter in-handler limiter (10/10s).
+    if (isRateLimited(`topup:${ip}`, 120, 60_000)) {
       return NextResponse.json({ error: 'Too many requests.' }, { status: 429, headers: { 'Retry-After': '60' } })
     }
   } else if (isApi) {
