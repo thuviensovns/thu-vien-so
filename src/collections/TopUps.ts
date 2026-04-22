@@ -108,9 +108,16 @@ export const TopUps: CollectionConfig = {
       name: 'transferCode',
       type: 'text',
       required: true,
-      unique: true,
+      index: true,
       label: 'Nội dung chuyển khoản',
-      admin: { description: 'Mã nhận dạng giao dịch (VD: NAP1A2B3C)' },
+      // NOT unique: users reuse NAPKH{userId} across multiple topups (fixed
+      // per-user memo). Unique previously forced a "fallback code with random
+      // suffix" workaround that broke bank-statement matching — processor
+      // looks for exact `NAPKH{userId}` but row had `NAPKH{userId}XXXX`,
+      // so pending topup never flipped to completed and /nap-tien UI polling
+      // hung. Uniqueness guarantee moved to `bankTransactionId` (one row per
+      // real bank tx).
+      admin: { description: 'Mã nhận dạng giao dịch (VD: NAPKH0181). Có thể trùng qua nhiều lần nạp.' },
     },
     {
       name: 'status',

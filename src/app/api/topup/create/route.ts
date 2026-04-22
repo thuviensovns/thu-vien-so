@@ -39,7 +39,11 @@ export async function POST(req: NextRequest) {
     // fallback path — leaving the UI polling on a stale transferCode.
     const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
 
-    // Upsert: if a pending topup with this fixed code exists, update its amount
+    // Upsert: one pending topup per (user, transferCode). Completed/expired
+    // rows with the same code coexist — the DB unique constraint on
+    // transferCode was dropped because it forced a fallback-code workaround
+    // (NAPKH0181ABCD) that broke bank-statement matching. Uniqueness is now
+    // enforced only on bankTransactionId at the processor level.
     stage = 'findExisting'
     const existing = await payload.find({
       collection: 'topups',
@@ -52,7 +56,6 @@ export async function POST(req: NextRequest) {
 
     let topup
     if (existing.totalDocs > 0) {
-      // Update existing pending topup with new amount and extend expiry
       stage = 'updateExisting'
       topup = await payload.update({
         collection: 'topups',
@@ -60,35 +63,11 @@ export async function POST(req: NextRequest) {
         data: { amount, expiresAt },
       })
     } else {
-      // Create new pending topup
       stage = 'createNew'
-      try {
-        topup = await payload.create({
-          collection: 'topups',
-          data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
-        })
-      } catch (createErr) {
-        const m = (createErr as Error).message || ''
-        if (/unique|duplicate/i.test(m)) {
-          // A completed topup with this code exists — find and update the existing pending one
-          // or the code was already used. Expire old completed ones won't help (unique constraint).
-          // Generate a one-time fallback code for this specific transaction.
-          stage = 'createFallback'
-          const fallbackCode = `${transferCode}${Date.now().toString(36).slice(-4).toUpperCase()}`
-          topup = await payload.create({
-            collection: 'topups',
-            data: { user: user.id, amount, transferCode: fallbackCode, status: 'pending', expiresAt },
-          })
-          return NextResponse.json({
-            id: topup.id,
-            transferCode: fallbackCode,
-            amount,
-            status: 'pending',
-            expiresAt,
-          })
-        }
-        throw createErr
-      }
+      topup = await payload.create({
+        collection: 'topups',
+        data: { user: user.id, amount, transferCode, status: 'pending', expiresAt },
+      })
     }
 
     // Piggy-back a throttled Web2M poll on this same serverless invocation
