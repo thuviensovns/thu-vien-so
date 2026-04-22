@@ -1,0 +1,48 @@
+name: Poll Web2M
+
+# Triggers /api/cron/poll-web2m every 5 minutes. The endpoint's self-loop
+# inside polls Web2M every ~5 seconds for 55 seconds, so each trigger covers
+# ~55s of ≤5s latency. Worst-case wait between coverage windows is ~4 minutes.
+#
+# For sub-minute auto-credit on the dead minutes, either:
+#   - Upgrade Vercel Pro → add 'crons' entry to vercel.json (schedule '* * * * *')
+#   - Or configure cron-job.org / UptimeRobot to hit the same URL every 1 min
+#
+# Requires GitHub repo secret CRON_SECRET (same value as Vercel env).
+
+on:
+  schedule:
+    # GitHub cron minimum is 5 minutes. Delay can be 5-15 min under load.
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: poll-web2m
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Trigger Web2M poll
+        run: |
+          set -euo pipefail
+          URL="${POLL_URL:-https://www.thuvienso.top/api/cron/poll-web2m}"
+          echo "Triggering $URL"
+          RESPONSE=$(curl -sSL --max-time 80 -w '\n%{http_code} %{time_total}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$URL" || true)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          STATUS_LINE=$(echo "$RESPONSE" | tail -n 1)
+          STATUS=$(echo "$STATUS_LINE" | awk '{print $1}')
+          TIME=$(echo "$STATUS_LINE" | awk '{print $2}')
+          echo "HTTP $STATUS in ${TIME}s"
+          echo "Body: $BODY"
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::Poll failed with HTTP $STATUS"
+            exit 1
+          fi
+        env:
+          POLL_URL: ${{ vars.POLL_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

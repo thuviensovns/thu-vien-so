@@ -30,6 +30,18 @@ export async function GET(req: NextRequest) {
     }
 
     const topup = result.docs[0]
+
+    // While a top-up is still pending the user is actively waiting.
+    // Fire a background Web2M poll (single iteration, no await) so auto-credit
+    // keeps up with the bank in near-realtime — independent of the scheduled
+    // cron's 5-minute interval. Idempotent on server side, so overlapping
+    // polls don't double-credit.
+    if (topup.status === 'pending' && process.env.CRON_SECRET) {
+      const host = req.nextUrl.origin
+      const triggerUrl = `${host}/api/cron/poll-web2m?token=${process.env.CRON_SECRET}&once=1`
+      fetch(triggerUrl, { cache: 'no-store' }).catch(() => { /* non-blocking */ })
+    }
+
     return NextResponse.json({
       id: topup.id,
       status: topup.status,
