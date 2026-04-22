@@ -121,6 +121,7 @@ export async function processBankTransaction(
           bankTransactionId: bankTxId,
           bankDescription: content,
           confirmedAt: new Date().toISOString(),
+          creditedAt: new Date().toISOString(),
         },
         overrideAccess: true,
       })
@@ -176,6 +177,8 @@ export async function processBankTransaction(
     return { id: bankTxId, status: 'duplicate' }
   }
 
+  // Mark topup completed + credited. Skip the auto-credit afterChange hook —
+  // we update balance manually below.
   await payload.update({
     collection: 'topups',
     id: topup.id,
@@ -184,7 +187,9 @@ export async function processBankTransaction(
       bankTransactionId: bankTxId,
       bankDescription: content,
       confirmedAt: new Date().toISOString(),
+      creditedAt: new Date().toISOString(),
     },
+    context: { skipAutoCredit: true },
   })
 
   const userId = typeof topup.user === 'object' ? topup.user.id : topup.user

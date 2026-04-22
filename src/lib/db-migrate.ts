@@ -473,6 +473,10 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add bank_config.web2m_last_status',
       q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_last_status VARCHAR`,
     },
+    {
+      label: 'Add topups.credited_at',
+      q: `ALTER TABLE topups ADD COLUMN IF NOT EXISTS credited_at TIMESTAMPTZ`,
+    },
   ]
 
   for (const { label, q } of queries) {

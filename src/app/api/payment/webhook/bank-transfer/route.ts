@@ -200,6 +200,7 @@ export async function POST(req: NextRequest) {
                 bankTransactionId: bankTxId,
                 bankDescription: content,
                 confirmedAt: new Date().toISOString(),
+                creditedAt: new Date().toISOString(),
               },
               overrideAccess: true,
             })
@@ -255,7 +256,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: 'Already processed' })
     }
 
-    // Mark top-up as completed immediately to prevent concurrent processing
+    // Mark top-up as completed immediately to prevent concurrent processing.
+    // Pass skipAutoCredit context so the afterChange hook doesn't double-credit
+    // (we credit the balance manually below).
     await payload.update({
       collection: 'topups',
       id: topup.id,
@@ -264,7 +267,9 @@ export async function POST(req: NextRequest) {
         bankTransactionId: bankTxId,
         bankDescription: content,
         confirmedAt: new Date().toISOString(),
+        creditedAt: new Date().toISOString(),
       },
+      context: { skipAutoCredit: true },
     })
 
     // Credit user balance
