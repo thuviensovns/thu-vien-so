@@ -22,13 +22,37 @@ export const TopUps: CollectionConfig = {
     delete: ({ req: { user } }) => user?.role === 'admin',
   },
   hooks: {
+    // Stamp creditedAt atomically in the SAME update that flips status to
+    // 'completed', so subsequent flips (completed→pending→completed) see the
+    // marker and skip re-crediting.
+    beforeChange: [
+      async ({ operation, originalDoc, data, req }) => {
+        if (operation !== 'update') return data
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((req as any)?.context?.skipAutoCredit) return data
+
+        const newStatus = data.status ?? originalDoc?.status
+        if (originalDoc?.status !== 'pending' || newStatus !== 'completed') return data
+        if (originalDoc?.creditedAt || data.creditedAt) return data
+
+        data.creditedAt = new Date().toISOString()
+        if (!data.confirmedAt && !originalDoc.confirmedAt) {
+          data.confirmedAt = new Date().toISOString()
+        }
+        return data
+      },
+    ],
+    // Credit the user balance after the topup row has committed. Relies on
+    // beforeChange marking creditedAt — if the marker is absent on the new
+    // doc we know this wasn't a fresh pending→completed transition.
     afterChange: [
       async ({ operation, previousDoc, doc, req }) => {
         if (operation !== 'update') return
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((req as any)?.context?.skipAutoCredit) return
         if (previousDoc?.status !== 'pending' || doc?.status !== 'completed') return
-        if (previousDoc?.creditedAt || doc?.creditedAt) return
+        if (previousDoc?.creditedAt) return
+        if (!doc?.creditedAt) return
 
         const userId = typeof doc.user === 'object' ? doc.user.id : doc.user
         if (!userId) return
@@ -46,17 +70,6 @@ export const TopUps: CollectionConfig = {
           id: userId,
           data: { balance: currentBalance + creditAmount },
           overrideAccess: true,
-        })
-
-        await req.payload.update({
-          collection: 'topups',
-          id: doc.id,
-          data: {
-            creditedAt: new Date().toISOString(),
-            confirmedAt: doc.confirmedAt || new Date().toISOString(),
-          },
-          overrideAccess: true,
-          context: { skipAutoCredit: true },
         })
 
         try {
