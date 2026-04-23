@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -11,7 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { typeLabels } from '@/lib/config'
+import { typeLabels, buildVietQRUrl, buildMomoQRUrl } from '@/lib/config'
+import { useBankConfig } from '@/hooks/use-bank-config'
+import BankTransferQR from '../BankTransferQR'
+import { formatVND } from '@/lib/format'
 
 interface DownloadItem {
   productId: string
@@ -30,10 +33,13 @@ interface DownloadStatus extends DownloadItem {
 
 export default function PaymentResultContent() {
   const searchParams = useSearchParams()
+  const bank = useBankConfig()
   const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading')
   const [orderNumber, setOrderNumber] = useState('')
   const [downloadToken, setDownloadToken] = useState('')
   const [transferCode, setTransferCode] = useState('')
+  const [orderAmount, setOrderAmount] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState<'bank-transfer' | 'momo' | ''>('')
   const [downloads, setDownloads] = useState<DownloadStatus[]>([])
   const [allDone, setAllDone] = useState(false)
   const [polling, setPolling] = useState(false)
@@ -48,11 +54,15 @@ export default function PaymentResultContent() {
     const directOrderNumber = searchParams.get('orderNumber')
     const token = searchParams.get('token')
     const tCode = searchParams.get('transferCode')
+    const amountParam = searchParams.get('amount')
+    const methodParam = searchParams.get('method')
 
     if (txnRef) setOrderNumber(txnRef)
     if (directOrderNumber) setOrderNumber(directOrderNumber)
     if (token) setDownloadToken(token)
     if (tCode) setTransferCode(tCode)
+    if (amountParam) setOrderAmount(Number(amountParam) || 0)
+    if (methodParam === 'bank-transfer' || methodParam === 'momo') setPaymentMethod(methodParam)
 
     if (responseCode === '00' || directStatus === 'success') {
       setStatus('success')
@@ -64,6 +74,15 @@ export default function PaymentResultContent() {
       setStatus('failed')
     }
   }, [searchParams])
+
+  // Auto-regenerated QR for pending bank-transfer / MoMo orders. Keeps the
+  // /thanh-toan checkout QR alive after redirect so the user can still scan
+  // if they haven't paid yet, or came back after navigating away.
+  const pendingQrUrl = useMemo(() => {
+    if (!orderAmount || !transferCode) return ''
+    if (paymentMethod === 'momo') return buildMomoQRUrl(orderAmount, transferCode)
+    return buildVietQRUrl(orderAmount, transferCode, bank)
+  }, [orderAmount, transferCode, bank, paymentMethod])
 
   // For VNPay: webhook may fire after redirect — poll for download token
   const pollForToken = useCallback(async (on: string) => {
@@ -225,7 +244,7 @@ export default function PaymentResultContent() {
     )
   }
 
-  // --- PENDING (bank transfer) ---
+  // --- PENDING (bank transfer / MoMo) ---
   if (status === 'pending') {
     return (
       <div className="container mx-auto flex items-center justify-center min-h-[60vh] px-4 py-8">
@@ -236,7 +255,7 @@ export default function PaymentResultContent() {
             </div>
             <h1 className="text-2xl font-bold">Chờ xác nhận thanh toán</h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Sau khi chuyển khoản, hệ thống sẽ tự động xác nhận trong 1-5 phút.
+              Sau khi chuyển khoản, hệ thống sẽ tự động xác nhận trong 1-2 phút.
             </p>
 
             {orderNumber && (
@@ -247,8 +266,48 @@ export default function PaymentResultContent() {
               </div>
             )}
 
-            {transferCode && (
-              <div className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20">
+            {/* Auto-regenerated QR — same bank config + transfer code the user
+                saw on /thanh-toan. Survives redirect, refresh, and revisit. */}
+            {pendingQrUrl && paymentMethod === 'bank-transfer' && (
+              <div className="mt-5">
+                <BankTransferQR
+                  qrUrl={pendingQrUrl}
+                  bank={bank}
+                  finalTotal={orderAmount}
+                  transferContent={transferCode}
+                />
+              </div>
+            )}
+
+            {pendingQrUrl && paymentMethod === 'momo' && (
+              <div className="mt-5 p-4 rounded-xl border border-pink-500/20 bg-pink-500/5 text-left">
+                <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start">
+                  <div className="shrink-0 bg-white rounded-lg p-2 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={pendingQrUrl} alt="QR MoMo" width={200} height={200} className="rounded" />
+                  </div>
+                  <div className="flex-1 space-y-2 text-sm w-full">
+                    <h3 className="font-bold text-base flex items-center gap-2">
+                      <QrCode className="h-4 w-4 text-pink-500" />
+                      Thanh toán qua MoMo
+                    </h3>
+                    <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                      <span className="text-muted-foreground text-xs">Số tiền</span>
+                      <span className="font-bold text-pink-500">{formatVND(orderAmount)}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                      <span className="text-muted-foreground text-xs">Nội dung CK</span>
+                      <span className="font-mono font-bold text-secondary">{transferCode}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback — no amount in URL (older link or direct visit): keep
+                the text-only panel so users aren't left blank. */}
+            {!pendingQrUrl && transferCode && (
+              <div className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/5 border border-primary/20">
                 <QrCode className="h-4 w-4 text-primary" />
                 <span className="text-sm text-muted-foreground">Nội dung CK:</span>
                 <span className="font-mono font-bold text-secondary">{transferCode}</span>

@@ -199,7 +199,18 @@ export default function CheckoutPage() {
         if (data.paymentUrl) { window.location.href = data.paymentUrl }
         else {
           const resultStatus = (paymentMethod === 'bank-transfer' || paymentMethod === 'momo') ? 'pending' : 'success'
-          router.push(`/thanh-toan/ket-qua?status=${resultStatus}&orderNumber=${data.orderNumber || ''}&orderId=${data.orderId || ''}&transferCode=${data.transferCode || transferContent}`)
+          // Pass amount + method so the pending page can re-render the same
+          // auto-generated QR (bank config still comes from useBankConfig on
+          // the other side — this URL just carries order-specific values).
+          const params = new URLSearchParams({
+            status: resultStatus,
+            orderNumber: data.orderNumber || '',
+            orderId: String(data.orderId || ''),
+            transferCode: String(data.transferCode || transferContent),
+            amount: String(finalTotal),
+            method: paymentMethod,
+          })
+          router.push(`/thanh-toan/ket-qua?${params.toString()}`)
         }
         return
       }
