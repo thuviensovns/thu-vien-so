@@ -88,46 +88,54 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       return
     }
 
-    // If logged in and balance covers the price, skip checkout and
-    // jump straight to the download result page after paying with balance.
-    if (user && balance >= price) {
-      const toastId = 'instant-buy'
-      toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
-      const result = await instantBuyWithBalance(id)
-      if (result.ok) {
-        // Dismiss and redirect — the result page is itself the success signal,
-        // no need for a second "Thanh toán thành công!" toast on top of it.
-        toast.dismiss(toastId)
-        // Hand the signed URLs to the result page via sessionStorage so its
-        // "Tải" buttons render on first paint — no follow-up API call.
-        stashInstantBuyResult(result.downloadToken, {
-          orderNumber: result.orderNumber,
-          items: result.downloadItems,
-        })
-        if (isInCart) removeItem(id)
-        refreshBalance()
-        router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))
-        return
-      }
-      toast.dismiss(toastId)
-      if (result.reason === 'error') {
-        toast.error(result.message || 'Thanh toán thất bại')
-        return
-      }
-      // insufficient / unauthorized → fall through to checkout
-    }
-
-    // Require login before checkout
+    // Not logged in — send to login, then back to this product page
     if (!user) {
       toast.info('Vui lòng đăng nhập để mua hàng')
-      router.push('/dang-nhap?redirect=/thanh-toan')
+      const back = typeof window !== 'undefined' ? window.location.pathname : '/'
+      router.push(`/dang-nhap?redirect=${encodeURIComponent(back)}`)
       return
     }
 
-    if (!isInCart) {
-      addItem({ id, name, slug, price, thumbnail, type })
+    // Balance not enough — straight to top-up. User's explicit ask: never
+    // route them through the bank-transfer checkout page just because the
+    // wallet can't cover this single "Mua ngay" click.
+    if (balance < price) {
+      toast.info('Số dư chưa đủ, mời bạn nạp thêm tiền.')
+      router.push('/nap-tien')
+      return
     }
-    router.push('/thanh-toan')
+
+    // Balance covers — instant-buy, then jump straight to downloads.
+    const toastId = 'instant-buy'
+    toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
+    const result = await instantBuyWithBalance(id)
+    if (result.ok) {
+      toast.dismiss(toastId)
+      stashInstantBuyResult(result.downloadToken, {
+        orderNumber: result.orderNumber,
+        items: result.downloadItems,
+      })
+      if (isInCart) removeItem(id)
+      refreshBalance()
+      router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))
+      return
+    }
+    toast.dismiss(toastId)
+    if (result.reason === 'unauthorized') {
+      toast.info('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.')
+      const back = typeof window !== 'undefined' ? window.location.pathname : '/'
+      router.push(`/dang-nhap?redirect=${encodeURIComponent(back)}`)
+      return
+    }
+    if (result.reason === 'insufficient') {
+      // Server disagreed with the local balance check — refresh and route to
+      // top-up so the customer can add the shortfall.
+      refreshBalance()
+      toast.info(result.message || 'Số dư chưa đủ, mời bạn nạp thêm.')
+      router.push('/nap-tien')
+      return
+    }
+    toast.error(result.message || 'Thanh toán thất bại')
   }
 
   if (isFree) {

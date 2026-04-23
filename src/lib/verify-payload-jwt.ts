@@ -1,12 +1,12 @@
 import crypto from 'crypto'
 
 /**
- * Payload's JWT payload shape (HS256). Only `id` + `collection` are mandatory
- * for our use cases; everything else is informational.
+ * Payload's JWT payload shape (HS256). We only rely on `id`; the rest is
+ * informational and shape may drift between Payload versions.
  */
 export interface VerifiedPayloadJwt {
   id: number
-  collection: string
+  collection?: string
   email?: string
   exp?: number
   iat?: number
@@ -20,6 +20,8 @@ export interface VerifiedPayloadJwt {
  * pulls in the entire Payload runtime (slow on cold serverless). We only
  * trust the token for reading user.id; anything that needs the full user
  * row must re-fetch from the DB.
+ *
+ * Returns null on any mismatch so the caller can fall back to `payload.auth`.
  */
 export function verifyPayloadJwt(token: string, secret: string): VerifiedPayloadJwt | null {
   if (!token || !secret) return null
@@ -38,11 +40,29 @@ export function verifyPayloadJwt(token: string, secret: string): VerifiedPayload
     if (!crypto.timingSafeEqual(a, b)) return null
 
     const raw = Buffer.from(p64, 'base64url').toString('utf8')
-    const payload = JSON.parse(raw) as VerifiedPayloadJwt
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null
-    if (typeof payload.id !== 'number' || !Number.isFinite(payload.id)) return null
-    if (payload.collection !== 'users') return null
-    return payload
+    const payload = JSON.parse(raw) as Record<string, unknown>
+
+    // Expiry
+    const exp = typeof payload.exp === 'number' ? payload.exp : undefined
+    if (exp && Date.now() / 1000 > exp) return null
+
+    // ID — accept number or numeric string (defensive across Payload versions)
+    const rawId = payload.id
+    const id = typeof rawId === 'number' ? rawId : Number(rawId)
+    if (!Number.isFinite(id) || id <= 0) return null
+
+    // Collection — some Payload versions omit this, or use a different key.
+    // Only reject if it's explicitly set to a non-users collection.
+    const collection = typeof payload.collection === 'string' ? payload.collection : undefined
+    if (collection && collection !== 'users') return null
+
+    return {
+      id,
+      collection,
+      email: typeof payload.email === 'string' ? payload.email : undefined,
+      exp,
+      iat: typeof payload.iat === 'number' ? payload.iat : undefined,
+    }
   } catch {
     return null
   }

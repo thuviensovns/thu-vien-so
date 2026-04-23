@@ -33,17 +33,31 @@ const REDOWNLOAD_MAX_COUNT = 10
  */
 export async function POST(req: NextRequest) {
   try {
-    // 1. AUTH — verify JWT ourselves; skips Payload bootstrap entirely
+    // 1. AUTH — fast path via local JWT verify; fall back to Payload auth
+    //    on any mismatch (version drift, rotated secret, etc.) so that a
+    //    verify bug never leaves a legitimately-authed buyer unauthenticated.
     const cookieToken = req.cookies.get('payload-token')?.value
     const secret = process.env.PAYLOAD_SECRET
     if (!cookieToken || !secret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    let userId: number | null = null
     const jwt = verifyPayloadJwt(cookieToken, secret)
-    if (!jwt) {
+    if (jwt) {
+      userId = jwt.id
+    } else {
+      try {
+        const { getPayloadForApi } = await import('@/lib/payload')
+        const payload = await getPayloadForApi()
+        const { user } = await payload.auth({ headers: req.headers })
+        if (user) userId = Number(user.id)
+      } catch (e) {
+        console.error('[Instant Buy] Payload auth fallback failed:', e)
+      }
+    }
+    if (!userId || !Number.isFinite(userId)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const userId = jwt.id
 
     // 2. VALIDATE BODY
     let body: { items?: Array<{ productId: string }> }
