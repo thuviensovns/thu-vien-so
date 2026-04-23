@@ -149,7 +149,8 @@ export const ProductCard = memo(function ProductCard({
       toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
       const result = await instantBuyWithBalance(productId)
       if (result.ok) {
-        toast.success('Thanh toán thành công!', { id: toastId, description: `Đang chuyển đến trang tải xuống...` })
+        // Dismiss and redirect — result page is the success signal.
+        toast.dismiss(toastId)
         if (isInCart) removeItem(productId)
         refreshBalance()
         router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))

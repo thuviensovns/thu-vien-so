@@ -95,7 +95,9 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       toast.loading('Đang thanh toán bằng số dư...', { id: toastId, description: name })
       const result = await instantBuyWithBalance(id)
       if (result.ok) {
-        toast.success('Thanh toán thành công!', { id: toastId, description: 'Đang chuyển đến trang tải xuống...' })
+        // Dismiss and redirect — the result page is itself the success signal,
+        // no need for a second "Thanh toán thành công!" toast on top of it.
+        toast.dismiss(toastId)
         if (isInCart) removeItem(id)
         refreshBalance()
         router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))
