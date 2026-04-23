@@ -67,14 +67,69 @@ export async function processBankTransaction(
     if (orderResult.totalDocs > 0) {
       const order = orderResult.docs[0] as Order
       const tolerance = Math.min(5000, order.total * 0.1)
+      const orderUserId = typeof order.user === 'object' ? order.user.id : order.user
+
       if (amount < order.total - tolerance) {
-        return { id: bankTxId, status: 'error', error: `Amount ${amount} too low for order ${orderNumber} (${order.total})` }
+        // Partial payment — don't reject. Credit to wallet + record a topup so
+        // the customer doesn't lose their VND and the next transfer can settle
+        // the order automatically.
+        try {
+          if (amount >= 1000) {
+            await payload.create({
+              collection: 'topups',
+              data: {
+                user: orderUserId,
+                amount,
+                transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+                status: 'completed',
+                bankTransactionId: bankTxId,
+                bankDescription: `Partial for ${orderNumber} (${amount}/${order.total})`,
+                confirmedAt: new Date().toISOString(),
+                creditedAt: new Date().toISOString(),
+              },
+              overrideAccess: true,
+              context: { skipAutoCredit: true },
+            })
+          }
+        } catch (e) { console.error('[processor] partial-topup log failed:', e) }
+
+        try { await autoSettlePendingOrders(payload, orderUserId, { preCredit: amount }) } catch (e) {
+          console.error('[processor] auto-settle (MUS-XXX partial) failed:', e)
+        }
+        return { id: bankTxId, status: 'topup-auto', userId: orderUserId, credited: amount }
       }
+
       await fulfillOrder(payload, order.id, {
         transactionId: bankTxId,
         paidAt: new Date().toISOString(),
         rawResponse: { source: 'bank-statement', bankTxId, amount, content },
       })
+
+      // Record any over-payment as a topup row for audit + replay protection,
+      // then credit the excess to balance and settle any other pending orders.
+      const excess = amount - order.total
+      if (excess >= 1000) {
+        try {
+          await payload.create({
+            collection: 'topups',
+            data: {
+              user: orderUserId,
+              amount: excess,
+              transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+              status: 'completed',
+              bankTransactionId: bankTxId,
+              bankDescription: `Excess from ${orderNumber} (CK ${amount}, order ${order.total})`,
+              confirmedAt: new Date().toISOString(),
+              creditedAt: new Date().toISOString(),
+            },
+            overrideAccess: true,
+            context: { skipAutoCredit: true },
+          })
+        } catch (e) { console.error('[processor] excess-topup log failed:', e) }
+      }
+      try { await autoSettlePendingOrders(payload, orderUserId, { preCredit: Math.max(excess, 0) }) } catch (e) {
+        console.error('[processor] auto-settle (MUS-XXX post-fulfill) failed:', e)
+      }
       return { id: bankTxId, status: 'order-fulfilled', orderNumber, amount }
     }
   }
@@ -98,12 +153,38 @@ export async function processBankTransaction(
     if (orderResult.totalDocs > 0) {
       const order = orderResult.docs[0] as Order
       const tolerance = Math.min(5000, order.total * 0.1)
+      const orderUserId = typeof order.user === 'object' ? order.user.id : order.user
       if (amount >= order.total - tolerance) {
         await fulfillOrder(payload, order.id, {
           transactionId: bankTxId,
           paidAt: new Date().toISOString(),
           rawResponse: { source: 'bank-statement', bankTxId, amount, content },
         })
+
+        // Over-payment → log + credit excess + settle remaining pending orders.
+        const excess = amount - order.total
+        if (excess >= 1000) {
+          try {
+            await payload.create({
+              collection: 'topups',
+              data: {
+                user: orderUserId,
+                amount: excess,
+                transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+                status: 'completed',
+                bankTransactionId: bankTxId,
+                bankDescription: `Excess from ${order.orderNumber} (CK ${amount}, order ${order.total})`,
+                confirmedAt: new Date().toISOString(),
+                creditedAt: new Date().toISOString(),
+              },
+              overrideAccess: true,
+              context: { skipAutoCredit: true },
+            })
+          } catch (e) { console.error('[processor] excess-topup log failed:', e) }
+        }
+        try { await autoSettlePendingOrders(payload, orderUserId, { preCredit: Math.max(excess, 0) }) } catch (e) {
+          console.error('[processor] auto-settle (NAPKH post-fulfill) failed:', e)
+        }
         return { id: bankTxId, status: 'order-fulfilled', orderNumber: order.orderNumber, amount }
       }
     }

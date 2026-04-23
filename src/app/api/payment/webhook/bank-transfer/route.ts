@@ -89,9 +89,44 @@ export async function POST(req: NextRequest) {
       if (orderResult.totalDocs > 0) {
         const order = orderResult.docs[0] as Order
         const tolerance = Math.min(5000, order.total * 0.1)
+        const orderUserId = typeof order.user === 'object' ? order.user.id : order.user
+
         if (amount < order.total - tolerance) {
-          console.warn(`[Sepay Webhook] Order amount mismatch: received ${amount}, expected ${order.total}`)
-          return NextResponse.json({ success: false, error: 'Amount too low for order' }, { status: 400 })
+          // Partial payment — credit to wallet instead of rejecting. Customer
+          // doesn't lose the VND and the next top-up can auto-settle the order.
+          console.warn(`[Sepay Webhook] Order amount too low (${amount}/${order.total}) — crediting to wallet`)
+          try {
+            if (amount >= 1000) {
+              await payload.create({
+                collection: 'topups',
+                data: {
+                  user: orderUserId,
+                  amount,
+                  transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+                  status: 'completed',
+                  bankTransactionId: bankTxId,
+                  bankDescription: `Partial for ${orderNumber} (${amount}/${order.total})`,
+                  confirmedAt: new Date().toISOString(),
+                  creditedAt: new Date().toISOString(),
+                },
+                overrideAccess: true,
+                context: { skipAutoCredit: true },
+              })
+            }
+          } catch (e) { console.error('[Sepay Webhook] partial-topup log failed:', e) }
+
+          let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+          try {
+            const r = await autoSettlePendingOrders(payload, orderUserId, { preCredit: amount })
+            autoSettled = r.settled
+          } catch (e) { console.error('[Sepay Webhook] auto-settle (partial) failed:', e) }
+          try { revalidatePath('/', 'layout') } catch {}
+          return NextResponse.json({
+            success: true,
+            message: 'Partial payment credited to wallet',
+            creditedAmount: amount,
+            autoSettledOrders: autoSettled,
+          })
         }
 
         const result = await fulfillOrder(payload, order.id, {
@@ -101,13 +136,42 @@ export async function POST(req: NextRequest) {
         })
 
         console.log(`[Sepay Webhook] Order ${orderNumber} fulfilled. Token: ${result.downloadToken}`)
-        try { revalidatePath('/', 'layout') } catch {}
 
+        // Credit any over-payment + settle remaining pending orders.
+        const excess = amount - order.total
+        if (excess >= 1000) {
+          try {
+            await payload.create({
+              collection: 'topups',
+              data: {
+                user: orderUserId,
+                amount: excess,
+                transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+                status: 'completed',
+                bankTransactionId: bankTxId,
+                bankDescription: `Excess from ${orderNumber} (CK ${amount}, order ${order.total})`,
+                confirmedAt: new Date().toISOString(),
+                creditedAt: new Date().toISOString(),
+              },
+              overrideAccess: true,
+              context: { skipAutoCredit: true },
+            })
+          } catch (e) { console.error('[Sepay Webhook] excess-topup log failed:', e) }
+        }
+        let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+        try {
+          const r = await autoSettlePendingOrders(payload, orderUserId, { preCredit: Math.max(excess, 0) })
+          autoSettled = r.settled
+        } catch (e) { console.error('[Sepay Webhook] auto-settle post-fulfill failed:', e) }
+
+        try { revalidatePath('/', 'layout') } catch {}
         return NextResponse.json({
           success: true,
           message: 'Order fulfilled',
           orderNumber,
           downloadToken: result.downloadToken,
+          excessCredited: excess > 0 ? excess : 0,
+          autoSettledOrders: autoSettled,
         })
       }
     }
@@ -134,6 +198,7 @@ export async function POST(req: NextRequest) {
       if (orderResult.totalDocs > 0) {
         const order = orderResult.docs[0] as Order
         const tolerance = Math.min(5000, order.total * 0.1)
+        const orderUserId = typeof order.user === 'object' ? order.user.id : order.user
         if (amount >= order.total - tolerance) {
           const result = await fulfillOrder(payload, order.id, {
             transactionId: bankTxId,
@@ -142,6 +207,33 @@ export async function POST(req: NextRequest) {
           })
 
           console.log(`[Sepay Webhook] Order ${order.orderNumber} fulfilled via ${transferCode}. Token: ${result.downloadToken}`)
+
+          // Credit any over-payment + settle remaining pending orders.
+          const excess = amount - order.total
+          if (excess >= 1000) {
+            try {
+              await payload.create({
+                collection: 'topups',
+                data: {
+                  user: orderUserId,
+                  amount: excess,
+                  transferCode: `BANK${bankTxId.slice(-8).toUpperCase()}`,
+                  status: 'completed',
+                  bankTransactionId: bankTxId,
+                  bankDescription: `Excess from ${order.orderNumber} (CK ${amount}, order ${order.total})`,
+                  confirmedAt: new Date().toISOString(),
+                  creditedAt: new Date().toISOString(),
+                },
+                overrideAccess: true,
+                context: { skipAutoCredit: true },
+              })
+            } catch (e) { console.error('[Sepay Webhook] excess-topup log failed:', e) }
+          }
+          let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+          try {
+            const r = await autoSettlePendingOrders(payload, orderUserId, { preCredit: Math.max(excess, 0) })
+            autoSettled = r.settled
+          } catch (e) { console.error('[Sepay Webhook] auto-settle (NAPKH post-fulfill) failed:', e) }
           try { revalidatePath('/', 'layout') } catch {}
 
           return NextResponse.json({
@@ -149,6 +241,8 @@ export async function POST(req: NextRequest) {
             message: 'Order fulfilled via transfer code',
             orderNumber: order.orderNumber,
             downloadToken: result.downloadToken,
+            excessCredited: excess > 0 ? excess : 0,
+            autoSettledOrders: autoSettled,
           })
         }
         // Amount too low for order — fall through to credit as topup instead
