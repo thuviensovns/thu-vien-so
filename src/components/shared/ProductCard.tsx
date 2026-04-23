@@ -12,7 +12,7 @@ import { useBalance } from '@/hooks/use-balance'
 import { typeLabels } from '@/lib/config'
 import { formatVND } from '@/lib/format'
 import { deleteAdminProduct, getAdminProducts } from '@/lib/admin-helpers'
-import { instantBuyWithBalance, buildDownloadResultUrl } from '@/lib/instant-buy'
+import { instantBuyWithBalance, buildDownloadResultUrl, stashInstantBuyResult } from '@/lib/instant-buy'
 import { useState, memo, useMemo } from 'react'
 import { toast } from 'sonner'
 import { confirmDialog } from '@/components/ui/confirm-dialog'
@@ -151,6 +151,10 @@ export const ProductCard = memo(function ProductCard({
       if (result.ok) {
         // Dismiss and redirect — result page is the success signal.
         toast.dismiss(toastId)
+        stashInstantBuyResult(result.downloadToken, {
+          orderNumber: result.orderNumber,
+          items: result.downloadItems,
+        })
         if (isInCart) removeItem(productId)
         refreshBalance()
         router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))

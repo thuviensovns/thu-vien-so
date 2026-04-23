@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useCart } from '@/hooks/use-cart'
 import { useAuth } from '@/hooks/use-auth'
 import { useBalance } from '@/hooks/use-balance'
-import { instantBuyWithBalance, buildDownloadResultUrl } from '@/lib/instant-buy'
+import { instantBuyWithBalance, buildDownloadResultUrl, stashInstantBuyResult } from '@/lib/instant-buy'
 import { toast } from 'sonner'
 
 interface AddToCartButtonProps {
@@ -98,6 +98,12 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
         // Dismiss and redirect — the result page is itself the success signal,
         // no need for a second "Thanh toán thành công!" toast on top of it.
         toast.dismiss(toastId)
+        // Hand the signed URLs to the result page via sessionStorage so its
+        // "Tải" buttons render on first paint — no follow-up API call.
+        stashInstantBuyResult(result.downloadToken, {
+          orderNumber: result.orderNumber,
+          items: result.downloadItems,
+        })
         if (isInCart) removeItem(id)
         refreshBalance()
         router.push(buildDownloadResultUrl(result.orderNumber, result.downloadToken))

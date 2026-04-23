@@ -16,6 +16,7 @@ import { useBankConfig } from '@/hooks/use-bank-config'
 import { PopupBlockerNotice } from '@/components/shared/PaymentNotices'
 import BankTransferQR from '../BankTransferQR'
 import { formatVND } from '@/lib/format'
+import { readInstantBuyStash, clearInstantBuyStash, type InstantBuyDownloadItem } from '@/lib/instant-buy'
 
 interface DownloadItem {
   productId: string
@@ -31,6 +32,28 @@ interface DownloadStatus extends DownloadItem {
   status: 'pending' | 'downloading' | 'done' | 'error'
   error?: string
   url?: string
+}
+
+function itemsToStatuses(items: InstantBuyDownloadItem[] | DownloadItem[]): DownloadStatus[] {
+  return items.map((item) => ({
+    productId: String(item.productId),
+    name: item.name,
+    hasFile: item.hasFile,
+    fileName: item.fileName,
+    fileSize: item.fileSize,
+    fileFormat: item.fileFormat,
+    url: item.url || undefined,
+    status: item.hasFile && item.url
+      ? 'done'
+      : item.hasFile
+        ? 'error'
+        : 'pending',
+    error: !item.hasFile
+      ? 'Chưa có file'
+      : !item.url
+        ? 'Không có URL'
+        : undefined,
+  }))
 }
 
 function deriveStatus(sp: URLSearchParams | ReturnType<typeof useSearchParams>): 'loading' | 'success' | 'failed' | 'pending' {
@@ -60,11 +83,27 @@ export default function PaymentResultContent() {
     const m = searchParams.get('method')
     return m === 'bank-transfer' || m === 'momo' ? m : ''
   })
-  const [downloads, setDownloads] = useState<DownloadStatus[]>([])
-  const [allDone, setAllDone] = useState(false)
+  // Lazy-read the instant-buy sessionStorage stash synchronously on first
+  // render. If the user just clicked "Mua ngay", the signed download URLs
+  // were stashed by the client before navigation — so "Tải" buttons render
+  // on the FIRST paint with zero network round-trips.
+  const initialStash = useMemo<DownloadStatus[] | null>(() => {
+    if (typeof window === 'undefined') return null
+    const token = searchParams.get('token')
+    if (!token) return null
+    const stash = readInstantBuyStash(token)
+    if (!stash?.items?.length) return null
+    return itemsToStatuses(stash.items)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [downloads, setDownloads] = useState<DownloadStatus[]>(initialStash || [])
+  const [allDone, setAllDone] = useState(!!initialStash?.length)
   const [polling, setPolling] = useState(false)
-  const downloadStarted = useRef(false)
+  // If we hydrated from the stash, mark the fetch effect as already-done so it
+  // doesn't also fire a redundant /api/download/[token] call.
+  const downloadStarted = useRef(!!initialStash?.length)
   const downloadFrameRef = useRef<HTMLIFrameElement | null>(null)
+  const autoTriggered = useRef(false)
 
   // Keep state in sync if params change after mount (back/forward nav, etc.)
   useEffect(() => {
@@ -80,6 +119,14 @@ export default function PaymentResultContent() {
     const methodParam = searchParams.get('method')
     if (methodParam === 'bank-transfer' || methodParam === 'momo') setPaymentMethod(methodParam)
   }, [searchParams])
+
+  // Drop the sessionStorage stash once we've hydrated from it so a page
+  // refresh doesn't serve stale URLs (signed R2 URLs expire in 1h anyway).
+  useEffect(() => {
+    if (initialStash && downloadToken) {
+      clearInstantBuyStash(downloadToken)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-regenerated QR for pending bank-transfer / MoMo orders. Keeps the
   // /thanh-toan checkout QR alive after redirect so the user can still scan
@@ -116,9 +163,9 @@ export default function PaymentResultContent() {
     return null
   }, [])
 
-  // Fetch list + pre-signed URLs in a single call so "Tải" buttons appear
-  // immediately on success. The list endpoint now returns `url` per item,
-  // replacing the old N+1 sequential fetch loop.
+  // Fallback fetch for VNPay / direct URL visits where the sessionStorage
+  // stash isn't populated. Instant-buy redirects skip this entirely because
+  // downloadStarted is already true from the lazy-init stash read above.
   useEffect(() => {
     if (status !== 'success' || downloadStarted.current) return
 
@@ -136,26 +183,8 @@ export default function PaymentResultContent() {
         const data = await res.json()
         if (!data.items?.length) return
 
-        const statuses: DownloadStatus[] = data.items.map((item: DownloadItem) => ({
-          ...item,
-          status: item.hasFile && item.url
-            ? 'done'
-            : item.hasFile
-              ? 'error'
-              : 'pending',
-          error: !item.hasFile
-            ? 'Chưa có file'
-            : !item.url
-              ? 'Không có URL'
-              : undefined,
-          url: item.url || undefined,
-        }))
-        setDownloads(statuses)
+        setDownloads(itemsToStatuses(data.items))
         setAllDone(true)
-
-        // Auto-trigger first item via hidden iframe (no popup blocker hit).
-        const first = statuses.find((s) => s.status === 'done' && s.url)
-        if (first?.url) triggerDownload(first.url)
       } catch (e) {
         console.error('[PaymentResult] Download error:', e)
       }
@@ -163,6 +192,20 @@ export default function PaymentResultContent() {
 
     startDownloads()
   }, [status, downloadToken, orderNumber, pollForToken])
+
+  // Auto-trigger first download via hidden iframe. Runs AFTER React commits
+  // (post-render) so the iframe ref is guaranteed attached — fixes the old
+  // race where triggerDownload fired synchronously after setDownloads before
+  // the iframe had mounted.
+  useEffect(() => {
+    if (autoTriggered.current) return
+    if (status !== 'success') return
+    if (downloads.length === 0) return
+    const first = downloads.find((d) => d.status === 'done' && d.url)
+    if (!first?.url) return
+    autoTriggered.current = true
+    triggerDownload(first.url)
+  }, [status, downloads])
 
   // Hidden-iframe navigation — Google Drive's `uc?export=download` URL returns
   // Content-Disposition: attachment, so the browser starts a file download and

@@ -4,6 +4,8 @@ import { randomUUID } from 'crypto'
 import { getPayloadForApi } from '@/lib/payload'
 import { generateOrderNumber } from '@/lib/payment'
 import { getUserTransferCode } from '@/lib/config'
+import { generateDownloadUrl } from '@/lib/r2'
+import { normalizeDownloadUrl } from '@/lib/normalize-download-url'
 import { revalidatePath } from 'next/cache'
 import type { User, Product } from '@/types/payload-types'
 
@@ -231,12 +233,39 @@ export async function POST(req: NextRequest) {
       }))
     })
 
+    // Sign download URLs inline so the result page can render "Tải" buttons
+    // on first paint without a follow-up /api/download/[token] round-trip.
+    // R2 signing + normalize are local CPU ops (~5-15ms total for a typical
+    // cart), safe to run on the critical path.
+    const downloadItems = await Promise.all(orderItems.map(async (item, i) => {
+      const product = productResults[i] as Product | null
+      const file = product?.file || {}
+      let url: string | null = null
+      if (file.r2Key) {
+        try { url = await generateDownloadUrl(file.r2Key, 3600) } catch (e) {
+          console.error('[Instant Buy] R2 signing failed:', e)
+        }
+      } else if (file.downloadUrl) {
+        url = normalizeDownloadUrl(file.downloadUrl)
+      }
+      return {
+        productId: product ? product.id : item.product,
+        name: item.productName || product?.name || 'Unknown',
+        hasFile: !!(file.r2Key || file.downloadUrl),
+        fileName: file.fileName || null,
+        fileSize: file.fileSize || null,
+        fileFormat: file.fileFormat || null,
+        url,
+      }
+    }))
+
     return NextResponse.json({
       success: true,
       orderId: order.id,
       orderNumber,
       downloadToken,
       newBalance: currentBalance - total,
+      downloadItems,
     })
   } catch (error) {
     console.error('[Instant Buy] Error:', error)
