@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { fulfillOrder } from '@/lib/fulfill-order'
+import { autoSettlePendingOrders } from '@/lib/auto-settle-pending-orders'
 import type { BankStatementTransaction } from '@/types/domain'
 import type { Order, TopUp, User } from '@/types/payload-types'
 
@@ -181,6 +182,11 @@ export async function processBankTransaction(
         })
       } catch { /* non-fatal */ }
 
+      // Auto-settle any pending orders the new balance can now cover.
+      try { await autoSettlePendingOrders(payload, userId) } catch (e) {
+        console.error('[processor] auto-settle (pending-topup-match) failed:', e)
+      }
+
       return { id: bankTxId, status: 'topup-completed', topupId: topup.id, credited: amount }
     }
 
@@ -220,6 +226,11 @@ export async function processBankTransaction(
           sourceId: String(newTopup.id),
         })
       } catch { /* non-fatal */ }
+
+      // Auto-settle any pending orders the new balance can now cover.
+      try { await autoSettlePendingOrders(payload, extractedUserId) } catch (e) {
+        console.error('[processor] auto-settle (auto-created-topup) failed:', e)
+      }
 
       return { id: bankTxId, status: 'topup-auto', userId: extractedUserId, credited: amount }
     } catch {
@@ -290,6 +301,11 @@ export async function processBankTransaction(
       sourceId: String(topup.id),
     })
   } catch { /* non-fatal */ }
+
+  // Auto-settle any pending orders the new balance can now cover.
+  try { await autoSettlePendingOrders(payload, userId) } catch (e) {
+    console.error('[processor] auto-settle (NAP-topup) failed:', e)
+  }
 
   return { id: bankTxId, status: 'topup-completed', topupId: topup.id, credited: creditAmount }
 }

@@ -82,6 +82,14 @@ export const TopUps: CollectionConfig = {
           })
         } catch { /* non-fatal */ }
 
+        // Auto-settle pending orders with the newly credited balance
+        try {
+          const { autoSettlePendingOrders } = await import('@/lib/auto-settle-pending-orders')
+          await autoSettlePendingOrders(req.payload, userId)
+        } catch (e) {
+          console.error('[TopUps afterChange] auto-settle failed:', e)
+        }
+
         try {
           const { revalidatePath } = await import('next/cache')
           revalidatePath('/', 'layout')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
 import { fulfillOrder } from '@/lib/fulfill-order'
+import { autoSettlePendingOrders } from '@/lib/auto-settle-pending-orders'
 import { revalidatePath } from 'next/cache'
 import type { Order, TopUp, User } from '@/types/payload-types'
 import type { SepayWebhookBody } from '@/types/domain'
@@ -226,11 +227,21 @@ export async function POST(req: NextRequest) {
               })
             } catch { /* non-fatal */ }
 
+            // Auto-settle pending orders the new balance now covers.
+            let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+            try {
+              const r = await autoSettlePendingOrders(payload, extractedUserId)
+              autoSettled = r.settled
+            } catch (e) {
+              console.error('[Sepay Webhook] auto-settle failed:', e)
+            }
+
             return NextResponse.json({
               success: true,
               message: 'Top-up auto-created and credited via fixed code',
               topupId: newTopup.id,
               creditedAmount: amount,
+              autoSettledOrders: autoSettled,
             })
           }
         } catch {
@@ -301,11 +312,21 @@ export async function POST(req: NextRequest) {
       })
     } catch { /* non-fatal */ }
 
+    // Auto-settle pending orders the new balance now covers.
+    let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+    try {
+      const r = await autoSettlePendingOrders(payload, userId)
+      autoSettled = r.settled
+    } catch (e) {
+      console.error('[Sepay Webhook] auto-settle failed:', e)
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Top-up confirmed',
       topupId: topup.id,
       creditedAmount: creditAmount,
+      autoSettledOrders: autoSettled,
     })
   } catch (error) {
     console.error('[Sepay Webhook] Error:', error)

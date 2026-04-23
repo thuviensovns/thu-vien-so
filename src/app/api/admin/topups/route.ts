@@ -200,12 +200,23 @@ export async function POST(req: NextRequest) {
       commission = { credited: false, amount: 0, reason: `error:${(err as Error).message}` }
     }
 
+    // Auto-settle pending orders using the newly credited balance.
+    let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
+    try {
+      const { autoSettlePendingOrders } = await import('@/lib/auto-settle-pending-orders')
+      const r = await autoSettlePendingOrders(payload, targetUser.id)
+      autoSettled = r.settled
+    } catch (e) {
+      console.error('[Admin topup] auto-settle failed:', e)
+    }
+
     return NextResponse.json({
       success: true,
       newBalance: currentBalance + amount,
       transferCode,
       userName: targetUser.displayName || targetUser.email,
       commission,
+      autoSettledOrders: autoSettled,
     })
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
