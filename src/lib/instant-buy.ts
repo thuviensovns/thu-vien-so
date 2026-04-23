@@ -1,9 +1,9 @@
 /**
  * Instant buy via account balance.
  *
- * When user clicks "Mua ngay" and their balance covers the price, we skip
- * the checkout page entirely: create a balance-method order and pay it in
- * one roundtrip, then let the caller redirect to the download result page.
+ * When user clicks "Mua ngay" and their balance covers the price, a single
+ * POST to /api/payment/instant-buy creates+pays+fulfills the order in one
+ * round-trip — perceptibly faster than the old two-call flow.
  *
  * Falls back to normal checkout flow on any failure (insufficient balance,
  * auth expired, network error).
@@ -14,45 +14,28 @@ export type InstantBuyResult =
 
 export async function instantBuyWithBalance(productId: string): Promise<InstantBuyResult> {
   try {
-    const createRes = await fetch('/api/payment/create-order', {
+    const res = await fetch('/api/payment/instant-buy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        items: [{ productId }],
-        paymentMethod: 'balance',
-      }),
+      body: JSON.stringify({ items: [{ productId }] }),
     })
 
-    if (createRes.status === 401) return { ok: false, reason: 'unauthorized' }
-    if (!createRes.ok) {
-      const err = await createRes.json().catch(() => ({}))
-      return { ok: false, reason: 'error', message: err?.error }
-    }
-    const orderData = await createRes.json()
-
-    const payRes = await fetch('/api/payment/pay-with-balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ orderId: orderData.orderId }),
-    })
-
-    if (payRes.status === 401) return { ok: false, reason: 'unauthorized' }
-    if (!payRes.ok) {
-      const err = await payRes.json().catch(() => ({}))
+    if (res.status === 401) return { ok: false, reason: 'unauthorized' }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
       const msg: string = err?.error || ''
       if (msg.includes('Số dư không đủ')) return { ok: false, reason: 'insufficient', message: msg }
       return { ok: false, reason: 'error', message: msg }
     }
 
-    const payData = await payRes.json()
+    const data = await res.json()
     return {
       ok: true,
-      orderId: orderData.orderId,
-      orderNumber: payData.orderNumber || orderData.orderNumber || '',
-      downloadToken: payData.downloadToken || '',
-      newBalance: Number(payData.newBalance) || 0,
+      orderId: data.orderId,
+      orderNumber: data.orderNumber || '',
+      downloadToken: data.downloadToken || '',
+      newBalance: Number(data.newBalance) || 0,
     }
   } catch (e) {
     return { ok: false, reason: 'error', message: (e as Error).message }

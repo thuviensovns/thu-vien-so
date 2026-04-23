@@ -49,11 +49,22 @@ export async function GET(
       return NextResponse.json({ error: 'Đơn hàng chưa được thanh toán' }, { status: 402 })
     }
 
-    // If no productId specified, return list of downloadable products
+    // If no productId specified, return list of downloadable products WITH
+    // their download URLs pre-signed. The /thanh-toan/ket-qua page used to fire
+    // a second fetch per item to get the URL; bundling them here collapses N+1
+    // round-trips into one so the user sees working "Tải" buttons instantly.
     if (!productId) {
-      const items = (order.items || []).map((item: OrderItem) => {
+      const items = await Promise.all((order.items || []).map(async (item: OrderItem) => {
         const product = typeof item.product === 'object' ? item.product as Product : null
         const file = product?.file || {}
+        let url: string | null = null
+        if (file.r2Key) {
+          try { url = await generateDownloadUrl(file.r2Key, 3600) } catch (e) {
+            console.error('[Download Token] R2 signing failed for list:', e)
+          }
+        } else if (file.downloadUrl) {
+          url = normalizeDownloadUrl(file.downloadUrl)
+        }
         return {
           productId: product ? product.id : item.product,
           name: item.productName || product?.name || 'Unknown',
@@ -61,8 +72,9 @@ export async function GET(
           fileName: file.fileName || null,
           fileSize: file.fileSize || null,
           fileFormat: file.fileFormat || null,
+          url,
         }
-      })
+      }))
       return NextResponse.json({
         orderNumber: order.orderNumber,
         expiresAt: order.downloadExpiresAt,

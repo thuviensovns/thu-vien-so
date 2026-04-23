@@ -24,6 +24,7 @@ interface DownloadItem {
   fileName: string | null
   fileSize: number | null
   fileFormat: string | null
+  url?: string | null
 }
 
 interface DownloadStatus extends DownloadItem {
@@ -32,48 +33,52 @@ interface DownloadStatus extends DownloadItem {
   url?: string
 }
 
+function deriveStatus(sp: URLSearchParams | ReturnType<typeof useSearchParams>): 'loading' | 'success' | 'failed' | 'pending' {
+  const responseCode = sp.get('vnp_ResponseCode')
+  const directStatus = sp.get('status')
+  if (responseCode === '00' || directStatus === 'success') return 'success'
+  if (directStatus === 'pending') return 'pending'
+  if (responseCode || directStatus === 'failed') return 'failed'
+  return 'failed'
+}
+
 export default function PaymentResultContent() {
   const searchParams = useSearchParams()
   const bank = useBankConfig()
-  const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>('loading')
-  const [orderNumber, setOrderNumber] = useState('')
-  const [downloadToken, setDownloadToken] = useState('')
-  const [transferCode, setTransferCode] = useState('')
-  const [orderAmount, setOrderAmount] = useState(0)
-  const [paymentMethod, setPaymentMethod] = useState<'bank-transfer' | 'momo' | ''>('')
+  // Lazy init from URL params so we skip the "Đang xử lý thanh toán..." flash
+  // on instant-buy redirects — the status is already known at mount time.
+  const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'pending'>(
+    () => deriveStatus(searchParams),
+  )
+  const [orderNumber, setOrderNumber] = useState(
+    () => searchParams.get('orderNumber') || searchParams.get('vnp_TxnRef') || '',
+  )
+  const [downloadToken, setDownloadToken] = useState(() => searchParams.get('token') || '')
+  const [transferCode, setTransferCode] = useState(() => searchParams.get('transferCode') || '')
+  const [orderAmount, setOrderAmount] = useState(() => Number(searchParams.get('amount')) || 0)
+  const [paymentMethod, setPaymentMethod] = useState<'bank-transfer' | 'momo' | ''>(() => {
+    const m = searchParams.get('method')
+    return m === 'bank-transfer' || m === 'momo' ? m : ''
+  })
   const [downloads, setDownloads] = useState<DownloadStatus[]>([])
   const [allDone, setAllDone] = useState(false)
   const [polling, setPolling] = useState(false)
   const downloadStarted = useRef(false)
   const downloadFrameRef = useRef<HTMLIFrameElement | null>(null)
 
-  // Determine payment result from URL params
+  // Keep state in sync if params change after mount (back/forward nav, etc.)
   useEffect(() => {
-    const responseCode = searchParams.get('vnp_ResponseCode')
-    const txnRef = searchParams.get('vnp_TxnRef')
-    const directStatus = searchParams.get('status')
-    const directOrderNumber = searchParams.get('orderNumber')
+    setStatus(deriveStatus(searchParams))
+    const on = searchParams.get('orderNumber') || searchParams.get('vnp_TxnRef')
+    if (on) setOrderNumber(on)
     const token = searchParams.get('token')
-    const tCode = searchParams.get('transferCode')
-    const amountParam = searchParams.get('amount')
-    const methodParam = searchParams.get('method')
-
-    if (txnRef) setOrderNumber(txnRef)
-    if (directOrderNumber) setOrderNumber(directOrderNumber)
     if (token) setDownloadToken(token)
+    const tCode = searchParams.get('transferCode')
     if (tCode) setTransferCode(tCode)
+    const amountParam = searchParams.get('amount')
     if (amountParam) setOrderAmount(Number(amountParam) || 0)
+    const methodParam = searchParams.get('method')
     if (methodParam === 'bank-transfer' || methodParam === 'momo') setPaymentMethod(methodParam)
-
-    if (responseCode === '00' || directStatus === 'success') {
-      setStatus('success')
-    } else if (directStatus === 'pending') {
-      setStatus('pending')
-    } else if (responseCode || directStatus === 'failed') {
-      setStatus('failed')
-    } else {
-      setStatus('failed')
-    }
   }, [searchParams])
 
   // Auto-regenerated QR for pending bank-transfer / MoMo orders. Keeps the
@@ -85,11 +90,13 @@ export default function PaymentResultContent() {
     return buildVietQRUrl(orderAmount, transferCode, bank)
   }, [orderAmount, transferCode, bank, paymentMethod])
 
-  // For VNPay: webhook may fire after redirect — poll for download token
+  // For VNPay: webhook may fire after redirect — poll for download token.
+  // Shorter/tighter interval than before so the success UI doesn't linger
+  // waiting on a cold webhook. 5 × 1s ≈ covers the usual webhook lag.
   const pollForToken = useCallback(async (on: string) => {
     if (!on) return
     setPolling(true)
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
       try {
         const res = await fetch(`/api/orders/by-number?orderNumber=${encodeURIComponent(on)}`, {
           credentials: 'include',
@@ -103,77 +110,52 @@ export default function PaymentResultContent() {
           }
         }
       } catch {}
-      await new Promise((r) => setTimeout(r, 2000))
+      await new Promise((r) => setTimeout(r, 1000))
     }
     setPolling(false)
     return null
   }, [])
 
-  // Auto-download when we have a token
+  // Fetch list + pre-signed URLs in a single call so "Tải" buttons appear
+  // immediately on success. The list endpoint now returns `url` per item,
+  // replacing the old N+1 sequential fetch loop.
   useEffect(() => {
     if (status !== 'success' || downloadStarted.current) return
 
     async function startDownloads() {
       let token = downloadToken
-
-      // If no token yet (VNPay redirect), poll for it
       if (!token && orderNumber) {
         token = await pollForToken(orderNumber) || ''
       }
-
       if (!token) return
       downloadStarted.current = true
 
-      // Fetch downloadable items from the token endpoint
       try {
         const res = await fetch(`/api/download/${token}`)
         if (!res.ok) return
         const data = await res.json()
-
         if (!data.items?.length) return
 
         const statuses: DownloadStatus[] = data.items.map((item: DownloadItem) => ({
           ...item,
-          status: 'pending' as const,
+          status: item.hasFile && item.url
+            ? 'done'
+            : item.hasFile
+              ? 'error'
+              : 'pending',
+          error: !item.hasFile
+            ? 'Chưa có file'
+            : !item.url
+              ? 'Không có URL'
+              : undefined,
+          url: item.url || undefined,
         }))
         setDownloads(statuses)
-
-        // Download each item
-        for (let i = 0; i < statuses.length; i++) {
-          statuses[i] = { ...statuses[i], status: 'downloading' }
-          setDownloads([...statuses])
-
-          try {
-            if (!statuses[i].hasFile) {
-              statuses[i] = { ...statuses[i], status: 'error', error: 'Chưa có file' }
-              setDownloads([...statuses])
-              continue
-            }
-
-            const dlRes = await fetch(`/api/download/${token}?productId=${statuses[i].productId}`)
-            if (dlRes.ok) {
-              const dlData = await dlRes.json()
-              if (dlData.url) {
-                // Only the first item auto-triggers via iframe — chained iframe
-                // navigations hit popup-blocker heuristics too. Remaining files
-                // surface as "Tải" buttons (user gesture = always allowed).
-                if (i === 0) triggerDownload(dlData.url)
-                statuses[i] = { ...statuses[i], status: 'done', url: dlData.url }
-              } else {
-                statuses[i] = { ...statuses[i], status: 'error', error: 'Không có URL' }
-              }
-            } else {
-              const err = await dlRes.json().catch(() => ({}))
-              statuses[i] = { ...statuses[i], status: 'error', error: err.error || 'Lỗi tải' }
-            }
-          } catch {
-            statuses[i] = { ...statuses[i], status: 'error', error: 'Lỗi kết nối' }
-          }
-
-          setDownloads([...statuses])
-        }
-
         setAllDone(true)
+
+        // Auto-trigger first item via hidden iframe (no popup blocker hit).
+        const first = statuses.find((s) => s.status === 'done' && s.url)
+        if (first?.url) triggerDownload(first.url)
       } catch (e) {
         console.error('[PaymentResult] Download error:', e)
       }
