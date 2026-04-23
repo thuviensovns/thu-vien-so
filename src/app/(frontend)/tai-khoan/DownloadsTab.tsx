@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic'
 import { Download, Loader2, Headphones, Video, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PopupBlockerNotice } from '@/components/shared/PaymentNotices'
 import { toast } from 'sonner'
 
 const AudioPreview = dynamic(
@@ -118,6 +119,14 @@ export default function DownloadsTab({ downloads, loading, onRefresh, onDownload
         <h2 className="font-bold">Downloads</h2>
         <Button variant="ghost" size="sm" className="text-xs" onClick={onRefresh}>Làm mới</Button>
       </div>
+
+      {/* Popup-blocker notice — shows only when there's actually something
+          to download (no clutter for the empty state). */}
+      {!loading && downloads.length > 0 && (
+        <div className="mb-4">
+          <PopupBlockerNotice />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">

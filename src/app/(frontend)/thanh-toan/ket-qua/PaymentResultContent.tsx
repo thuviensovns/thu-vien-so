@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   CheckCircle, XCircle, Loader2, Download, ShoppingCart,
-  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw, Info, QrCode,
+  Package, FileDown, Check, AlertTriangle, Clock, RefreshCw, QrCode,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { typeLabels, buildVietQRUrl, buildMomoQRUrl } from '@/lib/config'
 import { useBankConfig } from '@/hooks/use-bank-config'
+import { PopupBlockerNotice } from '@/components/shared/PaymentNotices'
 import BankTransferQR from '../BankTransferQR'
 import { formatVND } from '@/lib/format'
 
@@ -374,11 +375,8 @@ export default function PaymentResultContent() {
                   </h2>
                 </div>
 
-                <div className="flex items-start gap-2 p-3 mb-3 rounded-lg border border-primary/20 bg-primary/5 text-left max-w-sm mx-auto">
-                  <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Nếu trình duyệt chặn tải xuống, vui lòng nhấn nút <strong className="text-primary">Tải</strong> bên cạnh mỗi sản phẩm. Cho phép pop-up từ trang web để file tự tải lần sau.
-                  </p>
+                <div className="max-w-md mx-auto mb-4 text-left">
+                  <PopupBlockerNotice />
                 </div>
 
                 <div className="space-y-2 text-left max-w-sm mx-auto">

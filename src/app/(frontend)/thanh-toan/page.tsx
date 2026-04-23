@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { formatVND } from '@/lib/format'
 import { paymentMethods, buildVietQRUrl, buildMomoQRUrl, getUserTransferCode } from '@/lib/config'
 import { useBankConfig } from '@/hooks/use-bank-config'
+import { PaymentAutoConfirmNotice } from '@/components/shared/PaymentNotices'
 import { toast } from 'sonner'
 import OrderSummary from './OrderSummary'
 import BankTransferQR from './BankTransferQR'
@@ -279,6 +280,20 @@ export default function CheckoutPage() {
             <p className="text-xs text-muted-foreground">Hoàn tất đơn hàng của bạn</p>
           </div>
         </div>
+
+        {/* Auto-confirm reassurance — only relevant for bank-transfer/MoMo
+            (balance/VNPay are instant). Tailors first bullet to order context. */}
+        {(paymentMethod === 'bank-transfer' || paymentMethod === 'momo') && (
+          <PaymentAutoConfirmNotice
+            className="mb-6"
+            title="Đơn hàng sẽ tự động xử lý trong 1–2 phút sau khi chuyển khoản"
+            firstBullet={
+              <span>
+                Sau khi chuyển khoản, vui lòng <b className="text-foreground">chờ 1–2 phút</b>. Hệ thống tự động xác nhận đơn hàng và gửi link tải — bạn không cần thao tác gì thêm.
+              </span>
+            }
+          />
+        )}
 
         <form onSubmit={handleCheckout} className="relative">
           {isSubmitting && (
