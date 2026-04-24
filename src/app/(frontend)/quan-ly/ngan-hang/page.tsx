@@ -181,7 +181,7 @@ export default function BankSettingsPage() {
             <div>
               <label htmlFor="accountNumber" className="text-sm font-medium mb-1.5 block">Số tài khoản</label>
               <div className="flex gap-2">
-                <Input id="accountNumber" value={form.accountNumber} onChange={(e) => setForm((prev) => ({ ...prev, accountNumber: e.target.value }))} placeholder="0898 144 764" className="bg-muted/50 font-mono text-lg" />
+                <Input id="accountNumber" value={form.accountNumber} onChange={(e) => setForm((prev) => ({ ...prev, accountNumber: e.target.value }))} placeholder="0898 144 763" className="bg-muted/50 font-mono text-lg" />
                 <Button variant="outline" size="icon" className="shrink-0" onClick={() => copyText(form.accountNumber, 'stk')}>
                   {copied === 'stk' ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
                 </Button>
