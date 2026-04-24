@@ -104,7 +104,7 @@ export default function SettingsPage() {
       ]
       case 'contact': return [
         { key: 'contactEmail', label: 'Email', type: 'text', placeholder: 'support@...', icon: Mail },
-        { key: 'contactPhone', label: 'Số điện thoại', type: 'text', placeholder: '0876 096 170', icon: Phone },
+        { key: 'contactPhone', label: 'Số điện thoại', type: 'text', placeholder: '0898 144 764', icon: Phone },
         { key: 'contactAddress', label: 'Địa chỉ', type: 'text', placeholder: 'TP. Hà Nội, Việt Nam', icon: MapPin },
       ]
       case 'social': return [

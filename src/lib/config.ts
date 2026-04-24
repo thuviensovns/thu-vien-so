@@ -5,7 +5,7 @@ export const siteConfig = {
   url: process.env.NEXT_PUBLIC_SITE_URL || 'https://thuvienso.top',
   contact: {
     email: 'support.thuvienso@gmail.com',
-    phone: '0876 096 170',
+    phone: '0898 144 764',
   },
   social: {
     facebook: 'https://facebook.com/@thuviensovnso',
