@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Download, Eye, ShoppingCart, Check, Sparkles, Zap, Trash2 } from 'lucide-react'
+import { Download, Eye, ShoppingCart, Check, Sparkles, Zap, Trash2, PackageX } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/hooks/use-cart'
@@ -30,6 +30,7 @@ export interface ProductCardProps {
   bpm?: number | null
   musicalKey?: string | null
   featured?: boolean
+  outOfStock?: boolean
   onDeleted?: () => void
 }
 
@@ -46,6 +47,7 @@ export const ProductCard = memo(function ProductCard({
   bpm,
   musicalKey,
   featured,
+  outOfStock,
   onDeleted,
 }: ProductCardProps) {
   const { addItem, removeItem, items } = useCart()
@@ -68,6 +70,10 @@ export const ProductCard = memo(function ProductCard({
   function handleAddToCart(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
+    if (outOfStock) {
+      toast.info('Sản phẩm này đang hết hàng')
+      return
+    }
     if (isInCart) return
     addItem({ id: productId, name, slug, price, thumbnail, type })
     setJustAdded(true)
@@ -137,6 +143,10 @@ export const ProductCard = memo(function ProductCard({
   async function handleBuyNow(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
+    if (outOfStock) {
+      toast.info('Sản phẩm này đang hết hàng')
+      return
+    }
     if (isFreeItem) {
       await handleFreeDownload()
       return
@@ -224,8 +234,15 @@ export const ProductCard = memo(function ProductCard({
           )}
         </div>
 
-        {/* Top-right: discount or free */}
-        {isFreeItem ? (
+        {/* Top-right: out-of-stock takes priority, then discount or free */}
+        {outOfStock ? (
+          <div className="absolute top-2 right-2">
+            <Badge className="bg-destructive border-0 text-destructive-foreground text-[10px] sm:text-xs px-2 py-0.5 font-bold flex items-center gap-1">
+              <PackageX className="h-3 w-3" />
+              HẾT HÀNG
+            </Badge>
+          </div>
+        ) : isFreeItem ? (
           <div className="absolute top-2 right-2">
             <Badge className="bg-success border-0 text-success-foreground text-[10px] sm:text-xs px-2 py-0.5 font-bold">
               FREE
@@ -238,6 +255,11 @@ export const ProductCard = memo(function ProductCard({
             </Badge>
           </div>
         ) : null}
+
+        {/* Out-of-stock dim overlay */}
+        {outOfStock && (
+          <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        )}
 
         {/* Admin delete button */}
         {isAdmin && isAdminProduct && (
@@ -297,7 +319,16 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         {/* Action buttons */}
-        {isFreeItem ? (
+        {outOfStock ? (
+          <Button
+            size="sm"
+            disabled
+            className="mt-2.5 w-full text-xs h-8 rounded-lg font-medium bg-muted text-muted-foreground border border-destructive/20 cursor-not-allowed"
+          >
+            <PackageX className="mr-1 h-3 w-3" />
+            Hết hàng
+          </Button>
+        ) : isFreeItem ? (
           <Button
             size="sm"
             onClick={handleBuyNow}

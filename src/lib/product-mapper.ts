@@ -57,6 +57,7 @@ export function mapPayloadDoc(doc: Record<string, unknown> | Product): DemoProdu
     },
     downloadCount: Number(doc.downloadCount || 0),
     featured: Boolean(doc.featured),
+    outOfStock: Boolean(doc.outOfStock),
     category: category.slug
       ? { slug: String(category.slug), name: String(category.name || '') }
       : undefined,
@@ -69,6 +70,7 @@ export function mapPayloadToGridItems(docs: Record<string, unknown>[]): {
   id: string; name: string; slug: string; type: string;
   thumbnail: { url?: string }; pricing: { price: number; originalPrice?: number | null; isFree?: boolean };
   preview?: { bpm?: number | null; musicalKey?: string | null }; downloadCount?: number; featured?: boolean;
+  outOfStock?: boolean;
 }[] {
   return docs.map((doc) => {
     const mapped = mapPayloadDoc(doc)
@@ -82,6 +84,7 @@ export function mapPayloadToGridItems(docs: Record<string, unknown>[]): {
       preview: mapped.preview,
       downloadCount: mapped.downloadCount,
       featured: mapped.featured,
+      outOfStock: mapped.outOfStock,
     }
   })
 }

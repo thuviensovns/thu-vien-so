@@ -15,6 +15,7 @@ export interface DemoProduct {
   }
   downloadCount: number
   featured?: boolean
+  outOfStock?: boolean
   category?: { slug: string; name: string }
   file?: { r2Key?: string; fileName?: string; fileSize?: number; fileFormat?: string; downloadUrl?: string }
   video?: { url?: string; r2Key?: string; fileName?: string; fileSize?: number; mimeType?: string }

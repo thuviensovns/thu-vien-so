@@ -56,6 +56,13 @@ export async function POST(req: NextRequest) {
         )
       }
 
+      if ((product as { outOfStock?: boolean }).outOfStock) {
+        return NextResponse.json(
+          { error: `Sản phẩm "${product.name}" đang hết hàng, không thể mua lúc này.` },
+          { status: 409 },
+        )
+      }
+
       const price = product.pricing.price
       total += price
       orderItems.push({

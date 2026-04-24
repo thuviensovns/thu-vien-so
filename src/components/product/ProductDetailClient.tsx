@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft, Download, FileArchive, HardDrive, ChevronRight,
-  Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor, Package, Eye, Shield, Clock,
+  Music, Headphones, Zap, Sliders, Guitar, Mic, Monitor, Package, Eye, Shield, Clock, PackageX,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -68,6 +68,7 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
   const isFreeItem = p.pricing.isFree || p.pricing.price === 0
   const hasDiscount = p.pricing.originalPrice && p.pricing.originalPrice > p.pricing.price
   const discountPercent = hasDiscount ? Math.round((1 - p.pricing.price / p.pricing.originalPrice!) * 100) : 0
+  const outOfStock = Boolean(p.outOfStock)
 
   const CatIcon = categoryIcons[categorySlug] || Package
 
@@ -126,7 +127,14 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
                   </Badge>
                 )}
               </div>
-              {isFreeItem ? (
+              {outOfStock ? (
+                <div className="absolute top-3 right-3">
+                  <Badge className="bg-destructive border-0 text-white text-sm px-3 py-1 font-bold flex items-center gap-1">
+                    <PackageX className="h-3.5 w-3.5" />
+                    HẾT HÀNG
+                  </Badge>
+                </div>
+              ) : isFreeItem ? (
                 <div className="absolute top-3 right-3">
                   <Badge className="bg-success border-0 text-white text-sm px-3 py-1 font-bold">FREE</Badge>
                 </div>
@@ -135,6 +143,9 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
                   <Badge className="bg-destructive border-0 text-white text-sm px-3 py-1 font-bold">-{discountPercent}%</Badge>
                 </div>
               ) : null}
+              {outOfStock && (
+                <div className="absolute inset-0 bg-black/30 pointer-events-none" />
+              )}
               {(p.preview?.bpm || p.preview?.musicalKey) && (
                 <div className="absolute bottom-3 left-3 flex gap-1.5">
                   {p.preview.bpm && (
@@ -249,6 +260,7 @@ export function ProductDetailClient({ slug, serverProduct }: ProductDetailClient
                     thumbnail={thumbnailUrl}
                     type={p.type}
                     isFree={isFreeItem}
+                    outOfStock={outOfStock}
                   />
                 </div>
               </CardContent>

@@ -436,6 +436,13 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add products.preview_audio_mime_type',
       q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_audio_mime_type VARCHAR`,
     },
+    // === Out-of-stock flag — admin can mark a product as "Hết hàng" to hide
+    // purchase actions and show a badge to customers. Not a stock counter;
+    // just a binary switch because files are digital, not inventoried. ===
+    {
+      label: 'Add products.out_of_stock',
+      q: `ALTER TABLE products ADD COLUMN IF NOT EXISTS out_of_stock BOOLEAN NOT NULL DEFAULT false`,
+    },
     // === Web2M auto-polling fields on bank_config global ===
     {
       label: 'Add bank_config.web2m_enabled',

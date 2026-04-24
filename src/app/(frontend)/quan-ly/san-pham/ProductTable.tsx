@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import {
-  Package, Trash2, Pencil, Eye, Star, RotateCcw,
+  Package, Trash2, Pencil, Eye, Star, RotateCcw, PackageX,
 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +88,12 @@ export default function ProductTable({
                             {isDeleted && (
                               <Badge className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] px-1 py-0 shrink-0">
                                 Đã xóa
+                              </Badge>
+                            )}
+                            {'outOfStock' in product && product.outOfStock && !isDeleted && (
+                              <Badge className="bg-destructive text-destructive-foreground border-0 text-[10px] px-1 py-0 shrink-0 flex items-center gap-0.5">
+                                <PackageX className="h-2.5 w-2.5" />
+                                Hết hàng
                               </Badge>
                             )}
                             {product.featured && !isDeleted && (

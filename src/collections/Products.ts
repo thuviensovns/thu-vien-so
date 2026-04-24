@@ -179,6 +179,7 @@ export const Products: CollectionConfig = {
     },
     { name: 'downloadCount', type: 'number', defaultValue: 0, admin: { readOnly: true }, label: 'Lượt tải' },
     { name: 'featured', type: 'checkbox', defaultValue: false, label: 'Nổi bật' },
+    { name: 'outOfStock', type: 'checkbox', defaultValue: false, label: 'Hết hàng', admin: { description: 'Bật để báo khách hàng sản phẩm này đã hết hàng' } },
     { name: 'order', type: 'number', defaultValue: 0, label: 'Thứ tự' },
   ],
 }

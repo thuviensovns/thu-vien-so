@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2, Video, Music,
+  Package, ImagePlus, Save, Star, RotateCcw, Upload, FileArchive, X, Loader2, Video, Music, PackageX,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,7 @@ export interface ProductFormData {
   price: string
   originalPrice: string
   featured: boolean
+  outOfStock: boolean
   file: FileData | null
   downloadUrl: string
   video: VideoData | null
@@ -69,6 +70,7 @@ export const defaultForm: ProductFormData = {
   price: '',
   originalPrice: '',
   featured: false,
+  outOfStock: false,
   file: null,
   downloadUrl: '',
   video: null,
@@ -524,6 +526,22 @@ export default function ProductForm({
             <label htmlFor="featured-check" className="text-xs font-medium cursor-pointer flex items-center gap-1">
               <Star className="h-3 w-3 text-warning" />
               Sản phẩm nổi bật
+            </label>
+          </div>
+
+          {/* Out of stock */}
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={form.outOfStock}
+              onChange={(e) => setForm((p) => ({ ...p, outOfStock: e.target.checked }))}
+              className="accent-red-500"
+              id="out-of-stock-check"
+            />
+            <label htmlFor="out-of-stock-check" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+              <PackageX className="h-3 w-3 text-destructive" />
+              Hết hàng
+              <span className="text-[10px] text-muted-foreground font-normal">— báo khách hàng sản phẩm này tạm thời hết hàng</span>
             </label>
           </div>
 

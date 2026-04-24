@@ -243,6 +243,7 @@ export default function ProductsPage() {
       price: String(product.pricing.price),
       originalPrice: product.pricing.originalPrice ? String(product.pricing.originalPrice) : '',
       featured: product.featured || false,
+      outOfStock: ('outOfStock' in product && product.outOfStock) || false,
       file: fileData,
       downloadUrl: file?.downloadUrl || '',
       video: videoData,
@@ -273,6 +274,7 @@ export default function ProductsPage() {
       thumbnail: { url: form.thumbnailUrl },
       pricing: { price, originalPrice, isFree: price === 0 },
       featured: form.featured,
+      outOfStock: form.outOfStock,
       category: catMeta ? { slug: catMeta.slug, name: catMeta.name } : undefined,
     }
 
@@ -540,6 +542,7 @@ export default function ProductsPage() {
             type: productData.type,
             pricing: productData.pricing,
             featured: productData.featured,
+            outOfStock: productData.outOfStock,
             category: categoryId,
             video: videoPayload,
             preview: previewPayload,
@@ -557,6 +560,7 @@ export default function ProductsPage() {
             type: productData.type,
             pricing: productData.pricing,
             featured: productData.featured,
+            outOfStock: productData.outOfStock,
             category: categoryId,
             video: videoPayload,
             preview: previewPayload,

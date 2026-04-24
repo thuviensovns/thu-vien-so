@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
       id: number
       name: string
       pricing_price: string | number
+      out_of_stock: boolean | null
       file_r2_key: string | null
       file_download_url: string | null
       file_file_name: string | null
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
         [userId],
       ) as Promise<{ rows: UserRow[] }>,
       pool.query(
-        `SELECT id, name, pricing_price,
+        `SELECT id, name, pricing_price, out_of_stock,
                 file_r2_key, file_download_url,
                 file_file_name, file_file_size, file_file_format
          FROM products WHERE id = ANY($1::int[])`,
@@ -128,6 +129,11 @@ export async function POST(req: NextRequest) {
       const row = productsById.get(pid)
       if (!row) {
         return NextResponse.json({ error: 'Product not found' }, { status: 400 })
+      }
+      if (row.out_of_stock) {
+        return NextResponse.json({
+          error: `Sản phẩm "${row.name}" đang hết hàng, không thể mua lúc này.`,
+        }, { status: 409 })
       }
       products.push(row)
     }

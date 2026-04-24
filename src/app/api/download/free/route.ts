@@ -63,6 +63,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Product is not free' }, { status: 403 })
     }
 
+    if (product.outOfStock) {
+      return NextResponse.json(
+        { error: 'Sản phẩm này đang hết hàng, không thể tải lúc này.' },
+        { status: 409 },
+      )
+    }
+
     // Get download URL: direct link first, then R2
     let url: string | null = null
     if (product.file?.downloadUrl) {

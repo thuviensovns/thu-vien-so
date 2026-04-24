@@ -106,6 +106,7 @@ export interface Product extends PayloadBase {
   tags?: Array<{ tag?: string | null; id?: string }> | null
   downloadCount?: number | null
   featured?: boolean | null
+  outOfStock?: boolean | null
   order?: number | null
 }
 

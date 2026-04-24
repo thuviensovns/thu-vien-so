@@ -21,6 +21,7 @@ export interface ProductGridItem {
   preview?: { bpm?: number | null; musicalKey?: string | null } | null
   downloadCount?: number
   featured?: boolean
+  outOfStock?: boolean
 }
 
 interface ProductGridProps {
@@ -73,6 +74,7 @@ export function ProductGrid({ products }: ProductGridProps) {
               bpm={product.preview?.bpm}
               musicalKey={product.preview?.musicalKey}
               featured={product.featured}
+              outOfStock={product.outOfStock}
             />
           </div>
         )

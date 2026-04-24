@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Download, ShoppingCart, Check, Zap } from 'lucide-react'
+import { Download, ShoppingCart, Check, Zap, PackageX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCart } from '@/hooks/use-cart'
 import { useAuth } from '@/hooks/use-auth'
@@ -18,9 +18,10 @@ interface AddToCartButtonProps {
   thumbnail: string
   type: string
   isFree?: boolean
+  outOfStock?: boolean
 }
 
-export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree }: AddToCartButtonProps) {
+export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree, outOfStock }: AddToCartButtonProps) {
   const { addItem, removeItem, items } = useCart()
   const { user } = useAuth()
   const { balance, refreshBalance } = useBalance()
@@ -136,6 +137,19 @@ export function AddToCartButton({ id, name, slug, price, thumbnail, type, isFree
       return
     }
     toast.error(result.message || 'Thanh toán thất bại')
+  }
+
+  if (outOfStock) {
+    return (
+      <Button
+        size="lg"
+        disabled
+        className="w-full bg-muted text-muted-foreground border border-destructive/30 cursor-not-allowed"
+      >
+        <PackageX className="mr-2 h-5 w-5" />
+        Sản phẩm đã hết hàng
+      </Button>
+    )
   }
 
   if (isFree) {

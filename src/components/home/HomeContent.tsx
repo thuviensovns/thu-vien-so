@@ -46,6 +46,7 @@ function toCardProps(p: DemoProduct) {
     bpm: p.preview?.bpm,
     musicalKey: p.preview?.musicalKey,
     featured: p.featured,
+    outOfStock: p.outOfStock,
   }
 }
 
