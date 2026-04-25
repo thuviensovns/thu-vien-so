@@ -39,8 +39,12 @@ export async function GET(req: NextRequest) {
     const year = Math.min(2100, Math.max(2020, yearParam))
     const month = Math.min(12, Math.max(1, monthParam))
 
+    // DEDUCT* rows are admin balance adjustments stored with negative amount —
+    // they're not customer revenue, exclude unconditionally. COMM* are
+    // affiliate commissions (internal transfers), excluded by default.
     const affiliateFilter = includeAffiliate ? '' : `AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'COMM%')`
-    const baseWhere = `t.status = 'completed' ${affiliateFilter}`
+    const deductFilter = `AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'DEDUCT%')`
+    const baseWhere = `t.status = 'completed' ${affiliateFilter} ${deductFilter}`
 
     const pool = getDbPool()
 

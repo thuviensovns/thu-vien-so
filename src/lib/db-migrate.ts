@@ -492,6 +492,16 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       label: 'Add bank_config.web2m_loop_lease_until',
       q: `ALTER TABLE bank_config ADD COLUMN IF NOT EXISTS web2m_loop_lease_until TIMESTAMPTZ`,
     },
+    {
+      // Pre-fix, the deduct endpoint stored DEDUCT* topups with POSITIVE
+      // `amount` (Payload's min:1000 validator blocked negative). Every SUM-
+      // based aggregation (leaderboard, revenue, dashboard) read these as
+      // top-ups and inflated the totals. Flip them to negative so SUMs net
+      // out naturally. Idempotent via `amount > 0` guard.
+      label: 'Backfill: flip DEDUCT* topup amounts to negative',
+      q: `UPDATE topups SET amount = -amount
+          WHERE transfer_code LIKE 'DEDUCT%' AND amount > 0`,
+    },
   ]
 
   for (const { label, q } of queries) {

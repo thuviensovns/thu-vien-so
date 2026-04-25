@@ -5,6 +5,9 @@ import { getDbPool } from '@/lib/db-pool'
 export async function GET() {
   try {
     const pool = getDbPool()
+    // Exclude DEDUCT* (admin balance adjustments) and COMM* (affiliate commission
+    // credits) — leaderboard ranks customers by GROSS real-money deposits only,
+    // so admin actions can't push someone up or down.
     const { rows } = await pool.query(`
       SELECT
         u.id,
@@ -14,6 +17,7 @@ export async function GET() {
       FROM topups t
       JOIN users u ON u.id = t.user_id
       WHERE t.status = 'completed'
+        AND (t.transfer_code IS NULL OR (t.transfer_code NOT LIKE 'DEDUCT%' AND t.transfer_code NOT LIKE 'COMM%'))
         AND u.role = 'customer'
         AND u.email NOT LIKE 'test-%'
         AND u.email NOT LIKE '%test@%'

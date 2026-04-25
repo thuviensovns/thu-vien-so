@@ -76,8 +76,14 @@ export default function AdminDashboard() {
       const paidOrders = orders.filter((o: { status: string }) => o.status === 'paid')
       const revenue = paidOrders.reduce((s: number, o: { total?: number }) => s + (o.total || 0), 0)
       const pendingCount = orders.filter((o: { status: string }) => o.status === 'pending').length
+      // Doanh thu nạp = tiền khách hàng nạp thật. Loại DEDUCT* (admin trừ
+      // tiền) và COMM* (hoa hồng affiliate, nội bộ) — chỉ tính nạp gross.
       const topUpTotal = topups
-        .filter((t: { status: string }) => t.status === 'completed')
+        .filter((t: { status: string; transferCode?: string | null }) =>
+          t.status === 'completed' &&
+          !(t.transferCode || '').startsWith('DEDUCT') &&
+          !(t.transferCode || '').startsWith('COMM'),
+        )
         .reduce((s: number, t: { amount?: number }) => s + (t.amount || 0), 0)
       const activeCoupons = coupons.filter((c: { active: boolean }) => c.active).length
 

@@ -68,7 +68,16 @@ export default function TopUpManagementPage() {
     return () => clearInterval(interval)
   }, [fetchTopUps])
 
-  const totalCompleted = history.filter((h) => h.status === 'completed').reduce((s, h) => s + h.amount, 0)
+  // "Tổng nạp" hiển thị doanh thu thật (gross): loại DEDUCT* (admin trừ tiền,
+  // điều chỉnh nội bộ) và COMM* (hoa hồng affiliate). Các DEDUCT row vẫn
+  // xuất hiện trong list để admin theo dõi nhưng không cộng/trừ vào tổng.
+  const totalCompleted = history
+    .filter((h) =>
+      h.status === 'completed' &&
+      !(h.transferCode || '').startsWith('DEDUCT') &&
+      !(h.transferCode || '').startsWith('COMM'),
+    )
+    .reduce((s, h) => s + h.amount, 0)
   const totalPending = history.filter((h) => h.status === 'pending').length
 
   async function handleManualTopUp() {
@@ -265,10 +274,11 @@ export default function TopUpManagementPage() {
           {history.map((entry) => {
             const st = statusConfig[entry.status] || statusConfig.pending
             const StatusIcon = st.icon
+            const isDeduct = entry.amount < 0 || entry.transferCode?.startsWith('DEDUCT')
             return (
-              <Card key={entry.id} className="border-border bg-card">
+              <Card key={entry.id} className={`border-border ${isDeduct ? 'bg-destructive/5' : 'bg-card'}`}>
                 <CardContent className="p-3 flex items-center gap-3">
-                  <StatusIcon className={`h-5 w-5 shrink-0 ${st.color}`} />
+                  <StatusIcon className={`h-5 w-5 shrink-0 ${isDeduct ? 'text-destructive' : st.color}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium truncate">
@@ -277,6 +287,11 @@ export default function TopUpManagementPage() {
                       <Badge variant="outline" className={`text-[10px] ${st.bg} ${st.color}`}>
                         {st.label}
                       </Badge>
+                      {isDeduct && (
+                        <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
+                          Trừ tiền
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
                       <span className="font-mono">{entry.transferCode}</span>
@@ -291,8 +306,8 @@ export default function TopUpManagementPage() {
                       </p>
                     )}
                   </div>
-                  <span className="text-sm font-bold text-success shrink-0">
-                    +{formatVND(entry.amount)}
+                  <span className={`text-sm font-bold shrink-0 ${isDeduct ? 'text-destructive' : 'text-success'}`}>
+                    {isDeduct ? '−' : '+'}{formatVND(Math.abs(entry.amount))}
                   </span>
                 </CardContent>
               </Card>

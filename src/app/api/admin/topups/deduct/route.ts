@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPayloadForApi } from '@/lib/payload'
+import { getDbPool } from '@/lib/db-pool'
 
-/** POST: Admin deducts from a user's balance + creates topup record with negative amount */
+/** POST: Admin deducts from a user's balance + creates topup audit row.
+ *
+ *  The topup row is inserted with NEGATIVE amount so any SUM-based aggregation
+ *  (leaderboard, revenue analytics, dashboard totals) automatically nets out
+ *  without per-query special-casing. We bypass `payload.create` because the
+ *  TopUps collection enforces `min: 1000` on `amount`, which would block a
+ *  signed value. Direct INSERT is safe — no hooks need to fire (the balance
+ *  has already been deducted in step 1, and TopUps.afterChange only reacts to
+ *  pending→completed transitions, not direct creates).
+ */
 export async function POST(req: NextRequest) {
   try {
     const payload = await getPayloadForApi()
@@ -55,36 +65,19 @@ export async function POST(req: NextRequest) {
       overrideAccess: true,
     })
 
-    // 2. Create topup record with negative amount for audit trail
+    // 2. Create audit row with NEGATIVE amount via raw SQL (bypasses min:1000)
     const transferCode = `DEDUCT${Date.now().toString(36).toUpperCase()}`
-    try {
-      await payload.create({
-        collection: 'topups',
-        data: {
-          user: targetUser.id,
-          amount,
-          transferCode,
-          status: 'completed',
-          confirmedAt: new Date().toISOString(),
-          readByAdmin: true,
-          bankDescription: `[TRỪ TIỀN] Admin trừ ${amount}₫ bởi ${user.email}`,
-        },
-        overrideAccess: true,
-      })
-    } catch (topupErr) {
-      console.warn('[Admin deduct] Retrying without optional fields:', topupErr)
-      await payload.create({
-        collection: 'topups',
-        data: {
-          user: targetUser.id,
-          amount,
-          transferCode,
-          status: 'completed',
-          confirmedAt: new Date().toISOString(),
-        },
-        overrideAccess: true,
-      })
-    }
+    const negAmount = -Math.abs(amount)
+    const description = `[TRỪ TIỀN] Admin trừ ${amount}₫ bởi ${user.email}`
+
+    const pool = getDbPool()
+    await pool.query(
+      `INSERT INTO topups
+         (user_id, amount, transfer_code, status, confirmed_at, credited_at,
+          bank_description, read_by_admin, created_at, updated_at)
+       VALUES ($1, $2, $3, 'completed', NOW(), NOW(), $4, true, NOW(), NOW())`,
+      [targetUser.id, negAmount, transferCode, description],
+    )
 
     return NextResponse.json({
       success: true,
