@@ -39,12 +39,15 @@ export async function GET(req: NextRequest) {
     const year = Math.min(2100, Math.max(2020, yearParam))
     const month = Math.min(12, Math.max(1, monthParam))
 
-    // DEDUCT* rows are admin balance adjustments stored with negative amount —
-    // they're not customer revenue, exclude unconditionally. COMM* are
-    // affiliate commissions (internal transfers), excluded by default.
+    // Doanh thu thật = chỉ tiền vào từ ngân hàng (NAPKH*/random). Loại:
+    //   - DEDUCT*  → admin trừ (điều chỉnh nội bộ, lưu amount âm)
+    //   - ADMIN*   → admin cộng tay (số ảo, không có giao dịch ngân hàng)
+    //   - COMM*    → hoa hồng affiliate (nội bộ, có toggle bật riêng)
+    // Khi admin cộng nhầm rồi trừ → cả 2 dòng ADMIN/DEDUCT đều bị loại,
+    // không tồn tại trong doanh thu (đúng mô hình "tiền đó không tồn tại").
     const affiliateFilter = includeAffiliate ? '' : `AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'COMM%')`
-    const deductFilter = `AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'DEDUCT%')`
-    const baseWhere = `t.status = 'completed' ${affiliateFilter} ${deductFilter}`
+    const adminAdjustFilter = `AND (t.transfer_code IS NULL OR (t.transfer_code NOT LIKE 'DEDUCT%' AND t.transfer_code NOT LIKE 'ADMIN%'))`
+    const baseWhere = `t.status = 'completed' ${affiliateFilter} ${adminAdjustFilter}`
 
     const pool = getDbPool()
 

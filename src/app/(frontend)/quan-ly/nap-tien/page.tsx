@@ -68,15 +68,18 @@ export default function TopUpManagementPage() {
     return () => clearInterval(interval)
   }, [fetchTopUps])
 
-  // "Tổng nạp" hiển thị doanh thu thật (gross): loại DEDUCT* (admin trừ tiền,
-  // điều chỉnh nội bộ) và COMM* (hoa hồng affiliate). Các DEDUCT row vẫn
-  // xuất hiện trong list để admin theo dõi nhưng không cộng/trừ vào tổng.
+  // "Tổng nạp" = tiền vào từ ngân hàng thật. Loại 3 nhóm điều chỉnh nội bộ:
+  //   - DEDUCT* (admin trừ tay)
+  //   - ADMIN*  (admin cộng tay — số ảo, không phải tiền thật)
+  //   - COMM*   (hoa hồng affiliate)
+  // Các dòng này vẫn xuất hiện trong list để admin theo dõi audit, nhưng
+  // không cộng/trừ vào doanh thu.
   const totalCompleted = history
-    .filter((h) =>
-      h.status === 'completed' &&
-      !(h.transferCode || '').startsWith('DEDUCT') &&
-      !(h.transferCode || '').startsWith('COMM'),
-    )
+    .filter((h) => {
+      if (h.status !== 'completed') return false
+      const code = h.transferCode || ''
+      return !code.startsWith('DEDUCT') && !code.startsWith('ADMIN') && !code.startsWith('COMM')
+    })
     .reduce((s, h) => s + h.amount, 0)
   const totalPending = history.filter((h) => h.status === 'pending').length
 
@@ -274,11 +277,16 @@ export default function TopUpManagementPage() {
           {history.map((entry) => {
             const st = statusConfig[entry.status] || statusConfig.pending
             const StatusIcon = st.icon
-            const isDeduct = entry.amount < 0 || entry.transferCode?.startsWith('DEDUCT')
+            const code = entry.transferCode || ''
+            const isDeduct = entry.amount < 0 || code.startsWith('DEDUCT')
+            const isManualAdmin = code.startsWith('ADMIN')
+            const isAffiliate = code.startsWith('COMM')
+            const cardBg = isDeduct ? 'bg-destructive/5' : isManualAdmin ? 'bg-warning/5' : isAffiliate ? 'bg-muted/30' : 'bg-card'
+            const iconColor = isDeduct ? 'text-destructive' : isManualAdmin ? 'text-warning' : st.color
             return (
-              <Card key={entry.id} className={`border-border ${isDeduct ? 'bg-destructive/5' : 'bg-card'}`}>
+              <Card key={entry.id} className={`border-border ${cardBg}`}>
                 <CardContent className="p-3 flex items-center gap-3">
-                  <StatusIcon className={`h-5 w-5 shrink-0 ${isDeduct ? 'text-destructive' : st.color}`} />
+                  <StatusIcon className={`h-5 w-5 shrink-0 ${iconColor}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium truncate">
@@ -290,6 +298,16 @@ export default function TopUpManagementPage() {
                       {isDeduct && (
                         <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">
                           Trừ tiền
+                        </Badge>
+                      )}
+                      {isManualAdmin && (
+                        <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30" title="Admin cộng tay — không tính vào doanh thu">
+                          Cộng thủ công
+                        </Badge>
+                      )}
+                      {isAffiliate && (
+                        <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground" title="Hoa hồng affiliate — không tính vào doanh thu">
+                          Hoa hồng
                         </Badge>
                       )}
                     </div>
