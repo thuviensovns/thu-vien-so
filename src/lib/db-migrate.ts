@@ -502,6 +502,64 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
       q: `UPDATE topups SET amount = -amount
           WHERE transfer_code LIKE 'DEDUCT%' AND amount > 0`,
     },
+    // ── Reverse affiliate commissions wrongly accrued from ADMIN* manual
+    //    top-ups. Order matters: A→B→C must run BEFORE D (D flips status,
+    //    which is the filter used by A/B/C). All idempotent via
+    //    `status='credited'` filter — once D marks rows 'reversed', subsequent
+    //    runs find nothing and no-op.
+    {
+      label: 'Reverse ADMIN-derived affiliate commissions (A: balances)',
+      q: `UPDATE users u
+          SET balance = COALESCE(u.balance, 0) - sub.total
+          FROM (
+            SELECT referrer_user_id, SUM(commission_amount)::bigint AS total
+            FROM affiliate_commissions
+            WHERE source_id LIKE 'ADMIN%' AND status = 'credited'
+            GROUP BY referrer_user_id
+          ) sub
+          WHERE u.id = sub.referrer_user_id`,
+    },
+    {
+      label: 'Reverse ADMIN-derived affiliate commissions (B: account counters)',
+      q: `UPDATE affiliate_accounts aa
+          SET total_earned = GREATEST(0, COALESCE(aa.total_earned, 0) - sub.total),
+              auto_credited = GREATEST(0, COALESCE(aa.auto_credited, 0) - sub.total)
+          FROM (
+            SELECT referrer_user_id, SUM(commission_amount)::bigint AS total
+            FROM affiliate_commissions
+            WHERE source_id LIKE 'ADMIN%' AND status = 'credited'
+            GROUP BY referrer_user_id
+          ) sub
+          WHERE aa.user_id = sub.referrer_user_id`,
+    },
+    {
+      label: 'Reverse ADMIN-derived affiliate commissions (C: delete COMM audit topups)',
+      q: `DELETE FROM topups
+          WHERE id IN (
+            SELECT t.id FROM topups t
+            JOIN affiliate_commissions ac
+              ON ac.referrer_user_id = t.user_id
+              AND t.bank_description LIKE '%topup#' || ac.source_id || '%'
+            WHERE t.transfer_code LIKE 'COMM%'
+              AND ac.source_id LIKE 'ADMIN%'
+              AND ac.status = 'credited'
+          )`,
+    },
+    {
+      label: 'Reverse ADMIN-derived affiliate commissions (D: mark reversed)',
+      q: `UPDATE affiliate_commissions
+          SET status = 'reversed',
+              note = COALESCE(note, '') || ' [REVERSED: source admin manual top-up — not real revenue]'
+          WHERE source_id LIKE 'ADMIN%' AND status = 'credited'`,
+    },
+    {
+      // Defensive clamp for any drift introduced by past partial cleanups.
+      label: 'Clamp negative affiliate counters to zero',
+      q: `UPDATE affiliate_accounts
+          SET total_earned = GREATEST(0, total_earned),
+              auto_credited = GREATEST(0, COALESCE(auto_credited, 0))
+          WHERE total_earned < 0 OR auto_credited < 0`,
+    },
   ]
 
   for (const { label, q } of queries) {

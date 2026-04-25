@@ -168,37 +168,15 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // 3. Accrue affiliate commission — surface the outcome so admin sees whether
-    //    a referrer was credited (and why not, when applicable).
-    let commission: {
-      credited: boolean
-      amount: number
-      reason?: string
-      referrerId?: number
-      referrerEmail?: string
-    } = { credited: false, amount: 0 }
-    try {
-      const { accrueCommission } = await import('@/lib/affiliate')
-      const result = await accrueCommission({
-        referredUserId: Number(targetUser.id),
-        baseAmount: amount,
-        sourceType: 'topup',
-        sourceId: transferCode,
-      })
-      commission = { ...result }
-      if (result.referrerId) {
-        try {
-          const pool = getDbPool()
-          const { rows } = await pool.query(
-            `SELECT email FROM users WHERE id = $1`,
-            [result.referrerId],
-          )
-          commission.referrerEmail = (rows[0]?.email as string) || undefined
-        } catch { /* ignore */ }
-      }
-    } catch (err) {
-      commission = { credited: false, amount: 0, reason: `error:${(err as Error).message}` }
-    }
+    // 3. KHÔNG accrue affiliate commission cho admin cộng tay.
+    //    Manual top-up = số ảo (không có giao dịch ngân hàng thật) → referrer
+    //    không được phát hoa hồng. Giữ field `commission` trong response để
+    //    backward-compatible với frontend cũ.
+    const commission = {
+      credited: false,
+      amount: 0,
+      reason: 'manual_topup_excluded_from_commission',
+    } as const
 
     // Auto-settle pending orders using the newly credited balance.
     let autoSettled: { orderNumber: string; total: number; downloadToken: string }[] = []
