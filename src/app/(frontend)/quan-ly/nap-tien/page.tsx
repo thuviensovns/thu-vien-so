@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   Wallet, Plus, Search, CheckCircle2, Clock, XCircle,
-  ArrowUpCircle, RefreshCw, Loader2,
+  ArrowUpCircle, RefreshCw, Loader2, TrendingUp,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -124,6 +125,12 @@ export default function TopUpManagementPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/quan-ly/nap-tien/doanh-thu">
+            <Button size="sm" variant="outline" title="Xem doanh thu theo ngày/tháng/năm">
+              <TrendingUp className="mr-1.5 h-3.5 w-3.5 text-success" />
+              Doanh thu
+            </Button>
+          </Link>
           <Button size="sm" variant="outline" onClick={fetchTopUps} title="Làm mới">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
