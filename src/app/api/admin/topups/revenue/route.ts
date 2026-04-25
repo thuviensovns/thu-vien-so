@@ -6,10 +6,21 @@ type Row = Record<string, unknown>
 
 const VN_TZ = 'Asia/Ho_Chi_Minh'
 
-/** Effective payment timestamp: when wallet was credited, falls back to admin
- *  confirmation, then row creation. AT TIME ZONE first reads UTC then converts
- *  to VN local — admins see calendar buckets aligned to their day boundary. */
-const TS_EXPR = `(COALESCE(t.credited_at, t.confirmed_at, t.created_at) AT TIME ZONE '${VN_TZ}')`
+/** Effective payment timestamp.
+ *
+ *  For DEDUCT* rows linked to an `original_topup_id`, the timestamp is read
+ *  from the ORIGINAL topup so refunds/corrections land in the same calendar
+ *  bucket as the credit they cancel — admin sees `cộng nhầm + trừ nhầm` net
+ *  to 0 on the day the mistake was made, not split across two days.
+ *
+ *  Falls back to the row's own credited_at → confirmed_at → created_at chain
+ *  when there's no link (legacy DEDUCTs without match, or non-DEDUCT rows).
+ *  AT TIME ZONE converts UTC → VN local for day-boundary alignment. */
+const TS_EXPR = `(COALESCE(orig.credited_at, orig.confirmed_at, orig.created_at, t.credited_at, t.confirmed_at, t.created_at) AT TIME ZONE '${VN_TZ}')`
+
+/** Always LEFT JOIN the original topup for DEDUCT linkage. NULL for unlinked
+ *  rows so the COALESCE in TS_EXPR falls through to t.* timestamps. */
+const FROM_WITH_ORIG = `FROM topups t LEFT JOIN topups orig ON orig.id = t.original_topup_id`
 
 /** GET: Aggregated topup revenue for admin analytics.
  *
@@ -62,7 +73,7 @@ export async function GET(req: NextRequest) {
         `SELECT EXTRACT(DAY FROM ${TS_EXPR})::int AS day,
                 SUM(t.amount)::bigint AS amount,
                 COUNT(*)::int AS count
-         FROM topups t
+         ${FROM_WITH_ORIG}
          WHERE ${baseWhere}
            AND EXTRACT(YEAR FROM ${TS_EXPR}) = $1
            AND EXTRACT(MONTH FROM ${TS_EXPR}) = $2
@@ -75,7 +86,7 @@ export async function GET(req: NextRequest) {
         `SELECT EXTRACT(MONTH FROM ${TS_EXPR})::int AS month,
                 SUM(t.amount)::bigint AS amount,
                 COUNT(*)::int AS count
-         FROM topups t
+         ${FROM_WITH_ORIG}
          WHERE ${baseWhere}
            AND EXTRACT(YEAR FROM ${TS_EXPR}) = $1
          GROUP BY month
@@ -87,23 +98,24 @@ export async function GET(req: NextRequest) {
         `SELECT EXTRACT(YEAR FROM ${TS_EXPR})::int AS year,
                 SUM(t.amount)::bigint AS amount,
                 COUNT(*)::int AS count
-         FROM topups t
+         ${FROM_WITH_ORIG}
          WHERE ${baseWhere}
          GROUP BY year
          ORDER BY year`,
       ),
-      // All-time totals
+      // All-time totals (no time bucket — JOIN unnecessary but harmless and
+      // keeps the WHERE clause uniform across all five queries)
       pool.query<Row>(
         `SELECT COALESCE(SUM(t.amount), 0)::bigint AS amount,
                 COUNT(*)::int AS count
-         FROM topups t
+         ${FROM_WITH_ORIG}
          WHERE ${baseWhere}`,
       ),
       // Today's totals (VN day boundary)
       pool.query<Row>(
         `SELECT COALESCE(SUM(t.amount), 0)::bigint AS amount,
                 COUNT(*)::int AS count
-         FROM topups t
+         ${FROM_WITH_ORIG}
          WHERE ${baseWhere}
            AND DATE(${TS_EXPR}) = (CURRENT_TIMESTAMP AT TIME ZONE '${VN_TZ}')::date`,
       ),

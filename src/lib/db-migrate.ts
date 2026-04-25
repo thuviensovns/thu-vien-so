@@ -560,6 +560,52 @@ async function _runEnsureTablesExist(): Promise<{ executed: string[]; errors: st
               auto_credited = GREATEST(0, COALESCE(auto_credited, 0))
           WHERE total_earned < 0 OR auto_credited < 0`,
     },
+    {
+      // Link DEDUCT* rows back to the topup they correct so per-day revenue
+      // buckets attribute the negative to the original credit's date instead
+      // of the day the admin clicked "trừ". Nullable: legacy/orphan DEDUCTs
+      // fall back to their own date.
+      label: 'Add topups.original_topup_id',
+      q: `ALTER TABLE topups ADD COLUMN IF NOT EXISTS original_topup_id INT`,
+    },
+    {
+      label: 'Index topups.original_topup_id (for revenue JOIN)',
+      q: `CREATE INDEX IF NOT EXISTS topups_original_topup_id_idx ON topups(original_topup_id) WHERE original_topup_id IS NOT NULL`,
+    },
+    {
+      // Backfill: link unlinked DEDUCT rows to the topup they correct.
+      //  - Priority 1: same user, EXACT |amount| match, most recent before
+      //    the DEDUCT (the typical "cộng X rồi trừ X" flow).
+      //  - Priority 2: same user, LARGEST positive credit before the DEDUCT
+      //    (best-guess for partial / bulk-undo: trừ 10.6M when there's a
+      //    10M + 500K + 100K spread → attribute to the 10M day).
+      //  Excludes DEDUCT* (other deducts) and COMM* (affiliate internal).
+      //  Idempotent via `original_topup_id IS NULL` guard.
+      label: 'Backfill: link DEDUCT rows to their original topup',
+      q: `UPDATE topups d
+          SET original_topup_id = COALESCE(
+            (SELECT t.id FROM topups t
+             WHERE t.user_id = d.user_id
+               AND t.amount = ABS(d.amount)
+               AND t.status = 'completed'
+               AND t.id != d.id
+               AND (t.transfer_code IS NULL
+                 OR (t.transfer_code NOT LIKE 'DEDUCT%' AND t.transfer_code NOT LIKE 'COMM%'))
+               AND t.created_at <= d.created_at
+             ORDER BY t.created_at DESC LIMIT 1),
+            (SELECT t.id FROM topups t
+             WHERE t.user_id = d.user_id
+               AND t.amount > 0
+               AND t.status = 'completed'
+               AND t.id != d.id
+               AND (t.transfer_code IS NULL
+                 OR (t.transfer_code NOT LIKE 'DEDUCT%' AND t.transfer_code NOT LIKE 'COMM%'))
+               AND t.created_at <= d.created_at
+             ORDER BY t.amount DESC, t.created_at DESC LIMIT 1)
+          )
+          WHERE d.transfer_code LIKE 'DEDUCT%'
+            AND d.original_topup_id IS NULL`,
+    },
   ]
 
   for (const { label, q } of queries) {
