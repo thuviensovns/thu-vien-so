@@ -68,18 +68,11 @@ export default function TopUpManagementPage() {
     return () => clearInterval(interval)
   }, [fetchTopUps])
 
-  // "Tổng nạp" = tiền vào từ ngân hàng thật. Loại 3 nhóm điều chỉnh nội bộ:
-  //   - DEDUCT* (admin trừ tay)
-  //   - ADMIN*  (admin cộng tay — số ảo, không phải tiền thật)
-  //   - COMM*   (hoa hồng affiliate)
-  // Các dòng này vẫn xuất hiện trong list để admin theo dõi audit, nhưng
-  // không cộng/trừ vào doanh thu.
+  // "Tổng nạp" = SUM tất cả completed topups, chỉ loại COMM (hoa hồng nội bộ).
+  // ADMIN cộng tay là doanh thu; DEDUCT âm tự nét correction pairs. Đồng bộ
+  // với /api/admin/topups/revenue và leaderboard.
   const totalCompleted = history
-    .filter((h) => {
-      if (h.status !== 'completed') return false
-      const code = h.transferCode || ''
-      return !code.startsWith('DEDUCT') && !code.startsWith('ADMIN') && !code.startsWith('COMM')
-    })
+    .filter((h) => h.status === 'completed' && !(h.transferCode || '').startsWith('COMM'))
     .reduce((s, h) => s + h.amount, 0)
   const totalPending = history.filter((h) => h.status === 'pending').length
 
@@ -301,12 +294,12 @@ export default function TopUpManagementPage() {
                         </Badge>
                       )}
                       {isManualAdmin && (
-                        <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30" title="Admin cộng tay — không tính vào doanh thu">
+                        <Badge variant="outline" className="text-[10px] bg-warning/10 text-warning border-warning/30" title="Admin cộng tay cho khách hàng — tính là doanh thu">
                           Cộng thủ công
                         </Badge>
                       )}
                       {isAffiliate && (
-                        <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground" title="Hoa hồng affiliate — không tính vào doanh thu">
+                        <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground" title="Hoa hồng affiliate (nội bộ) — không tính vào doanh thu">
                           Hoa hồng
                         </Badge>
                       )}

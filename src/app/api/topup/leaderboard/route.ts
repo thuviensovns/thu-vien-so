@@ -5,11 +5,11 @@ import { getDbPool } from '@/lib/db-pool'
 export async function GET() {
   try {
     const pool = getDbPool()
-    // Leaderboard chỉ tính nạp THẬT từ ngân hàng. Loại:
-    //   - DEDUCT* (admin trừ — không có giao dịch ngân hàng thật)
-    //   - ADMIN*  (admin cộng tay — số ảo, không phải tiền vào)
-    //   - COMM*   (hoa hồng affiliate — nội bộ)
-    // → Admin actions hoàn toàn không ảnh hưởng ranking.
+    // Leaderboard đồng bộ với /api/admin/topups/revenue: SUM(amount) tất cả
+    // completed topups, chỉ loại COMM (hoa hồng affiliate, nội bộ). ADMIN cộng
+    // tay tính là nạp thật cho khách; DEDUCT lưu âm tự nét ra correction
+    // pairs. HAVING SUM > 0 ensures users với cộng nhầm + trừ nhầm net 0
+    // không xuất hiện trên bảng top.
     const { rows } = await pool.query(`
       SELECT
         u.id,
@@ -19,11 +19,7 @@ export async function GET() {
       FROM topups t
       JOIN users u ON u.id = t.user_id
       WHERE t.status = 'completed'
-        AND (t.transfer_code IS NULL OR (
-          t.transfer_code NOT LIKE 'DEDUCT%'
-          AND t.transfer_code NOT LIKE 'ADMIN%'
-          AND t.transfer_code NOT LIKE 'COMM%'
-        ))
+        AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'COMM%')
         AND u.role = 'customer'
         AND u.email NOT LIKE 'test-%'
         AND u.email NOT LIKE '%test@%'

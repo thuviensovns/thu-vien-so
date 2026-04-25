@@ -76,16 +76,13 @@ export default function AdminDashboard() {
       const paidOrders = orders.filter((o: { status: string }) => o.status === 'paid')
       const revenue = paidOrders.reduce((s: number, o: { total?: number }) => s + (o.total || 0), 0)
       const pendingCount = orders.filter((o: { status: string }) => o.status === 'pending').length
-      // Doanh thu nạp = tiền vào từ ngân hàng thật. Loại:
-      //   - DEDUCT* (admin trừ tay)
-      //   - ADMIN*  (admin cộng tay — số ảo)
-      //   - COMM*   (hoa hồng affiliate, nội bộ)
+      // Doanh thu nạp = SUM tất cả completed topups, chỉ loại COMM (hoa hồng
+      // affiliate nội bộ). ADMIN cộng tay tính là doanh thu; DEDUCT âm tự
+      // nét pairs cộng nhầm/trừ nhầm. Đồng bộ với revenue endpoint + leaderboard.
       const topUpTotal = topups
-        .filter((t: { status: string; transferCode?: string | null }) => {
-          if (t.status !== 'completed') return false
-          const code = t.transferCode || ''
-          return !code.startsWith('DEDUCT') && !code.startsWith('ADMIN') && !code.startsWith('COMM')
-        })
+        .filter((t: { status: string; transferCode?: string | null }) =>
+          t.status === 'completed' && !(t.transferCode || '').startsWith('COMM'),
+        )
         .reduce((s: number, t: { amount?: number }) => s + (t.amount || 0), 0)
       const activeCoupons = coupons.filter((c: { active: boolean }) => c.active).length
 

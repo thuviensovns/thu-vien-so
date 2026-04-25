@@ -38,18 +38,28 @@ function getCurrentVNDate() {
   return new Date(s)
 }
 
-/** Compact VND format for table cells: 1.234.567đ → "1.2M", 50.000đ → "50K" */
+/** Compact VND format for table cells: 1.234.567đ → "1.2M", 50.000đ → "50K".
+ *  Negative values get "−" prefix (refund-heavy buckets with DEDUCT > deposits). */
 function formatCompactVND(amount: number): string {
   if (amount === 0) return '–'
+  if (amount < 0) return '−' + formatCompactVND(-amount)
   if (amount >= 1_000_000_000) return `${(amount / 1_000_000_000).toFixed(amount >= 10_000_000_000 ? 0 : 1)}B`
   if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(amount >= 10_000_000 ? 0 : 1)}M`
   if (amount >= 1_000) return `${Math.round(amount / 1_000)}K`
   return `${amount}`
 }
 
-/** Heatmap intensity: returns Tailwind bg classes based on amount/max ratio. */
+/** Heatmap intensity. Positive = green (revenue); negative = red (refunds
+ *  exceeded deposits). max is the absolute peak of the bucket so signed
+ *  ratios share the same scale. */
 function heatClass(amount: number, max: number): string {
-  if (amount <= 0 || max <= 0) return 'bg-muted/20 text-muted-foreground'
+  if (amount === 0 || max <= 0) return 'bg-muted/20 text-muted-foreground'
+  if (amount < 0) {
+    const ratio = Math.abs(amount) / max
+    if (ratio >= 0.6) return 'bg-destructive/40 text-foreground border-destructive/60 font-bold'
+    if (ratio >= 0.3) return 'bg-destructive/25 text-foreground border-destructive/50 font-semibold'
+    return 'bg-destructive/15 text-foreground border-destructive/30'
+  }
   const ratio = amount / max
   if (ratio >= 0.8) return 'bg-success/40 text-success-foreground border-success/60 font-bold'
   if (ratio >= 0.6) return 'bg-success/30 text-foreground border-success/50 font-semibold'
@@ -109,9 +119,11 @@ export default function RevenueAnalyticsPage() {
   const todayMonth = nowVN.getMonth() + 1
   const todayYear = nowVN.getFullYear()
 
-  const maxDaily = useMemo(() => Math.max(0, ...(data?.daily || []).map((d) => d.amount)), [data])
-  const maxMonthly = useMemo(() => Math.max(0, ...(data?.monthly || []).map((m) => m.amount)), [data])
-  const maxYearly = useMemo(() => Math.max(0, ...(data?.yearly || []).map((y) => y.amount)), [data])
+  // Use abs() so negative buckets (refund-heavy days) still scale heatmap
+  // intensity proportional to the period's peak.
+  const maxDaily = useMemo(() => Math.max(0, ...(data?.daily || []).map((d) => Math.abs(d.amount))), [data])
+  const maxMonthly = useMemo(() => Math.max(0, ...(data?.monthly || []).map((m) => Math.abs(m.amount))), [data])
+  const maxYearly = useMemo(() => Math.max(0, ...(data?.yearly || []).map((y) => Math.abs(y.amount))), [data])
 
   // Available years for selector: range from earliest yearly bucket to current+0
   const yearOptions = useMemo(() => {
@@ -514,11 +526,15 @@ function StatCard({
 }: {
   label: string; amount: number; count: number; accent: string; border: string; bg: string
 }) {
+  // Negative bucket = refund/deduction exceeded deposits in period. Override
+  // accent to destructive so admin spots it immediately instead of misreading
+  // a green-styled negative number.
+  const amountClass = amount < 0 ? 'text-destructive' : accent
   return (
     <Card className={`${border} ${bg}`}>
       <CardContent className="p-3">
         <p className="text-[11px] text-muted-foreground truncate">{label}</p>
-        <p className={`text-base font-bold mt-1 ${accent} font-mono leading-tight`}>{formatVND(amount)}</p>
+        <p className={`text-base font-bold mt-1 ${amountClass} font-mono leading-tight`}>{formatVND(amount)}</p>
         <p className="text-[10px] text-muted-foreground mt-0.5">{count} giao dịch</p>
       </CardContent>
     </Card>

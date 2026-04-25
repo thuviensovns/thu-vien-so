@@ -39,15 +39,14 @@ export async function GET(req: NextRequest) {
     const year = Math.min(2100, Math.max(2020, yearParam))
     const month = Math.min(12, Math.max(1, monthParam))
 
-    // Doanh thu thật = chỉ tiền vào từ ngân hàng (NAPKH*/random). Loại:
-    //   - DEDUCT*  → admin trừ (điều chỉnh nội bộ, lưu amount âm)
-    //   - ADMIN*   → admin cộng tay (số ảo, không có giao dịch ngân hàng)
-    //   - COMM*    → hoa hồng affiliate (nội bộ, có toggle bật riêng)
-    // Khi admin cộng nhầm rồi trừ → cả 2 dòng ADMIN/DEDUCT đều bị loại,
-    // không tồn tại trong doanh thu (đúng mô hình "tiền đó không tồn tại").
+    // Doanh thu = SUM(amount) all completed topups, COMM excluded by default.
+    // Cơ chế: ADMIN cộng tay → +amount (tính là doanh thu); DEDUCT trừ tay
+    // → -amount (lưu âm, tự nét ra). Cộng nhầm + trừ nhầm: ADMIN +X, DEDUCT
+    // -X → SUM = 0 ("tiền không tồn tại"). Cộng tay legit, không trừ:
+    // SUM = +X (tính doanh thu). Refund real bank: SUM = REAL + DEDUCT (-X)
+    // = giảm doanh thu đúng. COMM là hoa hồng affiliate nội bộ, có toggle.
     const affiliateFilter = includeAffiliate ? '' : `AND (t.transfer_code IS NULL OR t.transfer_code NOT LIKE 'COMM%')`
-    const adminAdjustFilter = `AND (t.transfer_code IS NULL OR (t.transfer_code NOT LIKE 'DEDUCT%' AND t.transfer_code NOT LIKE 'ADMIN%'))`
-    const baseWhere = `t.status = 'completed' ${affiliateFilter} ${adminAdjustFilter}`
+    const baseWhere = `t.status = 'completed' ${affiliateFilter}`
 
     const pool = getDbPool()
 
