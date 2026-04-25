@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import {
   ShoppingCart, Package, Calendar, CreditCard, Search,
   CheckCircle2, Clock, XCircle, AlertCircle, Filter,
   ArrowUpDown, FileDown, Loader2, ScanSearch, User, Wallet,
-  Mail, Phone, Hash, X,
+  Mail, Phone, Hash, X, TrendingUp,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -199,10 +200,18 @@ export default function OrdersPage() {
             {orders.length} đơn hàng — Doanh thu: {formatVND(revenue)}
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={handleExport} disabled={orders.length === 0}>
-          <FileDown className="mr-1.5 h-3.5 w-3.5" />
-          Xuất CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/quan-ly/don-hang/doanh-thu">
+            <Button size="sm" variant="outline" title="Xem doanh thu sản phẩm theo ngày/tháng/năm">
+              <TrendingUp className="mr-1.5 h-3.5 w-3.5 text-success" />
+              Doanh thu sản phẩm
+            </Button>
+          </Link>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={orders.length === 0}>
+            <FileDown className="mr-1.5 h-3.5 w-3.5" />
+            Xuất CSV
+          </Button>
+        </div>
       </div>
 
       {/* Order lookup — admin enters an order code to see customer info */}
