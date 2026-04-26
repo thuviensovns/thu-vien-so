@@ -5,6 +5,13 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
+// Pin libvips threads to 1 and cap its in-memory cache so Sharp doesn't
+// spawn a thread pool per image operation. CloudLinux LVE on Vietnix shared
+// hosting counts threads against the NPROC=100 limit; Sharp's default
+// (cpus().length per op) was the largest single contributor to process count.
+sharp.concurrency(1)
+sharp.cache({ memory: 50, files: 20, items: 100 })
+
 import { Users } from '@/collections/Users'
 import { Media } from '@/collections/Media'
 import { Products } from '@/collections/Products'
