@@ -71,3 +71,6 @@ public/uploads/
 plans/
 
 .vercel
+
+# Deployment artifacts (chứa secrets + zip lớn)
+deploy/
