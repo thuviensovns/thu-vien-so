@@ -52,10 +52,7 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
-    "wavesurfer.js": "^7.12.5",
-    "youtube-dl-exec": "^3.1.4",
-    "youtube-po-token-generator": "^0.6.0",
-    "youtubei.js": "^17.0.1"
+    "wavesurfer.js": "^7.12.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.2",

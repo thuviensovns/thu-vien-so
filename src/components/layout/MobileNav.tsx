@@ -12,7 +12,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
   Menu, FileAudio, Guitar, Plug, Sliders, Mic, Monitor, BookOpen, Home,
-  Search, Info, HelpCircle, Phone, Wallet, Music, Video, Wand2, Sparkles,
+  Search, Info, HelpCircle, Phone, Wallet, Music, Wand2, Sparkles,
   Package, Gift,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -40,15 +40,6 @@ const toolItems = [
     gradient: 'from-fuchsia-500/20 to-purple-500/10 border-fuchsia-500/30',
     iconColor: 'text-fuchsia-400',
     badge: 'HOT',
-  },
-  {
-    label: 'Tải YouTube',
-    desc: 'MP3 / MP4 chất lượng cao',
-    href: '/cong-cu/tai-youtube',
-    icon: Video,
-    gradient: 'from-red-500/20 to-orange-500/10 border-red-500/30',
-    iconColor: 'text-red-400',
-    badge: null,
   },
 ]
 

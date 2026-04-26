@@ -8,7 +8,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Package, Wand2, Video, ShoppingCart } from 'lucide-react'
+import { Home, Package, Wand2, ShoppingCart } from 'lucide-react'
 import { useCart } from '@/hooks/use-cart'
 import { cn } from '@/lib/utils'
 
@@ -16,7 +16,6 @@ const items = [
   { label: 'Trang chủ', href: '/', icon: Home, match: (p: string) => p === '/' },
   { label: 'Sản phẩm', href: '/san-pham', icon: Package, match: (p: string) => p.startsWith('/san-pham') || p.startsWith('/danh-muc') },
   { label: 'Xóa Giọng', href: '/cong-cu/xoa-giong-ai', icon: Wand2, match: (p: string) => p.startsWith('/cong-cu/xoa-giong-ai'), accent: true },
-  { label: 'Tải YT', href: '/cong-cu/tai-youtube', icon: Video, match: (p: string) => p.startsWith('/cong-cu/tai-youtube') },
   { label: 'Giỏ hàng', href: '/gio-hang', icon: ShoppingCart, match: (p: string) => p.startsWith('/gio-hang'), showBadge: true },
 ]
 
@@ -30,7 +29,7 @@ export function MobileBottomBar() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Điều hướng nhanh"
     >
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-4">
         {items.map((it) => {
           const active = it.match(pathname)
           const Icon = it.icon

@@ -25,7 +25,6 @@ export const navItems = [
   { label: 'Sóng nhạc Lyrics', href: '/danh-muc/song-nhac-lyrics' },
   { label: 'Cài đặt phần mềm', href: '/danh-muc/cai-dat-phan-mem' },
   { label: 'Blog', href: '/blog' },
-  { label: 'Tải YouTube', href: '/cong-cu/tai-youtube' },
   { label: 'Xóa Giọng AI', href: '/cong-cu/xoa-giong-ai' },
 ] as const
 
