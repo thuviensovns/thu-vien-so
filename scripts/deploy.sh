@@ -14,8 +14,10 @@ pnpm build
 echo "=== 3. Switch sang deploy branch (force tạo lại từ main) ==="
 git checkout -B deploy main
 
-echo "=== 4. Force-add .next/ ==="
-git add -f .next
+echo "=== 4. Force-add .next/ (loại trừ cache để tránh limit 100MB của GitHub) ==="
+# Pathspec magic ':!' excludes the subpath. Cache + trace + diagnostics chỉ
+# dùng cho lần build kế tiếp, không cần cho runtime — bỏ ra giảm ~600MB.
+git add -f -- .next ':!.next/cache' ':!.next/trace' ':!.next/diagnostics'
 
 echo "=== 5. Commit ==="
 git -c core.autocrlf=false commit -m "build: $(date +%Y-%m-%d_%H-%M) snapshot" || echo "Nothing to commit"
