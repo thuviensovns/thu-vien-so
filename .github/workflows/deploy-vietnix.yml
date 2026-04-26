@@ -5,10 +5,11 @@ name: Deploy to Vietnix
 # trên Vietnix — toàn bộ command inline ở đây.
 #
 # Secrets cần (Settings → Secrets and variables → Actions):
-#   VIETNIX_HOST       - IP/hostname SSH (vd: 103.200.23.68)
-#   VIETNIX_PORT       - SSH port (Vietnix thường là 2222)
-#   VIETNIX_USER       - cPanel username
-#   VIETNIX_SSH_KEY    - Private key (BAO GỒM -----BEGIN/END-----)
+#   VIETNIX_HOST            - IP/hostname SSH (vd: 103.200.23.68)
+#   VIETNIX_PORT            - SSH port (Vietnix thường là 2222)
+#   VIETNIX_USER            - cPanel username
+#   VIETNIX_SSH_KEY         - Private key (BAO GỒM -----BEGIN/END-----)
+#   VIETNIX_SSH_PASSPHRASE  - Passphrase của private key (để trống nếu key không có passphrase)
 #
 # LƯU Ý: workflow KHÔNG chạy `npm install` trên Vietnix vì shared-hosting NPROC=100
 # sẽ bị quá tải khi npm fork hàng loạt process. Khi `package.json` thay đổi, bạn
@@ -36,6 +37,7 @@ jobs:
           port: ${{ secrets.VIETNIX_PORT }}
           username: ${{ secrets.VIETNIX_USER }}
           key: ${{ secrets.VIETNIX_SSH_KEY }}
+          passphrase: ${{ secrets.VIETNIX_SSH_PASSPHRASE }}
           script_stop: true
           command_timeout: 4m
           script: |
