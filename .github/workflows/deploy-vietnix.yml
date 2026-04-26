@@ -1,13 +1,19 @@
 name: Deploy to Vietnix
 
-# Tự động SSH vào Vietnix cPanel và chạy ~/update.sh mỗi khi branch `deploy`
-# được push (tức là sau khi `bash scripts/deploy.sh` đẩy build snapshot lên).
+# Mỗi lần push branch `deploy` (qua `bash scripts/deploy.sh`), GitHub Actions
+# tự SSH vào Vietnix để pull code mới + restart Node.js app. KHÔNG cần `~/update.sh`
+# trên Vietnix — toàn bộ command inline ở đây.
 #
-# Secrets cần khai báo trong GitHub repo (Settings → Secrets and variables → Actions):
-#   VIETNIX_HOST       - IP hoặc hostname SSH (vd: 103.xx.xx.xx hoặc ssh.thuvienso.top)
-#   VIETNIX_PORT       - Port SSH (Vietnix thường là 2222, không phải 22)
-#   VIETNIX_USER       - Username cPanel
-#   VIETNIX_SSH_KEY    - Private key (nội dung file id_rsa, BAO GỒM cả -----BEGIN/END-----)
+# Secrets cần (Settings → Secrets and variables → Actions):
+#   VIETNIX_HOST       - IP/hostname SSH (vd: 103.200.23.68)
+#   VIETNIX_PORT       - SSH port (Vietnix thường là 2222)
+#   VIETNIX_USER       - cPanel username
+#   VIETNIX_SSH_KEY    - Private key (BAO GỒM -----BEGIN/END-----)
+#
+# LƯU Ý: workflow KHÔNG chạy `npm install` trên Vietnix vì shared-hosting NPROC=100
+# sẽ bị quá tải khi npm fork hàng loạt process. Khi `package.json` thay đổi, bạn
+# vào cPanel → Setup Node.js App → bấm "Run NPM Install" 1 lần. Các push khác
+# (chỉ thay code, không thay deps) → workflow này tự deploy.
 
 on:
   push:
@@ -21,9 +27,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - name: SSH and run update.sh
+      - name: SSH pull + restart Node app
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VIETNIX_HOST }}
@@ -31,9 +37,15 @@ jobs:
           username: ${{ secrets.VIETNIX_USER }}
           key: ${{ secrets.VIETNIX_SSH_KEY }}
           script_stop: true
-          command_timeout: 8m
+          command_timeout: 4m
           script: |
             set -e
-            echo "=== Pull deploy branch + restart Node app ==="
-            bash ~/update.sh
-            echo "=== ✅ Deploy xong ==="
+            APP_DIR="$HOME/thu-vien-so"
+            echo "=== [$(date '+%F %T')] Pulling deploy branch ==="
+            cd "$APP_DIR"
+            git fetch origin deploy
+            git reset --hard origin/deploy
+            echo "=== Touching restart.txt to reload Node.js Selector ==="
+            mkdir -p "$APP_DIR/tmp"
+            touch "$APP_DIR/tmp/restart.txt"
+            echo "=== ✅ Deploy DONE @ $(date '+%F %T') ==="
