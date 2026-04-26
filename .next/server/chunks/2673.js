@@ -1,0 +1,1 @@
+"use strict";exports.id=2673,exports.ids=[2673],exports.modules={52673:(a,b,c)=>{c.r(b),c.d(b,{InlineBlockComponent:()=>d.b,useInlineBlockComponentContext:()=>d.a});var d=c(1181)}};

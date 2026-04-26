@@ -1,0 +1,1 @@
+"use strict";exports.id=5623,exports.ids=[5623,8004],exports.modules={8004:(a,b,c)=>{c.a(a,async(a,d)=>{try{c.d(b,{n:()=>g});var e=c(64939),f=a([e]);e=(f.then?(await f)():f)[0];let h=null;function g(){return h||(h=new e.default.Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:!1},max:5,idleTimeoutMillis:3e4})),h}d()}catch(a){d(a)}})}};

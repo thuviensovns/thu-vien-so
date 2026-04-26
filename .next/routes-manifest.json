@@ -1,0 +1,441 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [
+    {
+      "headers": [
+        {
+          "key": "Accept-CH",
+          "value": "Sec-CH-Prefers-Color-Scheme"
+        },
+        {
+          "key": "Vary",
+          "value": "Sec-CH-Prefers-Color-Scheme"
+        },
+        {
+          "key": "Critical-CH",
+          "value": "Sec-CH-Prefers-Color-Scheme"
+        }
+      ],
+      "source": "/:path*",
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    }
+  ],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/admin/[[...segments]]",
+      "regex": "^/admin(?:/(.+?))?(?:/)?$",
+      "routeKeys": {
+        "nxtPsegments": "nxtPsegments"
+      },
+      "namedRegex": "^/admin(?:/(?<nxtPsegments>.+?))?(?:/)?$"
+    },
+    {
+      "page": "/api/admin/automations/[id]",
+      "regex": "^/api/admin/automations/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/automations/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/email-campaigns/[id]",
+      "regex": "^/api/admin/email\\-campaigns/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/email\\-campaigns/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/email-campaigns/[id]/send",
+      "regex": "^/api/admin/email\\-campaigns/([^/]+?)/send(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/email\\-campaigns/(?<nxtPid>[^/]+?)/send(?:/)?$"
+    },
+    {
+      "page": "/api/admin/orders/lookup/[code]",
+      "regex": "^/api/admin/orders/lookup/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPcode": "nxtPcode"
+      },
+      "namedRegex": "^/api/admin/orders/lookup/(?<nxtPcode>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/admin/roles/[id]",
+      "regex": "^/api/admin/roles/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/admin/roles/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/ai-models/[id]",
+      "regex": "^/api/ai\\-models/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/ai\\-models/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/download/[token]",
+      "regex": "^/api/download/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPtoken": "nxtPtoken"
+      },
+      "namedRegex": "^/api/download/(?<nxtPtoken>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/messages/[id]",
+      "regex": "^/api/messages/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/api/messages/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/api/[...slug]",
+      "regex": "^/api/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/api/(?<nxtPslug>.+?)(?:/)?$"
+    },
+    {
+      "page": "/blog/[slug]",
+      "regex": "^/blog/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/blog/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/danh-muc/[slug]",
+      "regex": "^/danh\\-muc/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/danh\\-muc/(?<nxtPslug>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/san-pham/[slug]",
+      "regex": "^/san\\-pham/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/san\\-pham/(?<nxtPslug>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/blog",
+      "regex": "^/blog(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/blog(?:/)?$"
+    },
+    {
+      "page": "/cai-dat-admin",
+      "regex": "^/cai\\-dat\\-admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/cai\\-dat\\-admin(?:/)?$"
+    },
+    {
+      "page": "/chinh-sach-bao-mat",
+      "regex": "^/chinh\\-sach\\-bao\\-mat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/chinh\\-sach\\-bao\\-mat(?:/)?$"
+    },
+    {
+      "page": "/cong-cu/xoa-giong-ai",
+      "regex": "^/cong\\-cu/xoa\\-giong\\-ai(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/cong\\-cu/xoa\\-giong\\-ai(?:/)?$"
+    },
+    {
+      "page": "/dang-ky",
+      "regex": "^/dang\\-ky(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dang\\-ky(?:/)?$"
+    },
+    {
+      "page": "/dang-nhap",
+      "regex": "^/dang\\-nhap(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dang\\-nhap(?:/)?$"
+    },
+    {
+      "page": "/danh-muc",
+      "regex": "^/danh\\-muc(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/danh\\-muc(?:/)?$"
+    },
+    {
+      "page": "/dieu-khoan",
+      "regex": "^/dieu\\-khoan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/dieu\\-khoan(?:/)?$"
+    },
+    {
+      "page": "/gio-hang",
+      "regex": "^/gio\\-hang(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gio\\-hang(?:/)?$"
+    },
+    {
+      "page": "/gioi-thieu",
+      "regex": "^/gioi\\-thieu(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gioi\\-thieu(?:/)?$"
+    },
+    {
+      "page": "/gioi-thieu-ban-be",
+      "regex": "^/gioi\\-thieu\\-ban\\-be(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gioi\\-thieu\\-ban\\-be(?:/)?$"
+    },
+    {
+      "page": "/hoi-dap",
+      "regex": "^/hoi\\-dap(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/hoi\\-dap(?:/)?$"
+    },
+    {
+      "page": "/icon",
+      "regex": "^/icon(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/icon(?:/)?$"
+    },
+    {
+      "page": "/lien-he",
+      "regex": "^/lien\\-he(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/lien\\-he(?:/)?$"
+    },
+    {
+      "page": "/nap-tien",
+      "regex": "^/nap\\-tien(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/nap\\-tien(?:/)?$"
+    },
+    {
+      "page": "/opengraph-image",
+      "regex": "^/opengraph\\-image(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/opengraph\\-image(?:/)?$"
+    },
+    {
+      "page": "/quan-ly",
+      "regex": "^/quan\\-ly(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/affiliate",
+      "regex": "^/quan\\-ly/affiliate(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/affiliate(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/automations",
+      "regex": "^/quan\\-ly/automations(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/automations(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/bao-mat",
+      "regex": "^/quan\\-ly/bao\\-mat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/bao\\-mat(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/cai-dat",
+      "regex": "^/quan\\-ly/cai\\-dat(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/cai\\-dat(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/chat-support",
+      "regex": "^/quan\\-ly/chat\\-support(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/chat\\-support(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/cron",
+      "regex": "^/quan\\-ly/cron(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/cron(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/don-hang",
+      "regex": "^/quan\\-ly/don\\-hang(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/don\\-hang(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/don-hang/doanh-thu",
+      "regex": "^/quan\\-ly/don\\-hang/doanh\\-thu(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/don\\-hang/doanh\\-thu(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/email",
+      "regex": "^/quan\\-ly/email(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/email(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/khuyen-mai",
+      "regex": "^/quan\\-ly/khuyen\\-mai(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/khuyen\\-mai(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/nap-tien",
+      "regex": "^/quan\\-ly/nap\\-tien(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/nap\\-tien(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/nap-tien/doanh-thu",
+      "regex": "^/quan\\-ly/nap\\-tien/doanh\\-thu(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/nap\\-tien/doanh\\-thu(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/ngan-hang",
+      "regex": "^/quan\\-ly/ngan\\-hang(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/ngan\\-hang(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/nguoi-dung",
+      "regex": "^/quan\\-ly/nguoi\\-dung(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/nguoi\\-dung(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/nhat-ky",
+      "regex": "^/quan\\-ly/nhat\\-ky(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/nhat\\-ky(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/noi-dung",
+      "regex": "^/quan\\-ly/noi\\-dung(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/noi\\-dung(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/san-pham",
+      "regex": "^/quan\\-ly/san\\-pham(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/san\\-pham(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/tin-nhan",
+      "regex": "^/quan\\-ly/tin\\-nhan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/tin\\-nhan(?:/)?$"
+    },
+    {
+      "page": "/quan-ly/vai-tro",
+      "regex": "^/quan\\-ly/vai\\-tro(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/quan\\-ly/vai\\-tro(?:/)?$"
+    },
+    {
+      "page": "/robots.txt",
+      "regex": "^/robots\\.txt(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/robots\\.txt(?:/)?$"
+    },
+    {
+      "page": "/san-pham",
+      "regex": "^/san\\-pham(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/san\\-pham(?:/)?$"
+    },
+    {
+      "page": "/sitemap.xml",
+      "regex": "^/sitemap\\.xml(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/sitemap\\.xml(?:/)?$"
+    },
+    {
+      "page": "/tai-khoan",
+      "regex": "^/tai\\-khoan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tai\\-khoan(?:/)?$"
+    },
+    {
+      "page": "/thanh-toan",
+      "regex": "^/thanh\\-toan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/thanh\\-toan(?:/)?$"
+    },
+    {
+      "page": "/thanh-toan/ket-qua",
+      "regex": "^/thanh\\-toan/ket\\-qua(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/thanh\\-toan/ket\\-qua(?:/)?$"
+    },
+    {
+      "page": "/tim-kiem",
+      "regex": "^/tim\\-kiem(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tim\\-kiem(?:/)?$"
+    },
+    {
+      "page": "/tin-nhan",
+      "regex": "^/tin\\-nhan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/tin\\-nhan(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "RSC",
+    "varyHeader": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+    "prefetchHeader": "Next-Router-Prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "Next-Router-Segment-Prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

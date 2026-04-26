@@ -1,0 +1,15 @@
+"use strict";exports.id=7225,exports.ids=[7225],exports.modules={27225:(a,b,c)=>{c.a(a,async(a,d)=>{try{c.d(b,{processEmailQueue:()=>h});var e=c(8004),f=c(58093),g=a([e,f]);async function h(a=100){if(!(process.env.SMTP_HOST&&process.env.SMTP_USER&&process.env.SMTP_PASS))throw Error("SMTP chưa cấu h\xecnh (SMTP_HOST, SMTP_USER, SMTP_PASS)");await (0,f.ensureTablesExist)();let b=(0,e.n)();await b.query(`UPDATE email_queue SET status = 'pending'
+     WHERE status = 'sending' AND attempted_at < NOW() - INTERVAL '10 minutes'`);let{rows:c}=await b.query(`SELECT q.id AS qid, q.recipient_email, q.campaign_id, q.source_key,
+            c.subject, c.html_content, c.id AS cid
+     FROM email_queue q
+     LEFT JOIN email_campaigns c ON c.id = q.campaign_id
+     WHERE q.status = 'pending'
+     ORDER BY q.created_at ASC
+     LIMIT $1`,[a]);if(0===c.length)return{sent:0,failed:0};let d=null;try{let a=await import("nodemailer");d=a.createTransport||a.default?.createTransport||null}catch{throw Error("Chưa c\xe0i g\xf3i nodemailer")}if(!d)throw Error("nodemailer.createTransport kh\xf4ng khả dụng");let g=d({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT)||587,secure:"true"===process.env.SMTP_SECURE,auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}}),i=process.env.SMTP_FROM||process.env.SMTP_USER,j=0,k=0;for(let a of c)if(((await b.query(`UPDATE email_queue SET status = 'sending', attempted_at = NOW()
+       WHERE id = $1 AND status = 'pending' RETURNING id`,[a.qid])).rowCount??0)!==0)try{let c=a.subject,d=a.html_content;if(!c||!d)if("string"==typeof a.source_key&&a.source_key.startsWith("reminder_order_"))c="Đơn h\xe0ng của bạn đang chờ thanh to\xe1n",d="<p>Xin ch\xe0o,</p><p>Đơn h\xe0ng của bạn tr\xean Thư Viện Số vẫn đang chờ thanh to\xe1n. Vui l\xf2ng ho\xe0n tất thanh to\xe1n để ch\xfang t\xf4i xử l\xfd đơn h\xe0ng.</p><p>Cảm ơn bạn đ\xe3 sử dụng dịch vụ!</p>";else throw Error("Campaign thiếu subject/nội dung");await g.sendMail({from:i,to:a.recipient_email,subject:c,html:d}),await b.query("UPDATE email_queue SET status = 'sent', attempted_at = NOW() WHERE id = $1",[a.qid]),a.cid&&await b.query("UPDATE email_campaigns SET sent_count = COALESCE(sent_count, 0) + 1 WHERE id = $1",[a.cid]),j++}catch(c){await b.query("UPDATE email_queue SET status = 'failed', error = $1, attempted_at = NOW() WHERE id = $2",[(c.message||"Error").slice(0,1e3),a.qid]),a.cid&&await b.query("UPDATE email_campaigns SET failed_count = COALESCE(failed_count, 0) + 1 WHERE id = $1",[a.cid]),k++}return await b.query(`UPDATE email_campaigns c
+     SET status = 'completed', completed_at = NOW()
+     WHERE c.status = 'sending'
+       AND NOT EXISTS (
+         SELECT 1 FROM email_queue q
+         WHERE q.campaign_id = c.id AND q.status = 'pending'
+       )`),{sent:j,failed:k}}[e,f]=g.then?(await g)():g,d()}catch(a){d(a)}})}};

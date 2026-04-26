@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/[...slug]": {
+      "maxDuration": 60
+    },
+    "/api/graphql": {
+      "maxDuration": 60
+    },
+    "/api/admin/migrate": {
+      "maxDuration": 30
+    },
+    "/api/ai-models/[id]": {
+      "maxDuration": 60
+    },
+    "/api/cron/poll-web2m": {
+      "maxDuration": 60
+    },
+    "/api/debug-db": {
+      "maxDuration": 30
+    },
+    "/api/download/[token]": {
+      "maxDuration": 30
+    },
+    "/api/health": {
+      "maxDuration": 30
+    },
+    "/api/orders/by-number": {
+      "maxDuration": 15
+    },
+    "/api/payment/instant-buy": {
+      "maxDuration": 30
+    },
+    "/api/ping": {},
+    "/api/revalidate": {
+      "maxDuration": 30
+    },
+    "/api/setup": {
+      "maxDuration": 60
+    },
+    "/api/upload/product-audio": {
+      "maxDuration": 60
+    },
+    "/api/upload/product-file": {
+      "maxDuration": 60
+    },
+    "/api/upload/product-video": {
+      "maxDuration": 60
+    },
+    "/admin/[[...segments]]": {
+      "maxDuration": 60
+    }
+  }
+}

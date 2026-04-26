@@ -1,0 +1,351 @@
+{
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\chunk-2S5Q7QYO.js -> ./componentInline-NL25DNZ5.js": {
+    "id": 92013,
+    "files": [
+      "static/chunks/2013.dff0cac4428b7878.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\index.js -> ./Component-DOSSWC76.js": {
+    "id": 92186,
+    "files": [
+      "static/chunks/2186.5064ceb65a83b5f2.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\index.js -> ./Component-MBLHTKDK.js": {
+    "id": 61929,
+    "files": [
+      "static/chunks/1929.dd5784d067e9f9c2.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\index.js -> ./Field-OIMYWB22.js": {
+    "id": 80895,
+    "files": [
+      "static/css/36bcacf65a17174f.css",
+      "static/chunks/895.fe975c956e52734e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\index.js -> ./RelationshipComponent-BG3DPV3T.js": {
+    "id": 36757,
+    "files": [
+      "static/chunks/6757.c62bdf13dbc6280e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+richtext-lexica_aff7523d823a6d660ae072919b99ec0f\\node_modules\\@payloadcms\\richtext-lexical\\dist\\exports\\client\\index.js -> ./component-XIHC3W6W.js": {
+    "id": 6885,
+    "files": [
+      "static/chunks/6885.1d3ffe7ee7075ed0.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ar": {
+    "id": 58895,
+    "files": [
+      "static/chunks/8895.e15811a00d626607.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/az": {
+    "id": 9606,
+    "files": [
+      "static/chunks/9606.6b02269712dc08a0.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/bg": {
+    "id": 66754,
+    "files": [
+      "static/chunks/6754.3cf9f03aaa6647d0.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/bn": {
+    "id": 4404,
+    "files": [
+      "static/chunks/4404.95e83f3cdbe1f789.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ca": {
+    "id": 32936,
+    "files": [
+      "static/chunks/555.b9c134709bbc4e72.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/cs": {
+    "id": 87938,
+    "files": [
+      "static/chunks/7938.d9475c617cfb6fd4.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/da": {
+    "id": 41920,
+    "files": [
+      "static/chunks/1920.39fe43bc7e90eab5.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/de": {
+    "id": 34113,
+    "files": [
+      "static/chunks/4113.c2d1172666ecc313.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/en-US": {
+    "id": 29085,
+    "files": []
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/es": {
+    "id": 65708,
+    "files": [
+      "static/chunks/5708.fac1f22980e310ab.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/et": {
+    "id": 31567,
+    "files": [
+      "static/chunks/1567.2c024199a8e4cac9.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/fa-IR": {
+    "id": 9508,
+    "files": [
+      "static/chunks/9508.acfc6d695662bcf3.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/fr": {
+    "id": 41986,
+    "files": [
+      "static/chunks/1986.b25de2a0f9aefb60.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/he": {
+    "id": 3450,
+    "files": [
+      "static/chunks/3450.14986ec75b1dc9b0.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/hr": {
+    "id": 18620,
+    "files": [
+      "static/chunks/8620.9c46968518c0d202.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/hu": {
+    "id": 51217,
+    "files": [
+      "static/chunks/1217.a19bba279d6b9561.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/id": {
+    "id": 91424,
+    "files": [
+      "static/chunks/1424.58ee761899362424.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/is": {
+    "id": 64207,
+    "files": [
+      "static/chunks/4207.34ea0bd0f3531aa9.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/it": {
+    "id": 58223,
+    "files": [
+      "static/chunks/8223.dc7704afb31a292c.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ja": {
+    "id": 91213,
+    "files": [
+      "static/chunks/1213.29a6388091e76f4e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ko": {
+    "id": 72892,
+    "files": [
+      "static/chunks/2892.c0f37aeb66593fd3.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/lt": {
+    "id": 88633,
+    "files": [
+      "static/chunks/1014.5e9ac13f687e278f.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/lv": {
+    "id": 54548,
+    "files": [
+      "static/chunks/4548.e2bffdc91dbb92a3.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/nb": {
+    "id": 80432,
+    "files": [
+      "static/chunks/432.6e4f48f255fa3a6d.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/nl": {
+    "id": 27346,
+    "files": [
+      "static/chunks/7346.79d40587e718df01.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/pl": {
+    "id": 17577,
+    "files": [
+      "static/chunks/7577.64e1726c8a0635a5.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/pt": {
+    "id": 2393,
+    "files": [
+      "static/chunks/2393.b23a46cd135b4255.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ro": {
+    "id": 10246,
+    "files": [
+      "static/chunks/246.f846dbb80407a740.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ru": {
+    "id": 57104,
+    "files": [
+      "static/chunks/7104.d02a2e9142c4945e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/sk": {
+    "id": 70115,
+    "files": [
+      "static/chunks/115.869845636336cf11.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/sl": {
+    "id": 48028,
+    "files": [
+      "static/chunks/8028.206c4b5d32883ee9.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/sr": {
+    "id": 58575,
+    "files": [
+      "static/chunks/8575.c77dc84c56c3def7.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/sr-Latn": {
+    "id": 91328,
+    "files": [
+      "static/chunks/1328.b2d19c65fc94ed4e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/sv": {
+    "id": 70336,
+    "files": [
+      "static/chunks/336.41eaa8d0186c2965.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/ta": {
+    "id": 65111,
+    "files": [
+      "static/chunks/5111.40e32075bf2b7444.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/th": {
+    "id": 52998,
+    "files": [
+      "static/chunks/2998.9055fadb87edc34d.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/tr": {
+    "id": 61830,
+    "files": [
+      "static/chunks/1830.79dbf70e1716235e.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/uk": {
+    "id": 82991,
+    "files": [
+      "static/chunks/2991.d5ffb3958804b852.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/vi": {
+    "id": 6242,
+    "files": [
+      "static/chunks/6242.324ef25c082e9499.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/zh-CN": {
+    "id": 87902,
+    "files": [
+      "static/chunks/7902.e83473340e64ff52.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+translations@3.80.0\\node_modules\\@payloadcms\\translations\\dist\\importDateFNSLocale.js -> date-fns/locale/zh-TW": {
+    "id": 21391,
+    "files": [
+      "static/chunks/1391.f90154aab39570a5.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+ui@3.80.0_@type_54f9f790531d35d4ae15972912e24fc0\\node_modules\\@payloadcms\\ui\\dist\\exports\\client\\index.js -> ./CodeEditor-X3UZSEEZ.js": {
+    "id": 56515,
+    "files": [
+      "static/chunks/6515.58849ccd687ab120.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\@payloadcms+ui@3.80.0_@type_54f9f790531d35d4ae15972912e24fc0\\node_modules\\@payloadcms\\ui\\dist\\exports\\client\\index.js -> ./DatePicker-T2DMDMM5.js": {
+    "id": 67668,
+    "files": [
+      "static/chunks/7668.28c779ad74ba43e0.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\next@15.4.11_react-dom@19.2_ea9b4a82a8510fa04a9219a99ab6b3f2\\node_modules\\next\\dist\\client\\index.js -> ../pages/_app": {
+    "id": 50884,
+    "files": [
+      "static/chunks/884.dbb00692615c21c7.js"
+    ]
+  },
+  "..\\node_modules\\.pnpm\\next@15.4.11_react-dom@19.2_ea9b4a82a8510fa04a9219a99ab6b3f2\\node_modules\\next\\dist\\client\\index.js -> ../pages/_error": {
+    "id": 10665,
+    "files": [
+      "static/chunks/665.6797eefc6030fc2a.js"
+    ]
+  },
+  "app\\(frontend)\\tai-khoan\\DownloadsTab.tsx -> @/components/audio/AudioPreview": {
+    "id": 67458,
+    "files": [
+      "static/chunks/7458.d8d464ccb5857fe1.js"
+    ]
+  },
+  "app\\(frontend)\\tai-khoan\\DownloadsTab.tsx -> @/components/product/VideoPreview": {
+    "id": 88439,
+    "files": [
+      "static/chunks/820.88d17a5f366a874c.js"
+    ]
+  },
+  "components\\audio\\AudioPreview.tsx -> wavesurfer.js": {
+    "id": 20875,
+    "files": [
+      "static/chunks/875.007ff6ba4c3d6a4e.js"
+    ]
+  },
+  "components\\chat\\ChatWidgetLazy.tsx -> @/components/chat/ChatWidget": {
+    "id": 26563,
+    "files": [
+      "static/chunks/6563.6baf90dd349fc16d.js"
+    ]
+  },
+  "components\\product\\ProductDetailClient.tsx -> @/components/audio/AudioPreview": {
+    "id": 67458,
+    "files": [
+      "static/chunks/7458.d8d464ccb5857fe1.js"
+    ]
+  },
+  "components\\product\\ProductDetailClient.tsx -> @/components/product/VideoPreview": {
+    "id": 88439,
+    "files": [
+      "static/chunks/8439.ff0e245fd2f4ff6f.js"
+    ]
+  },
+  "lib\\audio\\htdemucs-separator.ts -> ./ai-separator": {
+    "id": 30270,
+    "files": []
+  },
+  "lib\\audio\\roformer-separator.ts -> ./ai-separator": {
+    "id": 30270,
+    "files": []
+  }
+}
