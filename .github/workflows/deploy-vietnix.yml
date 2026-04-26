@@ -1,0 +1,39 @@
+name: Deploy to Vietnix
+
+# Tự động SSH vào Vietnix cPanel và chạy ~/update.sh mỗi khi branch `deploy`
+# được push (tức là sau khi `bash scripts/deploy.sh` đẩy build snapshot lên).
+#
+# Secrets cần khai báo trong GitHub repo (Settings → Secrets and variables → Actions):
+#   VIETNIX_HOST       - IP hoặc hostname SSH (vd: 103.xx.xx.xx hoặc ssh.thuvienso.top)
+#   VIETNIX_PORT       - Port SSH (Vietnix thường là 2222, không phải 22)
+#   VIETNIX_USER       - Username cPanel
+#   VIETNIX_SSH_KEY    - Private key (nội dung file id_rsa, BAO GỒM cả -----BEGIN/END-----)
+
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vietnix
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: SSH and run update.sh
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VIETNIX_HOST }}
+          port: ${{ secrets.VIETNIX_PORT }}
+          username: ${{ secrets.VIETNIX_USER }}
+          key: ${{ secrets.VIETNIX_SSH_KEY }}
+          script_stop: true
+          command_timeout: 8m
+          script: |
+            set -e
+            echo "=== Pull deploy branch + restart Node app ==="
+            bash ~/update.sh
+            echo "=== ✅ Deploy xong ==="

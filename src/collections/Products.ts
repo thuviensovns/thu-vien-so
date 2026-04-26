@@ -103,10 +103,10 @@ export const Products: CollectionConfig = {
           type: 'text',
           label: 'URL audio demo (R2/Blob/External)',
           admin: {
-            description: 'Dán link audio trực tiếp (mp3/wav/flac...). Ưu tiên dùng trước audioFile. Để trống nếu upload qua R2/Blob.',
+            description: 'Dán link audio trực tiếp (mp3/wav/flac...). Ưu tiên dùng trước audioFile. Để trống nếu upload qua R2.',
           },
         },
-        { name: 'audioR2Key', type: 'text', label: 'R2/Blob Key', admin: { description: 'Storage key khi upload qua R2/Vercel Blob' } },
+        { name: 'audioR2Key', type: 'text', label: 'R2 Key', admin: { description: 'Storage key khi upload qua Cloudflare R2 (giá trị cũ có thể là URL Vercel Blob)' } },
         { name: 'audioFileName', type: 'text', label: 'Tên file audio' },
         { name: 'audioFileSize', type: 'number', label: 'Dung lượng audio (bytes)' },
         { name: 'audioMimeType', type: 'text', label: 'MIME type (audio/mpeg...)' },

@@ -4,11 +4,10 @@ name: Poll Web2M
 # inside polls Web2M every ~5 seconds for 55 seconds, so each trigger covers
 # ~55s of ≤5s latency. Worst-case wait between coverage windows is ~4 minutes.
 #
-# For sub-minute auto-credit on the dead minutes, either:
-#   - Upgrade Vercel Pro → add 'crons' entry to vercel.json (schedule '* * * * *')
-#   - Or configure cron-job.org / UptimeRobot to hit the same URL every 1 min
+# For sub-minute auto-credit on the dead minutes, configure cron-job.org or
+# UptimeRobot to hit the same URL every 1 min.
 #
-# Requires GitHub repo secret CRON_SECRET (same value as Vercel env).
+# Requires GitHub repo secret CRON_SECRET (same value as the server's env).
 
 on:
   schedule:
@@ -28,7 +27,7 @@ jobs:
       - name: Trigger Web2M poll
         run: |
           set -euo pipefail
-          URL="${POLL_URL:-https://www.thuvienso.top/api/cron/poll-web2m}"
+          URL="${POLL_URL:-https://thuvienso.top/api/cron/poll-web2m}"
           echo "Triggering $URL"
           RESPONSE=$(curl -sSL --max-time 80 -w '\n%{http_code} %{time_total}' \
             -H "Authorization: Bearer $CRON_SECRET" \

@@ -114,7 +114,7 @@ export default function CronPage() {
         <CardContent className="p-3 flex items-start gap-2">
           <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
           <div className="text-xs text-muted-foreground space-y-1">
-            <p>Có thể chạy jobs thủ công từ đây, hoặc cấu hình scheduler bên ngoài (cron-job.org / Vercel Cron) gọi:</p>
+            <p>Có thể chạy jobs thủ công từ đây, hoặc cấu hình scheduler bên ngoài (cron-job.org / GitHub Actions) gọi:</p>
             <code className="block bg-muted/50 px-2 py-1 rounded text-[10px] font-mono break-all">
               GET /api/admin/cron/run?key=JOB_KEY&amp;token=CRON_SECRET
             </code>

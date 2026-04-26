@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     // clicking "đã chuyển khoản" and reaching this line, the credit is
     // applied within ~1s without spawning an extra function invocation.
     // Wrapped in try/catch: `after()` itself can throw at module/runtime
-    // level on some Vercel builds and must not block the happy-path response.
+    // level on some serverless builds and must not block the happy-path response.
     stage = 'after'
     try {
       after(async () => {

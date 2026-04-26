@@ -36,9 +36,9 @@ export async function GET(req: NextRequest) {
     // Web2M poll on this request using Next 15 `after()` — the handler
     // returns immediately to the client, then the poll runs in the SAME
     // serverless invocation before container freeze. This avoids the extra
-    // fetch-to-self function call that would double our Vercel invocation
-    // count (the client polls /status every 5s; on Hobby plan that adds up
-    // fast). The atomic throttle inside pollWeb2m coalesces concurrent users.
+    // fetch-to-self function call that would double our invocation count
+    // (the client polls /status every 5s; that adds up fast). The atomic
+    // throttle inside pollWeb2m coalesces concurrent users.
     if (topup.status === 'pending') {
       after(async () => {
         try {

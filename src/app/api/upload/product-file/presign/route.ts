@@ -7,7 +7,7 @@ const ALLOWED_EXTENSIONS = ['zip', 'rar', '7z', 'flp', 'wav', 'mp3', 'mp4', 'fla
 
 /**
  * Returns instructions for the client to upload a product file:
- *  - mode: 'presign' → PUT directly to R2 at `url` (production path; bypasses Vercel 4.5MB body limit)
+ *  - mode: 'presign' → PUT directly to R2 at `url` (production path)
  *  - mode: 'direct'  → POST file to /api/upload/product-file (local dev fallback when R2 unconfigured)
  */
 export async function POST(req: NextRequest) {
@@ -45,20 +45,6 @@ export async function POST(req: NextRequest) {
     const safeSlug = productSlug.replace(/[^a-zA-Z0-9._-]/g, '_')
     const r2Key = `products/${safeSlug}/${timestamp}-${safeFileName}`
     const safeContentType = contentType && typeof contentType === 'string' ? contentType : 'application/octet-stream'
-
-    // Storage selection priority: Vercel Blob (production default) → R2 → local
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log(`[Presign] Admin ${user.email} → blob handshake for products/${safeSlug}/${safeFileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`)
-      return NextResponse.json({
-        mode: 'blob',
-        handshakeUrl: '/api/upload/product-file/blob-handshake',
-        pathname: `products/${safeSlug}/${safeFileName}`,
-        fileName,
-        fileSize,
-        fileFormat: ext,
-        contentType: safeContentType,
-      })
-    }
 
     if (isR2Configured()) {
       const url = await getPresignedUploadUrl(r2Key, safeContentType, 600)

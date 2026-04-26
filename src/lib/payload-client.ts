@@ -54,7 +54,7 @@ export async function uploadMedia(dataUrl: string, slugName?: string): Promise<n
       ? `${slugName.replace(/\.[^.]+$/, '')}-${Date.now()}.${ext}`
       : `product-${Date.now()}.${ext}`
 
-    // Upload via /api/upload/thumbnail (handles R2 or Vercel Blob)
+    // Upload via /api/upload/thumbnail → R2
     const formData = new FormData()
     formData.append('file', blob, name)
     formData.append('productSlug', slugName || 'product')

@@ -10,9 +10,8 @@ import { isRateLimited, cleanupStaleEntries } from '@/lib/rate-limit'
 //   self         — same-origin
 //   data:        — small inline resources (fonts, tiny images)
 //   blob:        — URL.createObjectURL() previews, client-generated files
-//   *.r2.*       — Cloudflare R2 (product files, demos)
-//   *.blob.v-s.c — Vercel Blob (admin uploads)
-//   vercel.com   — @vercel/blob client-upload ingest endpoint
+//   *.r2.*       — Cloudflare R2 (product files, demos, thumbnails)
+//   *.blob.v-s.c — legacy Vercel Blob URLs already in DB (read-only)
 //   img.vietqr.io — bank transfer QR
 //   *.supabase.co — legacy media
 //   *.ngrok/*.trycloudflare — YouTube-downloader home-PC proxy
@@ -36,14 +35,12 @@ function buildCsp(opts: { isDev: boolean; isAIToolPage: boolean }): string {
 
   const connectSrc = [
     "'self'",
-    // Vercel Blob client-upload — browser PUTs bytes to https://vercel.com/api/blob;
-    // without this, client-upload hangs silently at 0%.
-    'https://vercel.com',
-    'https://blob.vercel-storage.com',
-    'https://*.public.blob.vercel-storage.com',
+    // R2 presigned PUT — browser uploads bytes directly to the bucket.
+    'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev',
     // Media fetches (WaveSurfer pre-loads audio, Next/Image, etc.)
     'https://*.supabase.co',
-    'https://*.r2.cloudflarestorage.com', 'https://*.r2.dev',
+    // Legacy Vercel Blob URLs still referenced from product records.
+    'https://*.public.blob.vercel-storage.com',
     // Bank QR + home-PC YouTube proxy
     'https://img.vietqr.io',
     'https://*.ngrok-free.dev', 'https://*.ngrok-free.app',

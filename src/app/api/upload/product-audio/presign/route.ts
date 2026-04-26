@@ -18,8 +18,7 @@ const DEFAULT_CONTENT_TYPE: Record<string, string> = {
 
 /**
  * Returns instructions for the client to upload a product demo audio:
- *  - mode: 'blob'    → Vercel Blob client-upload (production default)
- *  - mode: 'presign' → PUT directly to R2 (bypasses Vercel 4.5MB body cap)
+ *  - mode: 'presign' → PUT directly to R2 (production)
  *  - mode: 'direct'  → POST file to /api/upload/product-audio (local dev fallback)
  */
 export async function POST(req: NextRequest) {
@@ -57,20 +56,6 @@ export async function POST(req: NextRequest) {
     const safeSlug = productSlug.replace(/[^a-zA-Z0-9._-]/g, '_')
     const r2Key = `products/${safeSlug}/audio-${timestamp}-${safeFileName}`
     const safeContentType = (contentType && typeof contentType === 'string' && contentType) || DEFAULT_CONTENT_TYPE[ext] || 'audio/mpeg'
-
-    // Storage selection priority: Vercel Blob (production default) → R2 → local
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log(`[Presign audio] Admin ${user.email} → blob handshake for products/${safeSlug}/audio-${safeFileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`)
-      return NextResponse.json({
-        mode: 'blob',
-        handshakeUrl: '/api/upload/product-audio/blob-handshake',
-        pathname: `products/${safeSlug}/audio-${safeFileName}`,
-        fileName,
-        fileSize,
-        mimeType: safeContentType,
-        contentType: safeContentType,
-      })
-    }
 
     if (isR2Configured()) {
       const url = await getPresignedUploadUrl(r2Key, safeContentType, 600)

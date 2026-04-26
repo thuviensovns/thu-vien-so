@@ -27,11 +27,9 @@ jobs:
       - name: Ping /api/ping
         run: |
           set -euo pipefail
-          # Use www canonical domain — apex thuvienso.top issues a 307 redirect
-          # to www, and without -L the old cron was silently failing on the
-          # redirect without ever reaching the DB. -L is kept as a safety net
-          # in case the canonical domain changes.
-          URL="${KEEPALIVE_URL:-https://www.thuvienso.top/api/ping}"
+          # Apex domain points at the Vietnix Node app. -L follows redirects
+          # in case the canonical hostname changes again.
+          URL="${KEEPALIVE_URL:-https://thuvienso.top/api/ping}"
           echo "Pinging $URL"
           RESPONSE=$(curl -sSL --max-time 30 -w '\n%{http_code} %{time_total}' "$URL" || true)
           BODY=$(echo "$RESPONSE" | sed '$d')

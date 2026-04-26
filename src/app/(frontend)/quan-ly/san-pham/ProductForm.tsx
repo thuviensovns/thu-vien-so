@@ -153,26 +153,8 @@ export default function ProductForm({
       // Step 2: upload bytes via the route the server picked
       let storageKey: string = presign.r2Key
 
-      if (presign.mode === 'blob') {
-        // Vercel Blob client upload — streams directly to Blob storage,
-        // bypassing the Vercel 4.5MB function body limit.
-        const { upload } = await import('@vercel/blob/client')
-        // Multipart parts must be ≥5MB (S3 rule); smaller files hang
-        // because the single chunk is rejected as undersized.
-        const useMultipart = file.size > 5 * 1024 * 1024
-        const blob = await upload(presign.pathname, file, {
-          access: 'public',
-          handleUploadUrl: presign.handshakeUrl,
-          contentType: presign.contentType || file.type || 'application/octet-stream',
-          multipart: useMultipart,
-          onUploadProgress: ({ loaded, total }) => {
-            const pct = total ? Math.round((loaded / total) * 100) : 0
-            setUploadProgress(`Đang upload ${file.name} — ${pct}% (${formatFileSize(loaded)}/${formatFileSize(total || file.size)})`)
-          },
-        })
-        storageKey = blob.url
-      } else if (presign.mode === 'presign') {
-        // Direct PUT to R2 — bypasses the Vercel 4.5MB function body limit
+      if (presign.mode === 'presign') {
+        // Direct PUT to R2 (production)
         const putRes = await fetch(presign.url, {
           method: 'PUT',
           headers: { 'Content-Type': presign.contentType || 'application/octet-stream' },
@@ -182,6 +164,7 @@ export default function ProductForm({
           toast.error(`Upload R2 thất bại (${putRes.status}). Kiểm tra CORS bucket nếu chạy production.`)
           return
         }
+        setUploadProgress(`Đã upload ${file.name} (${formatFileSize(file.size)})`)
       } else {
         // Local dev fallback: server proxies to local filesystem
         const formData = new FormData()
@@ -256,10 +239,6 @@ export default function ProductForm({
       toast.error('File video quá lớn (tối đa 50MB). Hãy dùng link YouTube/Vimeo hoặc URL trực tiếp.')
       return
     }
-    if (file.size > 4.5 * 1024 * 1024) {
-      toast.warning('Video lớn hơn 4.5MB — trên Vercel Hobby có thể upload thất bại. Khuyến nghị dùng link YouTube/URL trực tiếp.')
-    }
-
     // Revoke previous object URL to avoid memory leaks
     if (form.videoPreviewUrl) URL.revokeObjectURL(form.videoPreviewUrl)
 
@@ -311,10 +290,6 @@ export default function ProductForm({
       toast.error('File audio quá lớn (tối đa 50MB). Hãy dùng link URL trực tiếp.')
       return
     }
-    if (file.size > 4.5 * 1024 * 1024) {
-      toast.warning('Audio lớn hơn 4.5MB — sẽ upload qua Vercel Blob (bypass giới hạn 4.5MB của Vercel).')
-    }
-
     if (form.audioPreviewUrl) URL.revokeObjectURL(form.audioPreviewUrl)
 
     const previewUrl = URL.createObjectURL(file)
@@ -647,7 +622,7 @@ export default function ProductForm({
                 )}
 
                 <p className="text-[10px] text-muted-foreground">
-                  MP4, WebM, MOV — tối đa 50MB. Upload trực tiếp lên R2 (bypass giới hạn Vercel). Video dài nên dùng link YouTube/URL.
+                  MP4, WebM, MOV — tối đa 50MB. Upload trực tiếp lên R2. Video dài nên dùng link YouTube/URL.
                 </p>
               </div>
             </div>
@@ -741,7 +716,7 @@ export default function ProductForm({
                 )}
 
                 <p className="text-[10px] text-muted-foreground">
-                  MP3, WAV, FLAC, AAC, M4A, OGG — tối đa 50MB. Upload trực tiếp lên Vercel Blob (bypass giới hạn 4.5MB).
+                  MP3, WAV, FLAC, AAC, M4A, OGG — tối đa 50MB. Upload trực tiếp lên R2.
                 </p>
               </div>
             </div>
@@ -816,7 +791,7 @@ export default function ProductForm({
                   )}
                 </Button>
                 <p className="text-[10px] text-muted-foreground">
-                  ZIP, RAR, 7Z, FLP, WAV, MP3, MP4, FLAC, VST... — tối đa 50MB. Upload trực tiếp lên R2 (bypass giới hạn Vercel 4.5MB).
+                  ZIP, RAR, 7Z, FLP, WAV, MP3, MP4, FLAC, VST... — tối đa 50MB. Upload trực tiếp lên R2.
                 </p>
               </div>
             )}

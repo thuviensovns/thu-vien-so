@@ -90,7 +90,7 @@ export default function UsersPage() {
   const fetchUsers = useCallback(async () => {
     try {
       // cache: 'no-store' + cache-buster so balance updates land immediately
-      // after admin credits a user (Vercel prod otherwise returns stale docs)
+      // after admin credits a user (CDN edge cache otherwise returns stale docs)
       const res = await fetch(`/api/users?limit=500&sort=-createdAt&_t=${Date.now()}`, {
         credentials: 'include',
         cache: 'no-store',

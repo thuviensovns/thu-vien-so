@@ -5,9 +5,9 @@ import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
-// Vercel Hobby caps request body at 4.5MB. For larger audio files, admins
-// should use Vercel Blob (client-upload) or R2 presigned PUT.
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB (self-hosted ceiling)
+// Direct POST path: small files (≤ ~4MB) only. Larger uploads go through the
+// presign endpoint and stream straight to R2.
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_EXTENSIONS = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'oga', 'webm']
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   mp3: ['audio/mpeg', 'audio/mp3'],

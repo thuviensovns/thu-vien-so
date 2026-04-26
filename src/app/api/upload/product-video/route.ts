@@ -5,9 +5,9 @@ import { uploadToR2, deleteFromR2 } from '@/lib/r2'
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 
-// Vercel Hobby caps request body at 4.5MB. Keep admins on external URLs for
-// larger demo clips — the UI warns before the file hits the API.
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB (self-hosted ceiling)
+// Direct POST path: small files only. Larger uploads go through the presign
+// endpoint and stream straight to R2.
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 const ALLOWED_EXTENSIONS = ['mp4', 'webm', 'mov']
 const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   mp4: ['video/mp4'],

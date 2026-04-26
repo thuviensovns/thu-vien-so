@@ -13,7 +13,7 @@ const DEFAULT_CONTENT_TYPE: Record<string, string> = {
 
 /**
  * Returns instructions for the client to upload a product demo video:
- *  - mode: 'presign' → PUT directly to R2 (production; bypasses Vercel 4.5MB body cap)
+ *  - mode: 'presign' → PUT directly to R2 (production)
  *  - mode: 'direct'  → POST file to /api/upload/product-video (local dev fallback)
  */
 export async function POST(req: NextRequest) {
@@ -51,20 +51,6 @@ export async function POST(req: NextRequest) {
     const safeSlug = productSlug.replace(/[^a-zA-Z0-9._-]/g, '_')
     const r2Key = `products/${safeSlug}/video-${timestamp}-${safeFileName}`
     const safeContentType = (contentType && typeof contentType === 'string' && contentType) || DEFAULT_CONTENT_TYPE[ext] || 'video/mp4'
-
-    // Storage selection priority: Vercel Blob (production default) → R2 → local
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      console.log(`[Presign video] Admin ${user.email} → blob handshake for products/${safeSlug}/video-${safeFileName} (${(fileSize / 1024 / 1024).toFixed(1)}MB)`)
-      return NextResponse.json({
-        mode: 'blob',
-        handshakeUrl: '/api/upload/product-video/blob-handshake',
-        pathname: `products/${safeSlug}/video-${safeFileName}`,
-        fileName,
-        fileSize,
-        mimeType: safeContentType,
-        contentType: safeContentType,
-      })
-    }
 
     if (isR2Configured()) {
       const url = await getPresignedUploadUrl(r2Key, safeContentType, 600)

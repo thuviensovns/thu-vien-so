@@ -55,8 +55,8 @@ export async function generateDownloadUrl(
   r2Key: string,
   expiresIn = 172800,
 ): Promise<string> {
-  // Vercel Blob (and any other) public URLs are stored verbatim in r2Key
-  // and need no signing — pass them through unchanged.
+  // Public URLs (legacy Vercel Blob, external CDN, etc.) are stored verbatim
+  // in r2Key and need no signing — pass them through unchanged.
   if (/^https?:\/\//i.test(r2Key)) return r2Key
   if (!isR2Configured()) {
     return getLocalPublicUrl(r2Key)
@@ -97,10 +97,9 @@ export async function uploadToR2(
 }
 
 /**
- * Generate a presigned PUT URL so the browser can upload directly to R2 —
- * required because Vercel serverless functions cap request body at 4.5MB.
- * The signature locks the bucket+key+contentType; client must send matching
- * Content-Type header on PUT.
+ * Generate a presigned PUT URL so the browser can upload directly to R2,
+ * bypassing the Next.js API route entirely. The signature locks the
+ * bucket+key+contentType; client must send matching Content-Type header on PUT.
  * @param r2Key - Object key (path) in R2 bucket
  * @param contentType - MIME the client will send (use 'application/octet-stream' if unknown)
  * @param expiresIn - URL validity in seconds (default 600 = 10 min)
@@ -127,12 +126,12 @@ export async function getPresignedUploadUrl(
  * @param r2Key - Object key to delete
  */
 export async function deleteFromR2(r2Key: string): Promise<void> {
-  // Vercel Blob URLs are stored verbatim in r2Key. Route them to the Blob
-  // delete API instead of S3 — otherwise S3 silently no-ops and the file
-  // leaks forever in Blob storage.
+  // Legacy public URLs (eg. *.public.blob.vercel-storage.com from the old
+  // Vercel Blob storage) are stored verbatim in r2Key. We no longer have
+  // credentials for those buckets — skip the delete and let them orphan.
+  // The owning account will GC them eventually.
   if (/^https?:\/\//i.test(r2Key)) {
-    const { del } = await import('@vercel/blob')
-    await del(r2Key)
+    console.warn(`[deleteFromR2] Skipping legacy external URL (no creds): ${r2Key}`)
     return
   }
   if (!isR2Configured()) {

@@ -23,7 +23,7 @@ export async function GET() {
     return NextResponse.json({
       ...result,
       status: 'error',
-      error: 'DATABASE_URL is not set. Please configure it in Vercel Environment Variables.',
+      error: 'DATABASE_URL is not set. Please configure it in your hosting environment variables.',
       ms: Date.now() - start,
     }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }

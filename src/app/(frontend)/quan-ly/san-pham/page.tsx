@@ -306,7 +306,7 @@ export default function ProductsPage() {
           thumbnailResult = await uploadMedia(form.thumbnailUrl, productData.slug)
           toast.dismiss('img-upload')
           if (!thumbnailResult) {
-            toast.warning('Không thể upload ảnh. Hãy thêm BLOB_READ_WRITE_TOKEN vào Vercel hoặc dùng link ảnh URL.', { duration: 6000 })
+            toast.warning('Không thể upload ảnh. Kiểm tra cấu hình R2 hoặc dùng link ảnh URL.', { duration: 6000 })
             thumbnailResult = null
           }
           if (typeof thumbnailResult === 'string') {
@@ -357,24 +357,7 @@ export default function ProductsPage() {
 
             // Step 2: upload bytes
             let videoStorageKey: string = presign.r2Key
-            if (presign.mode === 'blob') {
-              const { upload } = await import('@vercel/blob/client')
-              // Multipart requires parts ≥5MB (S3 rule). Enable only for files
-              // above that threshold — smaller ones hang when the single part
-              // is rejected as undersized.
-              const useMultipart = videoFile.size > 5 * 1024 * 1024
-              const blob = await upload(presign.pathname, videoFile, {
-                access: 'public',
-                handleUploadUrl: presign.handshakeUrl,
-                contentType: presign.contentType || videoFile.type || 'video/mp4',
-                multipart: useMultipart,
-                onUploadProgress: ({ loaded, total }) => {
-                  const pct = total ? Math.round((loaded / total) * 100) : 0
-                  toast.loading(`Upload video ${pct}%...`, { id: 'video-upload' })
-                },
-              })
-              videoStorageKey = blob.url
-            } else if (presign.mode === 'presign') {
+            if (presign.mode === 'presign') {
               const putRes = await fetch(presign.url, {
                 method: 'PUT',
                 headers: { 'Content-Type': presign.contentType || 'video/mp4' },
@@ -461,21 +444,7 @@ export default function ProductsPage() {
             const presign = await presignRes.json()
 
             let audioStorageKey: string = presign.r2Key
-            if (presign.mode === 'blob') {
-              const { upload } = await import('@vercel/blob/client')
-              const useMultipart = audioFile.size > 5 * 1024 * 1024
-              const blob = await upload(presign.pathname, audioFile, {
-                access: 'public',
-                handleUploadUrl: presign.handshakeUrl,
-                contentType: presign.contentType || audioFile.type || 'audio/mpeg',
-                multipart: useMultipart,
-                onUploadProgress: ({ loaded, total }) => {
-                  const pct = total ? Math.round((loaded / total) * 100) : 0
-                  toast.loading(`Upload audio ${pct}%...`, { id: 'audio-upload' })
-                },
-              })
-              audioStorageKey = blob.url
-            } else if (presign.mode === 'presign') {
+            if (presign.mode === 'presign') {
               const putRes = await fetch(presign.url, {
                 method: 'PUT',
                 headers: { 'Content-Type': presign.contentType || 'audio/mpeg' },
@@ -832,7 +801,7 @@ export default function ProductsPage() {
               <div className="text-xs text-muted-foreground space-y-1">
                 <p>Nguyên nhân phổ biến:</p>
                 <ul className="list-disc list-inside space-y-0.5 ml-1">
-                  <li>DATABASE_URL chưa được cấu hình trên Vercel</li>
+                  <li>DATABASE_URL chưa được cấu hình trên Vietnix</li>
                   <li>Neon database đang cold start (thử kết nối lại)</li>
                   <li>Connection string sai hoặc database chưa tạo</li>
                 </ul>
